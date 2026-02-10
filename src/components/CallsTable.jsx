@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 
 const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
   const formatDisposition = (disposition) => {
@@ -25,6 +25,25 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
 
   const [playingId, setPlayingId] = useState(null)
   const audioRefs = useRef({})
+
+  const pageSize = 20
+  const [page, setPage] = useState(1)
+
+  const totalPages = Math.max(1, Math.ceil(calls.length / pageSize))
+
+  useEffect(() => {
+    // Reset or clamp page when data changes
+    const newTotalPages = Math.max(1, Math.ceil(calls.length / pageSize))
+    if (page > newTotalPages) {
+      setPage(newTotalPages)
+    }
+  }, [calls, page])
+
+  const paginatedCalls = useMemo(() => {
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return calls.slice(startIndex, endIndex)
+  }, [calls, page])
 
   const handleTogglePlay = (callId) => {
     const currentAudio = audioRefs.current[callId]
@@ -95,7 +114,9 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
               <span>Syncing...</span>
             </span>
           )}
-          <span className="text-sm text-slate-500">{calls.length} total</span>
+          <span className="text-sm text-slate-500">
+            {calls.length} total
+          </span>
         </div>
       </div>
 
@@ -115,7 +136,7 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {calls.map((call) => (
+            {paginatedCalls.map((call) => (
               <tr
                 key={call.id}
                 onClick={() => onSelectCall(call)}
@@ -201,6 +222,42 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
             ))}
           </tbody>
         </table>
+      </div>
+      {/* Pagination */}
+      <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-600">
+        <span>
+          Showing{' '}
+          <span className="font-medium">
+            {Math.min((page - 1) * pageSize + 1, calls.length)}
+          </span>{' '}
+          -{' '}
+          <span className="font-medium">
+            {Math.min(page * pageSize, calls.length)}
+          </span>{' '}
+          of <span className="font-medium">{calls.length}</span> calls
+        </span>
+        <div className="inline-flex items-center space-x-1">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <span className="px-2">
+            Page <span className="font-medium">{page}</span> of{' '}
+            <span className="font-medium">{totalPages}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   )

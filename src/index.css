@@ -2,12 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Circular Std font faces */
+@font-face {
+  font-family: 'CircularStd';
+  src:
+    url('../circular-std-font-family/CircularStd-Book.woff2') format('woff2'),
+    url('../circular-std-font-family/CircularStd-Book.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CircularStd';
+  src:
+    url('../circular-std-font-family/CircularStd-Medium.woff2') format('woff2'),
+    url('../circular-std-font-family/CircularStd-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CircularStd';
+  src:
+    url('../circular-std-font-family/CircularStd-Bold.woff2') format('woff2'),
+    url('../circular-std-font-family/CircularStd-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'CircularStd', system-ui, sans-serif;
   background: #f9fafb;
   min-height: 100vh;
 }

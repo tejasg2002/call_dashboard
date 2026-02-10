@@ -34,6 +34,8 @@ const Filters = ({ calls, filters, onFilterChange }) => {
       maxScore: '',
       minDuration: '',
       maxDuration: '',
+      startDate: '',
+      endDate: '',
     })
   }
 
@@ -96,8 +98,8 @@ const Filters = ({ calls, filters, onFilterChange }) => {
             </div>
           </div>
 
-          {/* Filter Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {/* Filter Stack (vertical layout) */}
+          <div className="flex flex-col gap-4">
             {/* Lead Owner */}
             <div>
               <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
@@ -280,6 +282,28 @@ const Filters = ({ calls, filters, onFilterChange }) => {
                   min="0"
                   value={filters.maxDuration}
                   onChange={(e) => handleChange('maxDuration', e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Date Range */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                Date range
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => handleChange('startDate', e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 transition-all"
+                />
+                <span className="text-slate-400">-</span>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => handleChange('endDate', e.target.value)}
                   className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 transition-all"
                 />
               </div>
