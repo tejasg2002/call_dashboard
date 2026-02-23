@@ -16,7 +16,6 @@ const Settings = () => {
   const [successMsg, setSuccessMsg] = useState(null)
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [yourPassword, setYourPassword] = useState('')
   const [newUserMasked, setNewUserMasked] = useState(true)
   const [existingEmail, setExistingEmail] = useState('')
   const [existingMasked, setExistingMasked] = useState(true)
@@ -51,17 +50,8 @@ const Settings = () => {
       setError('Password for the new user must be at least 6 characters.')
       return
     }
-    if (!yourPassword) {
-      setError('Enter your password so you can stay signed in after creating the user.')
-      return
-    }
     if (users.some((u) => u.email.toLowerCase() === email)) {
       setError('This user is already in the list.')
-      return
-    }
-    const adminEmail = auth.currentUser?.email
-    if (!adminEmail) {
-      setError('You must be signed in to add users.')
       return
     }
     try {
@@ -72,11 +62,9 @@ const Settings = () => {
       await setAccessUsers(next)
       setUsers(next)
       await createUserWithEmailAndPassword(auth, email, newPassword)
-      await signInWithEmailAndPassword(auth, adminEmail, yourPassword)
       setNewEmail('')
       setNewPassword('')
-      setYourPassword('')
-      setSuccessMsg('User created and added to list.')
+      setSuccessMsg('User created and added to list. You may need to log out and back in as admin.')
     } catch (err) {
       const msg = err?.message || 'Failed to add user'
       try {
@@ -85,8 +73,6 @@ const Settings = () => {
       } catch (_) {}
       if (msg.includes('email-already-in-use')) {
         setError('This email is already registered. Use "Add existing user" below to add them to the restricted list only (they sign in with their existing password).')
-      } else if (msg.includes('invalid-credential') || msg.includes('wrong-password')) {
-        setError('Your password was incorrect. Try again with the correct password.')
       } else {
         setError(msg)
       }
@@ -219,18 +205,10 @@ const Settings = () => {
                   <option value="unmasked">Unmasked (full access)</option>
                 </select>
               </div>
-              <input
-                type="password"
-                placeholder="Your password (to stay signed in after creating the user)"
-                value={yourPassword}
-                onChange={(e) => setYourPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 text-sm"
-              />
               <button
                 type="button"
                 onClick={handleAdd}
-                disabled={saving || !newEmail.trim() || newPassword.length < 6 || !yourPassword}
+                disabled={saving || !newEmail.trim() || newPassword.length < 6}
                 className="w-full px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Creating user…' : 'Create user & add to list'}
