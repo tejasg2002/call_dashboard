@@ -2,8 +2,12 @@ import { useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Analysis from './components/Analysis'
 import HotLeads from './components/HotLeads'
+import Settings from './components/Settings'
 import Login from './components/Login'
 import { auth, onAuthStateChanged, signOut } from './firebase'
+import { MaskedViewProvider } from './context/MaskedViewContext'
+
+const ADMIN_EMAIL = 'server@letsupgrade.in'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -39,6 +43,14 @@ function App() {
     setUser(null)
   }
 
+  return (
+    <MaskedViewProvider user={user}>
+      <AppContent user={user} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab} navCollapsed={navCollapsed} setNavCollapsed={setNavCollapsed} isAdmin={user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()} />
+    </MaskedViewProvider>
+  )
+}
+
+function AppContent({ user, onLogout, activeTab, setActiveTab, navCollapsed, setNavCollapsed, isAdmin }) {
   const navItems = [
     {
       id: 'overview',
@@ -97,6 +109,30 @@ function App() {
         </svg>
       ),
     },
+    ...(isAdmin
+      ? [
+          {
+            id: 'settings',
+            label: 'Settings',
+            icon: (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            ),
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -192,6 +228,7 @@ function App() {
           {activeTab === 'overview' && <Dashboard />}
           {activeTab === 'analysis' && <Analysis />}
           {activeTab === 'hotLeads' && <HotLeads />}
+          {activeTab === 'settings' && isAdmin && <Settings />}
         </main>
       </div>
     </div>

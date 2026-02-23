@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore'
+import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore'
 import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
 } from 'firebase/auth'
 
 // Firebase configuration from environment variables
@@ -100,4 +101,40 @@ export async function fetchHotLeadsToday() {
   })
 }
 
-export { db, auth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+const SETTINGS_DOC = 'project_settings'
+const ACCESS_DOC = 'access'
+
+/**
+ * Fetches the list of user emails who see masked PII (phone, email).
+ * @returns {Promise<string[]>}
+ */
+export async function getRestrictedViewEmails() {
+  try {
+    const ref = doc(db, SETTINGS_DOC, ACCESS_DOC)
+    const snap = await getDoc(ref)
+    const data = snap.data()
+    const list = data?.restrictedViewEmails
+    return Array.isArray(list) ? list : []
+  } catch (err) {
+    console.error('Error fetching restricted view list:', err)
+    return []
+  }
+}
+
+/**
+ * Saves the full list of restricted view user emails.
+ * @param {string[]} emails
+ */
+export async function setRestrictedViewEmails(emails) {
+  const ref = doc(db, SETTINGS_DOC, ACCESS_DOC)
+  await setDoc(ref, { restrictedViewEmails: emails }, { merge: true })
+}
+
+export {
+  db,
+  auth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+}

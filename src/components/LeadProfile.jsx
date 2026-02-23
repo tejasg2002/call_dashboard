@@ -1,4 +1,7 @@
+import { useMaskedView } from '../context/MaskedViewContext'
+
 const LeadProfile = ({ lead, onClose }) => {
+  const { maskPhone, maskEmail, maskText } = useMaskedView()
   if (!lead) return null
 
   const getTagStyles = (tag) => {
@@ -34,7 +37,7 @@ const LeadProfile = ({ lead, onClose }) => {
             </div>
             <div className="space-y-1 min-w-0">
               <h3 className="text-slate-900 font-semibold truncate">{lead.name || '—'}</h3>
-              <p className="text-slate-500 text-sm truncate">{lead.email || '—'}</p>
+              <p className="text-slate-500 text-sm truncate">{maskEmail(lead.email)}</p>
               {lead.lead_id && (
                 <p className="text-xs text-slate-500 font-mono truncate" title={lead.lead_id}>
                   <span className="uppercase tracking-wide text-slate-400">Lead ID: </span>
@@ -47,7 +50,7 @@ const LeadProfile = ({ lead, onClose }) => {
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between py-1.5 border-b border-slate-100">
               <span className="text-slate-500">Mobile</span>
-              <span className="text-slate-900 font-medium">{lead.mobile ?? '—'}</span>
+              <span className="text-slate-900 font-medium">{maskPhone(lead.mobile)}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-slate-100">
               <span className="text-slate-500">City</span>
@@ -90,7 +93,7 @@ const LeadProfile = ({ lead, onClose }) => {
                     className="flex gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-sm text-slate-700"
                   >
                     <span className="flex-shrink-0 w-2 h-2 rounded-full bg-violet-400 mt-1.5" aria-hidden />
-                    <span className="min-w-0">{text}</span>
+                    <span className="min-w-0">{maskText(text)}</span>
                   </li>
                 )
               })}

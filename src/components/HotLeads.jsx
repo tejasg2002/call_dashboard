@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { fetchHotWarmLeads } from '../firebase'
 import LeadProfile from './LeadProfile'
+import { useMaskedView } from '../context/MaskedViewContext'
 
 const initialFilters = {
   search: '',
@@ -24,6 +25,7 @@ function toDate(value) {
 const FETCH_TIMEOUT_MS = 20000
 
 const HotLeads = () => {
+  const { maskPhone, maskEmail } = useMaskedView()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -496,10 +498,10 @@ const HotLeads = () => {
                       <span className="text-slate-900 font-medium">{lead.name ?? '—'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-slate-700 text-sm">{lead.email ?? '—'}</span>
+                      <span className="text-slate-700 text-sm">{maskEmail(lead.email)}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-slate-700 text-sm">{lead.mobile ?? '—'}</span>
+                      <span className="text-slate-700 text-sm">{maskPhone(lead.mobile)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-slate-700 text-sm">{lead.city === 'City Not Available' ? '—' : (lead.city ?? '—')}</span>
