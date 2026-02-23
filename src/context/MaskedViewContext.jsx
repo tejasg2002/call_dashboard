@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, useEffect } from 'react'
-import { getRestrictedViewEmails } from '../firebase'
+import { getAccessUsers } from '../firebase'
 
 const MaskedViewContext = createContext(null)
 
@@ -50,19 +50,19 @@ export function maskPiiInText(text) {
 }
 
 export function MaskedViewProvider({ user, children }) {
-  const [restrictedEmails, setRestrictedEmails] = useState([])
+  const [accessUsers, setAccessUsers] = useState([])
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     if (!user) {
-      setRestrictedEmails([])
+      setAccessUsers([])
       setLoaded(true)
       return
     }
     let cancelled = false
-    getRestrictedViewEmails()
+    getAccessUsers()
       .then((list) => {
-        if (!cancelled) setRestrictedEmails(list)
+        if (!cancelled) setAccessUsers(list)
       })
       .finally(() => {
         if (!cancelled) setLoaded(true)
@@ -72,8 +72,9 @@ export function MaskedViewProvider({ user, children }) {
 
   const shouldMask = useMemo(() => {
     if (!user?.email || !loaded) return false
-    return restrictedEmails.some((e) => e && e.toLowerCase() === user.email.toLowerCase())
-  }, [user?.email, restrictedEmails, loaded])
+    const entry = accessUsers.find((u) => u.email.toLowerCase() === user.email.toLowerCase())
+    return entry ? !!entry.masked : false
+  }, [user?.email, accessUsers, loaded])
 
   const value = useMemo(
     () => ({
@@ -81,7 +82,7 @@ export function MaskedViewProvider({ user, children }) {
       maskPhone: (v) => (shouldMask ? maskPhoneValue(v) : (v ?? '—')),
       maskEmail: (v) => (shouldMask ? maskEmailValue(v) : (v ?? '—')),
       maskText: (v) => (shouldMask ? maskPiiInText(v) : (v ?? '')),
-      refreshRestrictedList: () => getRestrictedViewEmails().then(setRestrictedEmails),
+      refreshRestrictedList: () => getAccessUsers().then(setAccessUsers),
     }),
     [shouldMask]
   )

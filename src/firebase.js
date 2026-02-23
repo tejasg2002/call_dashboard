@@ -6,6 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 
 // Firebase configuration from environment variables
@@ -105,29 +106,61 @@ const SETTINGS_DOC = 'project_settings'
 const ACCESS_DOC = 'access'
 
 /**
- * Fetches the list of user emails who see masked PII (phone, email).
- * @returns {Promise<string[]>}
+ * Access list: { email, masked }[]. masked = true means they see masked phone/email.
+ * @returns {Promise<{ email: string, masked: boolean }[]>}
  */
-export async function getRestrictedViewEmails() {
+export async function getAccessUsers() {
   try {
     const ref = doc(db, SETTINGS_DOC, ACCESS_DOC)
     const snap = await getDoc(ref)
     const data = snap.data()
-    const list = data?.restrictedViewEmails
-    return Array.isArray(list) ? list : []
+    const accessList = data?.accessUsers
+    if (Array.isArray(accessList) && accessList.length > 0) {
+      return accessList.filter((u) => u && typeof u.email === 'string').map((u) => ({ email: u.email.toLowerCase().trim(), masked: !!u.masked }))
+    }
+    const legacy = data?.restrictedViewEmails
+    if (Array.isArray(legacy)) {
+      return legacy.filter(Boolean).map((email) => ({ email: String(email).toLowerCase().trim(), masked: true }))
+    }
+    return []
   } catch (err) {
-    console.error('Error fetching restricted view list:', err)
+    console.error('Error fetching access list:', err)
     return []
   }
 }
 
 /**
- * Saves the full list of restricted view user emails.
- * @param {string[]} emails
+ * Saves the access list (email + masked per user).
+ * @param {{ email: string, masked: boolean }[]} users
  */
-export async function setRestrictedViewEmails(emails) {
+export async function setAccessUsers(users) {
   const ref = doc(db, SETTINGS_DOC, ACCESS_DOC)
-  await setDoc(ref, { restrictedViewEmails: emails }, { merge: true })
+  await setDoc(ref, { accessUsers: users }, { merge: true })
+}
+
+/** @deprecated Use getAccessUsers. Returns emails that have masked view. */
+export async function getRestrictedViewEmails() {
+  const users = await getAccessUsers()
+  return users.filter((u) => u.masked).map((u) => u.email)
+}
+
+/** @deprecated Use setAccessUsers. Keeps existing unmasked users, sets listed emails as masked. */
+export async function setRestrictedViewEmails(emails) {
+  const current = await getAccessUsers()
+  const existingEmails = new Set(emails.map((e) => e.toLowerCase()))
+  const next = [
+    ...current.filter((u) => !existingEmails.has(u.email)),
+    ...emails.map((e) => ({ email: e.toLowerCase().trim(), masked: true })),
+  ]
+  await setAccessUsers(next)
+}
+
+/**
+ * Sends a password reset email to the user. They can set a new password via the link.
+ * @param {string} email
+ */
+export async function sendUserPasswordResetEmail(email) {
+  await sendPasswordResetEmail(auth, email)
 }
 
 export {
@@ -137,4 +170,5 @@ export {
   signOut,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 }

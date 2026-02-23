@@ -1,28 +1,33 @@
 import { useState, useEffect } from 'react'
 import {
-  getRestrictedViewEmails,
-  setRestrictedViewEmails,
+  getAccessUsers,
+  setAccessUsers,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendUserPasswordResetEmail,
   auth,
 } from '../firebase'
 import { maskEmailValue, maskPhoneValue } from '../context/MaskedViewContext'
 
 const Settings = () => {
-  const [emails, setEmails] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [successMsg, setSuccessMsg] = useState(null)
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [yourPassword, setYourPassword] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [newUserMasked, setNewUserMasked] = useState(true)
   const [existingEmail, setExistingEmail] = useState('')
+  const [existingMasked, setExistingMasked] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [resettingEmail, setResettingEmail] = useState(null)
 
   const load = async () => {
     try {
       setLoading(true)
-      const list = await getRestrictedViewEmails()
-      setEmails(list)
+      const list = await getAccessUsers()
+      setUsers(list)
       setError(null)
     } catch (err) {
       setError(err?.message || 'Failed to load settings')
@@ -50,7 +55,7 @@ const Settings = () => {
       setError('Enter your password so you can stay signed in after creating the user.')
       return
     }
-    if (emails.some((e) => e.toLowerCase() === email)) {
+    if (users.some((u) => u.email.toLowerCase() === email)) {
       setError('This user is already in the list.')
       return
     }
@@ -62,22 +67,21 @@ const Settings = () => {
     try {
       setSaving(true)
       setError(null)
-      // 1) Add to restricted list (while still signed in as admin)
-      await setRestrictedViewEmails([...emails, email])
-      setEmails((prev) => [...prev, email])
-      // 2) Create the new user (this signs us in as the new user)
+      setSuccessMsg(null)
+      const next = [...users, { email, masked: newUserMasked }]
+      await setAccessUsers(next)
+      setUsers(next)
       await createUserWithEmailAndPassword(auth, email, newPassword)
-      // 3) Sign back in as admin
       await signInWithEmailAndPassword(auth, adminEmail, yourPassword)
       setNewEmail('')
       setNewPassword('')
       setYourPassword('')
+      setSuccessMsg('User created and added to list.')
     } catch (err) {
       const msg = err?.message || 'Failed to add user'
-      // Revert restricted list (we had already added the email)
       try {
-        await setRestrictedViewEmails(emails)
-        setEmails(emails)
+        await setAccessUsers(users)
+        setUsers(users)
       } catch (_) {}
       if (msg.includes('email-already-in-use')) {
         setError('This email is already registered. Use "Add existing user" below to add them to the restricted list only (they sign in with their existing password).')
@@ -97,16 +101,19 @@ const Settings = () => {
       setError('Please enter a valid email address.')
       return
     }
-    if (emails.some((e) => e.toLowerCase() === email)) {
+    if (users.some((u) => u.email.toLowerCase() === email)) {
       setError('This user is already in the list.')
       return
     }
     try {
       setSaving(true)
       setError(null)
-      await setRestrictedViewEmails([...emails, email])
-      setEmails((prev) => [...prev, email])
+      setSuccessMsg(null)
+      const next = [...users, { email, masked: existingMasked }]
+      await setAccessUsers(next)
+      setUsers(next)
       setExistingEmail('')
+      setSuccessMsg('User added to list.')
     } catch (err) {
       setError(err?.message || 'Failed to add user')
     } finally {
@@ -114,13 +121,42 @@ const Settings = () => {
     }
   }
 
+  const handleToggleMask = async (emailKey, masked) => {
+    const next = users.map((u) => (u.email.toLowerCase() === emailKey.toLowerCase() ? { ...u, masked } : u))
+    try {
+      setSaving(true)
+      setError(null)
+      await setAccessUsers(next)
+      setUsers(next)
+      setSuccessMsg(masked ? 'User will see masked data.' : 'User will see full data.')
+    } catch (err) {
+      setError(err?.message || 'Failed to update')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleResetPassword = async (emailKey) => {
+    try {
+      setResettingEmail(emailKey)
+      setError(null)
+      await sendUserPasswordResetEmail(emailKey)
+      setSuccessMsg(`Password reset email sent to ${emailKey}.`)
+    } catch (err) {
+      setError(err?.message || 'Failed to send reset email')
+    } finally {
+      setResettingEmail(null)
+    }
+  }
+
   const handleRemove = async (emailToRemove) => {
     try {
       setSaving(true)
       setError(null)
-      const next = emails.filter((e) => e.toLowerCase() !== emailToRemove.toLowerCase())
-      await setRestrictedViewEmails(next)
-      setEmails(next)
+      setSuccessMsg(null)
+      const next = users.filter((u) => u.email.toLowerCase() !== emailToRemove.toLowerCase())
+      await setAccessUsers(next)
+      setUsers(next)
     } catch (err) {
       setError(err?.message || 'Failed to remove user')
     } finally {
@@ -143,12 +179,17 @@ const Settings = () => {
             {error}
           </div>
         )}
+        {successMsg && (
+          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
+            {successMsg}
+          </div>
+        )}
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-semibold text-slate-900">Restricted view users</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Users & access</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Create a login for them and add to the list. They will see masked data. Share the password with them manually.
+              Create logins or add existing users. Choose whether each user sees masked or full phone/email. Reset password sends them an email to set a new one.
             </p>
           </div>
           <div className="p-6 space-y-4">
@@ -162,11 +203,22 @@ const Settings = () => {
               />
               <input
                 type="password"
-                placeholder="Password for new user (min 6 characters) — share this with them manually"
+                placeholder="Password for new user (min 6 characters) — share manually"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 text-sm"
               />
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600 text-sm">Data access:</span>
+                <select
+                  value={newUserMasked ? 'masked' : 'unmasked'}
+                  onChange={(e) => setNewUserMasked(e.target.value === 'masked')}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm"
+                >
+                  <option value="masked">Masked (phone/email hidden)</option>
+                  <option value="unmasked">Unmasked (full access)</option>
+                </select>
+              </div>
               <input
                 type="password"
                 placeholder="Your password (to stay signed in after creating the user)"
@@ -186,16 +238,24 @@ const Settings = () => {
             </div>
 
             <div className="pt-4 border-t border-slate-200">
-              <p className="text-xs text-slate-500 mb-2">User already has an account? Add them to the restricted list only.</p>
-              <div className="flex gap-2">
+              <p className="text-xs text-slate-500 mb-2">User already has an account? Add them and set access.</p>
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="email"
                   placeholder="Existing user email"
                   value={existingEmail}
                   onChange={(e) => setExistingEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddExisting()}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 text-sm"
+                  className="flex-1 min-w-[180px] px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-300 text-sm"
                 />
+                <select
+                  value={existingMasked ? 'masked' : 'unmasked'}
+                  onChange={(e) => setExistingMasked(e.target.value === 'masked')}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm"
+                >
+                  <option value="masked">Masked</option>
+                  <option value="unmasked">Unmasked</option>
+                </select>
                 <button
                   type="button"
                   onClick={handleAddExisting}
@@ -209,24 +269,43 @@ const Settings = () => {
 
             {loading ? (
               <p className="text-slate-500 text-sm">Loading...</p>
-            ) : emails.length === 0 ? (
-              <p className="text-slate-500 text-sm">No restricted users yet. Add an email above.</p>
+            ) : users.length === 0 ? (
+              <p className="text-slate-500 text-sm">No users in the list yet. Create or add one above.</p>
             ) : (
               <ul className="space-y-2">
-                {emails.map((email) => (
+                {users.map((u) => (
                   <li
-                    key={email}
-                    className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 border border-slate-100"
+                    key={u.email}
+                    className="flex flex-wrap items-center justify-between gap-2 py-3 px-3 rounded-xl bg-slate-50 border border-slate-100"
                   >
-                    <span className="text-slate-900 text-sm font-medium">{email}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(email)}
-                      disabled={saving}
-                      className="text-slate-500 hover:text-rose-600 text-xs font-medium disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
+                    <span className="text-slate-900 text-sm font-medium shrink-0">{u.email}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={u.masked ? 'masked' : 'unmasked'}
+                        onChange={(e) => handleToggleMask(u.email, e.target.value === 'masked')}
+                        disabled={saving}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-xs"
+                      >
+                        <option value="masked">Masked</option>
+                        <option value="unmasked">Unmasked</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleResetPassword(u.email)}
+                        disabled={saving || resettingEmail !== null}
+                        className="text-xs font-medium text-slate-600 hover:text-violet-600 disabled:opacity-50"
+                      >
+                        {resettingEmail === u.email ? 'Sending…' : 'Reset password'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(u.email)}
+                        disabled={saving}
+                        className="text-slate-500 hover:text-rose-600 text-xs font-medium disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
