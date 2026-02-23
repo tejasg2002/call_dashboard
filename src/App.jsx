@@ -201,7 +201,7 @@ function AppContent({ user, onLogout, activeTab, setActiveTab, navCollapsed, set
                 <p className="truncate text-slate-700">{user.email}</p>
               </div>
               <button
-                onClick={handleLogout}
+                onClick={onLogout}
                 className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-xl text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
               >
                 Log out
