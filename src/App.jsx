@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Analysis from './components/Analysis'
+import HotLeads from './components/HotLeads'
 import Login from './components/Login'
 import { auth, onAuthStateChanged, signOut } from './firebase'
-import ItmLogo from '../ITM Skills University (1).png'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -78,6 +78,25 @@ function App() {
         </svg>
       ),
     },
+    {
+      id: 'hotLeads',
+      label: 'Hot & Warm Leads',
+      icon: (
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+          />
+        </svg>
+      ),
+    },
   ]
 
   return (
@@ -91,11 +110,9 @@ function App() {
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center justify-center overflow-hidden">
             {!navCollapsed && (
-              <img
-                src={ItmLogo}
-                alt="ITM Skills University"
-                className="object-contain h-14 transition-all duration-300 ease-in-out"
-              />
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                ITM Skills University
+              </span>
             )}
           </div>
           <button
@@ -172,7 +189,9 @@ function App() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">
-          {activeTab === 'overview' ? <Dashboard /> : <Analysis />}
+          {activeTab === 'overview' && <Dashboard />}
+          {activeTab === 'analysis' && <Analysis />}
+          {activeTab === 'hotLeads' && <HotLeads />}
         </main>
       </div>
     </div>
