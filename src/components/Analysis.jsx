@@ -40,7 +40,11 @@ const Analysis = () => {
       setLastUpdated(new Date())
       setError(null)
     } catch (err) {
-      setError(err.message)
+      setError({
+        message: err?.message || String(err),
+        code: err?.code,
+        rawMessage: err?.rawMessage,
+      })
       console.error('Failed to fetch calls:', err)
     } finally {
       setLoading(false)
@@ -234,8 +238,16 @@ const Analysis = () => {
 
         {/* Error banner */}
         {error && (
-          <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm">
-            {error}
+          <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm flex flex-col gap-2">
+            <span>{typeof error === 'string' ? error : error.message}</span>
+            {typeof error === 'object' && error?.code && (
+              <p className="text-xs font-medium">Reason: <code className="bg-rose-100 px-1 rounded">{error.code}</code>
+                {error.rawMessage && <span className="font-normal text-rose-600"> — {error.rawMessage}</span>}
+              </p>
+            )}
+            {(typeof error === 'object' && ['permission-denied', 'not-found', 'unavailable', 'failed-precondition'].includes(error?.code)) && (
+              <p className="text-xs">Check <code className="bg-rose-100 px-1 rounded">FIRESTORE_RULES.md</code>: enable Firestore, create collection <code className="bg-rose-100 px-1 rounded">Call_logs</code>, and set rules to allow read for signed-in users.</p>
+            )}
           </div>
         )}
 

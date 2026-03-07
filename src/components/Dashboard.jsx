@@ -42,7 +42,11 @@ const Dashboard = () => {
       setLastUpdated(new Date())
       setError(null)
     } catch (err) {
-      setError(err.message)
+      setError({
+        message: err?.message || String(err),
+        code: err?.code,
+        rawMessage: err?.rawMessage,
+      })
       console.error('Failed to fetch calls:', err)
     } finally {
       setLoading(false)
@@ -372,11 +376,21 @@ const Dashboard = () => {
 
         {/* Error Banner */}
         {error && (
-          <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 flex items-center space-x-3">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{error}</span>
+          <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 flex flex-col gap-2">
+            <div className="flex items-center space-x-3">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{typeof error === 'string' ? error : error.message}</span>
+            </div>
+            {typeof error === 'object' && error?.code && (
+              <p className="text-sm pl-8 font-medium">Reason: <code className="bg-rose-100 px-1.5 py-0.5 rounded">{error.code}</code>
+                {error.rawMessage && <span className="font-normal text-rose-600"> — {error.rawMessage}</span>}
+              </p>
+            )}
+            {(typeof error === 'object' && ['permission-denied', 'not-found', 'unavailable', 'failed-precondition'].includes(error?.code)) && (
+              <p className="text-sm pl-8">Check <code className="bg-rose-100 px-1 rounded">FIRESTORE_RULES.md</code>: enable Firestore, create collection <code className="bg-rose-100 px-1 rounded">Call_logs</code>, and set rules to allow read for signed-in users.</p>
+            )}
           </div>
         )}
 

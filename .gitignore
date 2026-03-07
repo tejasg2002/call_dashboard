@@ -12,6 +12,10 @@ build/
 .env.test.local
 .env.production.local
 
+# Service account key - NEVER commit
+serviceAccountKey.json
+*-service-account*.json
+
 # Editor directories
 .idea/
 .vscode/
