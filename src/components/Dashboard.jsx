@@ -150,16 +150,17 @@ const Dashboard = () => {
         return false
       }
 
-      // Date range filter
+      // Date range filter (parse as local midnight to avoid UTC offset issues)
       const callDate = getCallDate(call)
       if (filters.startDate) {
-        const start = new Date(filters.startDate)
+        const [sy, sm, sd] = filters.startDate.split('-').map(Number)
+        const start = new Date(sy, sm - 1, sd)
         if (callDate && callDate < start) return false
       }
       if (filters.endDate) {
         // Add 1 day to make end date inclusive
-        const end = new Date(filters.endDate)
-        end.setDate(end.getDate() + 1)
+        const [ey, em, ed] = filters.endDate.split('-').map(Number)
+        const end = new Date(ey, em - 1, ed + 1)
         if (callDate && callDate >= end) return false
       }
 
@@ -249,7 +250,10 @@ const Dashboard = () => {
   }
 
   const formatDateInput = (date) => {
-    return date.toISOString().slice(0, 10)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   const handleQuickRange = (range) => {
@@ -306,30 +310,30 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 lg:p-8 bg-[#f5f3f7]">
+    <div className="min-h-screen p-4 lg:p-8 bg-[#f5f3f7] dark:bg-slate-950">
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100">
                 Analytics
               </h1>
-              <p className="text-slate-600 text-sm md:text-base">
+              <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base">
                 Overview of your call performance and lead engagement
               </p>
             </div>
 
             <div className="hidden md:flex items-center space-x-3">
               {lastUpdated && (
-                <span className="text-xs text-slate-500 bg-white/60 border border-slate-200 rounded-full px-3 py-1">
+                <span className="text-xs text-slate-500 dark:text-slate-400 bg-white/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1">
                   Last updated: {formatLastUpdated(lastUpdated)}
                 </span>
               )}
               <button
                 onClick={loadCalls}
                 disabled={loading}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-full text-sm transition-all duration-200 disabled:opacity-50"
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-black dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-full text-sm transition-all duration-200 disabled:opacity-50"
               >
                 <svg
                   className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
@@ -411,13 +415,13 @@ const Dashboard = () => {
 
         {/* Date filter row for overview (affects everything below) */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span>Date:</span>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowPresetMenu((v) => !v)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-[11px]"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px]"
               >
                 <span>
                   {rangePreset === 'all' && 'All time'}
@@ -441,42 +445,21 @@ const Dashboard = () => {
                 </svg>
               </button>
               {showPresetMenu && (
-                <div className="absolute z-10 mt-1 w-32 rounded-xl border border-slate-200 bg-white shadow-sm text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickRange('today')}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickRange('week')}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    This week
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickRange('month')}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    This month
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickRange('custom')}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    Custom
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickRange('all')}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    All time
-                  </button>
+                <div className="absolute z-10 mt-1 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-[11px]">
+                  {['today', 'week', 'month', 'custom', 'all'].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => handleQuickRange(r)}
+                      className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                    >
+                      {r === 'today' && 'Today'}
+                      {r === 'week' && 'This week'}
+                      {r === 'month' && 'This month'}
+                      {r === 'custom' && 'Custom'}
+                      {r === 'all' && 'All time'}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -493,9 +476,9 @@ const Dashboard = () => {
                     startDate: e.target.value,
                   }))
                 }
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:border-violet-300"
+                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
               />
-              <span className="text-slate-400 text-xs">to</span>
+              <span className="text-slate-400 dark:text-slate-500 text-xs">to</span>
               <input
                 type="date"
                 value={filters.endDate}
@@ -505,12 +488,12 @@ const Dashboard = () => {
                     endDate: e.target.value,
                   }))
                 }
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:border-violet-300"
+                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
               />
               {(filters.startDate || filters.endDate) && (
                 <button
                   onClick={() => handleQuickRange('all')}
-                  className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                 >
                   Clear
                 </button>

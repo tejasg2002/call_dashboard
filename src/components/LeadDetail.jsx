@@ -2,15 +2,15 @@ const LeadDetail = ({ call, onClose }) => {
   if (!call) return null
 
   const getScoreColor = (score) => {
-    if (score >= 70) return 'text-emerald-600'
-    if (score >= 40) return 'text-amber-600'
-    return 'text-rose-600'
+    if (score >= 70) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 40) return 'text-amber-600 dark:text-amber-400'
+    return 'text-rose-600 dark:text-rose-400'
   }
 
   const getConfidenceColor = (confidence) => {
-    if (confidence === 'high') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    if (confidence === 'medium') return 'bg-amber-50 text-amber-700 border-amber-200'
-    return 'bg-rose-50 text-rose-700 border-rose-200'
+    if (confidence === 'high') return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700'
+    if (confidence === 'medium') return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700'
+    return 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-700'
   }
 
   const formatDuration = (seconds) => {
@@ -51,15 +51,15 @@ const LeadDetail = ({ call, onClose }) => {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full flex flex-col shadow-sm sticky top-4 max-h-[calc(100vh-6rem)]">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden h-full flex flex-col shadow-sm sticky top-4 max-h-[calc(100vh-6rem)]">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-        <h2 className="text-lg font-semibold text-slate-900">Lead Details</h2>
+      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lead Details</h2>
         <button
           onClick={onClose}
-          className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+          className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
         >
-          <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -74,20 +74,18 @@ const LeadDetail = ({ call, onClose }) => {
               {call.Name?.charAt(0) || '?'}
             </div>
             <div className="space-y-1">
-              <h3 className="text-slate-900 font-semibold capitalize">{call.Name || 'Unknown'}</h3>
-              <p className="text-slate-500 text-sm">{call.City}, {call.State}</p>
+              <h3 className="text-slate-900 dark:text-slate-100 font-semibold capitalize">{call.Name || 'Unknown'}</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">{call.City}, {call.State}</p>
               {call.Lead_id && (
-                <p className="text-xs text-slate-500 font-mono">
-                  <span className="uppercase tracking-wide text-slate-400">Lead ID:&nbsp;</span>
-                  <span className="text-slate-700">{call.Lead_id}</span>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                  <span className="uppercase tracking-wide text-slate-400 dark:text-slate-500">Lead ID:&nbsp;</span>
+                  <span className="text-slate-700 dark:text-slate-300">{call.Lead_id}</span>
                 </p>
               )}
               {callDateLabel && (
-                <p className="text-xs text-slate-500">
-                  <span className="uppercase tracking-wide text-slate-400">
-                    Call Date:&nbsp;
-                  </span>
-                  <span className="text-slate-700">{callDateLabel}</span>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="uppercase tracking-wide text-slate-400 dark:text-slate-500">Call Date:&nbsp;</span>
+                  <span className="text-slate-700 dark:text-slate-300">{callDateLabel}</span>
                 </p>
               )}
             </div>
@@ -95,53 +93,43 @@ const LeadDetail = ({ call, onClose }) => {
         </div>
 
         {/* Score Section */}
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-4">
-          <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
+          <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
             Score Details
           </h4>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-500 text-sm">Overall Score</p>
-              <p
-                className={`text-3xl font-bold font-mono ${getScoreColor(
-                  call.scores?.overall || 0
-                )}`}
-              >
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Overall Score</p>
+              <p className={`text-3xl font-bold font-mono ${getScoreColor(call.scores?.overall || 0)}`}>
                 {call.scores?.overall || 0}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-slate-500 text-sm">Confidence</p>
-              <span
-                className={`inline-block mt-1 px-3 py-1 text-sm font-medium rounded-full border capitalize ${getConfidenceColor(
-                  call.scores?.confidence
-                )}`}
-              >
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Confidence</p>
+              <span className={`inline-block mt-1 px-3 py-1 text-sm font-medium rounded-full border capitalize ${getConfidenceColor(call.scores?.confidence)}`}>
                 {call.scores?.confidence || 'N/A'}
               </span>
             </div>
           </div>
 
           {call.scores && (
-            <div className="pt-3 border-t border-slate-200 grid grid-cols-2 gap-3 text-xs text-slate-600">
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-3 text-xs text-slate-600 dark:text-slate-400">
               {[
                 ['opening', 'Opening'],
                 ['feature_coverage', 'Feature coverage'],
                 ['next_step', 'Next step'],
                 ['persuasion', 'Persuasion'],
               ].map(([key, label]) => {
-                if (call.scores[key] === undefined || call.scores[key] === null) {
-                  return null
-                }
+                if (call.scores[key] === undefined || call.scores[key] === null) return null
                 return (
                   <div
                     key={key}
-                    className="flex items-center justify-between bg-white rounded-xl border border-slate-200 px-3 py-2"
+                    className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2"
                   >
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       {label}
                     </span>
-                    <span className="font-mono font-semibold text-slate-900">
+                    <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
                       {call.scores[key]}
                     </span>
                   </div>
@@ -153,80 +141,55 @@ const LeadDetail = ({ call, onClose }) => {
 
         {/* Call Info Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Duration</p>
-            <p className="text-slate-900 font-mono text-lg">
-              {formatDuration(call.Duration?.seconds || 0)}
-            </p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Lead Stage</p>
-            <p className="text-slate-900 font-medium">{call.lead_stage || 'N/A'}</p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Call Type</p>
-            <p className="text-slate-900 font-medium capitalize">{call.Call_type?.replace(/_/g, ' ') || 'N/A'}</p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Course</p>
-            <p className="text-slate-900 font-medium">{call.course || 'N/A'}</p>
-          </div>
+          {[
+            { label: 'Duration', value: formatDuration(call.Duration?.seconds || 0) },
+            { label: 'Lead Stage', value: call.lead_stage || 'N/A' },
+            { label: 'Call Type', value: call.Call_type?.replace(/_/g, ' ') || 'N/A', capitalize: true },
+            { label: 'Course', value: call.course || 'N/A' },
+          ].map(({ label, value, capitalize }) => (
+            <div key={label} className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider mb-1">{label}</p>
+              <p className={`text-slate-900 dark:text-slate-100 font-medium font-mono text-lg ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+            </div>
+          ))}
         </div>
 
         {/* Summary */}
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-4">
-          <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Summary</h4>
-          <p className="text-slate-800 leading-relaxed">
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
+          <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Summary</h4>
+          <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
             {call.summary?.one_line || 'No summary available'}
           </p>
 
-          {/* Structured summary cards if available */}
           {call.summary && (
             <div className="space-y-3">
-              {/* What went right – green */}
-              {normalizeSummaryList(
-                call.summary.what_went_right || call.summary['What Went Right']
-              ).length > 0 && (
-                <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-xs space-y-2">
-                  <p className="font-semibold text-emerald-800">What went right</p>
-                  <ul className="list-disc list-inside space-y-1 text-emerald-700">
-                    {normalizeSummaryList(
-                      call.summary.what_went_right || call.summary['What Went Right']
-                    ).map((item, idx) => (
+              {normalizeSummaryList(call.summary.what_went_right || call.summary['What Went Right']).length > 0 && (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-3 text-xs space-y-2">
+                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">What went right</p>
+                  <ul className="list-disc list-inside space-y-1 text-emerald-700 dark:text-emerald-400">
+                    {normalizeSummaryList(call.summary.what_went_right || call.summary['What Went Right']).map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* What went wrong – red */}
-              {normalizeSummaryList(
-                call.summary.what_went_wrong || call.summary['What Went Wrong']
-              ).length > 0 && (
-                <div className="bg-rose-50 rounded-2xl border border-rose-200 p-3 text-xs space-y-2">
-                  <p className="font-semibold text-rose-800">What went wrong</p>
-                  <ul className="list-disc list-inside space-y-1 text-rose-700">
-                    {normalizeSummaryList(
-                      call.summary.what_went_wrong || call.summary['What Went Wrong']
-                    ).map((item, idx) => (
+              {normalizeSummaryList(call.summary.what_went_wrong || call.summary['What Went Wrong']).length > 0 && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-200 dark:border-rose-800 p-3 text-xs space-y-2">
+                  <p className="font-semibold text-rose-800 dark:text-rose-300">What went wrong</p>
+                  <ul className="list-disc list-inside space-y-1 text-rose-700 dark:text-rose-400">
+                    {normalizeSummaryList(call.summary.what_went_wrong || call.summary['What Went Wrong']).map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* Top 3 fixes – grey */}
-              {normalizeSummaryList(
-                call.summary.top_3_fixes_next_call ||
-                  call.summary['Top 3 Fixes Next Call']
-              ).length > 0 && (
-                <div className="bg-slate-50 rounded-2xl border border-slate-300 p-3 text-xs space-y-2">
-                  <p className="font-semibold text-slate-800">Top 3 fixes next call</p>
-                  <ul className="list-disc list-inside space-y-1 text-slate-700">
-                    {normalizeSummaryList(
-                      call.summary.top_3_fixes_next_call ||
-                        call.summary['Top 3 Fixes Next Call']
-                    ).map((item, idx) => (
+              {normalizeSummaryList(call.summary.top_3_fixes_next_call || call.summary['Top 3 Fixes Next Call']).length > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-300 dark:border-slate-600 p-3 text-xs space-y-2">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">Top 3 fixes next call</p>
+                  <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300">
+                    {normalizeSummaryList(call.summary.top_3_fixes_next_call || call.summary['Top 3 Fixes Next Call']).map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
                   </ul>
@@ -237,10 +200,10 @@ const LeadDetail = ({ call, onClose }) => {
         </div>
 
         {/* Transcript */}
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-          <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Transcript</h4>
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Transcript</h4>
           <div className="max-h-64 overflow-y-auto">
-            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap font-mono">
+            <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
               {call.Transcript || 'No transcript available'}
             </p>
           </div>
@@ -248,13 +211,9 @@ const LeadDetail = ({ call, onClose }) => {
 
         {/* Recording */}
         {call.Recording_Url && (
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Recording</h4>
-            <audio
-              controls
-              src={call.Recording_Url}
-              className="w-full"
-            />
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+            <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Recording</h4>
+            <audio controls src={call.Recording_Url} className="w-full" />
           </div>
         )}
       </div>

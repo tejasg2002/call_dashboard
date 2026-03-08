@@ -39,10 +39,14 @@ export function applyFilters(docs, filters = {}) {
       if (!ts) return true
       const date = new Date(ts)
       if (isNaN(date.getTime())) return true
-      if (filters.startDate && date < new Date(filters.startDate)) return false
+      if (filters.startDate) {
+        const [sy, sm, sd] = filters.startDate.split('-').map(Number)
+        const start = new Date(sy, sm - 1, sd)
+        if (date < start) return false
+      }
       if (filters.endDate) {
-        const end = new Date(filters.endDate)
-        end.setHours(23, 59, 59, 999)
+        const [ey, em, ed] = filters.endDate.split('-').map(Number)
+        const end = new Date(ey, em - 1, ed, 23, 59, 59, 999)
         if (date > end) return false
       }
       return true

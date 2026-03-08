@@ -18,9 +18,9 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
   }
 
   const getScoreColor = (score) => {
-    if (score >= 70) return 'text-emerald-600'
-    if (score >= 40) return 'text-amber-600'
-    return 'text-rose-600'
+    if (score >= 70) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 40) return 'text-amber-600 dark:text-amber-400'
+    return 'text-rose-600 dark:text-rose-400'
   }
 
   const [playingId, setPlayingId] = useState(null)
@@ -32,7 +32,6 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
   const totalPages = Math.max(1, Math.ceil(calls.length / pageSize))
 
   useEffect(() => {
-    // Reset or clamp page when data changes
     const newTotalPages = Math.max(1, Math.ceil(calls.length / pageSize))
     if (page > newTotalPages) {
       setPage(newTotalPages)
@@ -49,7 +48,6 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
     const currentAudio = audioRefs.current[callId]
     if (!currentAudio) return
 
-    // If this row is already playing, pause and reset
     if (playingId === callId && !currentAudio.paused) {
       currentAudio.pause()
       currentAudio.currentTime = 0
@@ -57,17 +55,14 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
       return
     }
 
-    // Pause any previously playing audio
     if (playingId && audioRefs.current[playingId]) {
       audioRefs.current[playingId].pause()
       audioRefs.current[playingId].currentTime = 0
     }
 
-    // Play this one
     currentAudio.play()
     setPlayingId(callId)
 
-    // When it ends, reset state
     currentAudio.onended = () => {
       setPlayingId((current) => (current === callId ? null : current))
     }
@@ -75,13 +70,13 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
 
   if (loading && calls.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-8 flex flex-col items-center justify-center space-y-4">
           <div className="relative">
             <div className="w-16 h-16 border-4 border-violet-300 rounded-full" />
             <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-violet-500 rounded-full animate-spin" />
           </div>
-          <p className="text-slate-500 text-sm">Loading calls data...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Loading calls data...</p>
         </div>
       </div>
     )
@@ -89,32 +84,32 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
 
   if (calls.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-12 flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
           </div>
-          <p className="text-slate-500">No calls found</p>
+          <p className="text-slate-500 dark:text-slate-400">No calls found</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
       {/* Table Header */}
-      <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-        <h2 className="text-lg font-semibold text-slate-900">Recent Calls</h2>
+      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent Calls</h2>
         <div className="flex items-center space-x-2">
           {loading && (
-            <span className="flex items-center space-x-2 text-xs text-violet-600">
+            <span className="flex items-center space-x-2 text-xs text-violet-600 dark:text-violet-400">
               <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
               <span>Syncing...</span>
             </span>
           )}
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
             {calls.length} total
           </span>
         </div>
@@ -124,41 +119,38 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Lead Name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Lead Owner</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">City</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Course</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Disposition</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Duration</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Score</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Recording</th>
+            <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+              {['Lead Name', 'Lead Owner', 'City', 'Course', 'Disposition', 'Duration', 'Score', 'Recording'].map((h) => (
+                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
             {paginatedCalls.map((call) => (
               <tr
                 key={call.id}
                 onClick={() => onSelectCall(call)}
                 className={`table-row-hover cursor-pointer ${
-                  selectedCallId === call.id ? 'bg-violet-50' : 'bg-white'
+                  selectedCallId === call.id
+                    ? 'bg-violet-50 dark:bg-violet-900/20'
+                    : 'bg-white dark:bg-slate-800'
                 }`}
               >
                 <td className="px-6 py-4">
-                  <span className="text-slate-900 font-medium capitalize">
+                  <span className="text-slate-900 dark:text-slate-100 font-medium capitalize">
                     {call.Name || 'N/A'}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-slate-700">
+                  <span className="text-slate-700 dark:text-slate-300">
                     {call.Lead_owner?.replace(/_/g, ' ') || 'N/A'}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-slate-700">{call.City || 'N/A'}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{call.City || 'N/A'}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-md">
+                  <span className="px-2 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md">
                     {call.course || 'N/A'}
                   </span>
                 </td>
@@ -168,7 +160,7 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-slate-700 font-mono text-sm">
+                  <span className="text-slate-700 dark:text-slate-300 font-mono text-sm">
                     {call.Duration?.seconds || 0}s
                   </span>
                 </td>
@@ -177,45 +169,32 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
                     {call.scores?.overall || 0}
                   </span>
                 </td>
-                <td
-                  className="px-6 py-4"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   {call.Recording_Url ? (
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
                         onClick={() => handleTogglePlay(call.id)}
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700 transition-colors"
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 hover:border-violet-300 hover:text-violet-700 transition-colors"
                       >
                         {playingId === call.id ? (
-                          <svg
-                            className="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6 4a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1zm7 0a1 1 0 011 1v10a1 1 0 11-2 0V5a1 1 0 011-1z" />
                           </svg>
                         ) : (
-                          <svg
-                            className="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6.5 4.5a1 1 0 00-1.5.866v9.268a1 1 0 001.5.866l8-4.634a1 1 0 000-1.732l-8-4.634z" />
                           </svg>
                         )}
                       </button>
                       <audio
-                        ref={(el) => {
-                          if (el) audioRefs.current[call.id] = el
-                        }}
+                        ref={(el) => { if (el) audioRefs.current[call.id] = el }}
                         src={call.Recording_Url}
                         className="hidden"
                       />
                     </div>
                   ) : (
-                    <span className="text-slate-400 text-sm">N/A</span>
+                    <span className="text-slate-400 dark:text-slate-500 text-sm">N/A</span>
                   )}
                 </td>
               </tr>
@@ -223,25 +202,22 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
           </tbody>
         </table>
       </div>
+
       {/* Pagination */}
-      <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-600">
+      <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
         <span>
           Showing{' '}
-          <span className="font-medium">
-            {Math.min((page - 1) * pageSize + 1, calls.length)}
-          </span>{' '}
-          -{' '}
-          <span className="font-medium">
-            {Math.min(page * pageSize, calls.length)}
-          </span>{' '}
-          of <span className="font-medium">{calls.length}</span> calls
+          <span className="font-medium">{Math.min((page - 1) * pageSize + 1, calls.length)}</span>
+          {' '}-{' '}
+          <span className="font-medium">{Math.min(page * pageSize, calls.length)}</span>
+          {' '}of <span className="font-medium">{calls.length}</span> calls
         </span>
         <div className="inline-flex items-center space-x-1">
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Prev
           </button>
@@ -253,7 +229,7 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next
           </button>
