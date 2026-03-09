@@ -41,6 +41,7 @@ const APP_USERS_COLLECTION = 'app_users'
 export const DEFAULT_PERMISSIONS = {
   canViewCallReview:   false,
   canViewWhatsApp:     true,
+  canViewEmail:        true,
   dataMasked:          true,
 }
 
@@ -64,6 +65,7 @@ export async function createAppUser({ email, password, displayName, role = 'view
     role,
     canViewCallReview: permissions.canViewCallReview ?? DEFAULT_PERMISSIONS.canViewCallReview,
     canViewWhatsApp:   permissions.canViewWhatsApp   ?? DEFAULT_PERMISSIONS.canViewWhatsApp,
+    canViewEmail:      permissions.canViewEmail      ?? DEFAULT_PERMISSIONS.canViewEmail,
     dataMasked:        permissions.dataMasked        ?? DEFAULT_PERMISSIONS.dataMasked,
     createdAt: serverTimestamp(),
   })

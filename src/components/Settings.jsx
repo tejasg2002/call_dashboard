@@ -42,24 +42,32 @@ function ToggleRow({ label, description, checked, onChange, isDark }) {
   )
 }
 
-/* ─── Permission pill toggle ──────────────────────────────────────── */
-function PermPill({ label, checked, onChange, isDark, color = 'violet' }) {
-  const activeColors = {
-    violet: 'bg-violet-600 text-white border-violet-600',
-    emerald: 'bg-emerald-600 text-white border-emerald-600',
-    amber: 'bg-amber-500 text-white border-amber-500',
-  }
-  const inactiveColors = isDark
-    ? 'bg-slate-700 text-slate-400 border-slate-600 hover:border-slate-500'
-    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+/* ─── Permission toggle row ───────────────────────────────────────── */
+function PermToggle({ label, description, checked, onChange, isDark, color = 'violet' }) {
+  const trackColor = {
+    violet:  checked ? 'bg-violet-600'  : isDark ? 'bg-slate-600' : 'bg-slate-300',
+    emerald: checked ? 'bg-emerald-600' : isDark ? 'bg-slate-600' : 'bg-slate-300',
+    amber:   checked ? 'bg-amber-500'   : isDark ? 'bg-slate-600' : 'bg-slate-300',
+  }[color]
+
   return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${checked ? activeColors[color] : inactiveColors}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${checked ? 'bg-white/80' : isDark ? 'bg-slate-500' : 'bg-slate-300'}`} />
-      {label}
-    </button>
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div className="min-w-0">
+        <p className={`text-xs font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{label}</p>
+        {description && (
+          <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none ${trackColor}`}
+        role="switch"
+        aria-checked={checked}
+      >
+        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </button>
+    </div>
   )
 }
 
@@ -68,6 +76,7 @@ function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, on
   const [expanded, setExpanded] = useState(false)
   const canViewCallReview = u.canViewCallReview ?? DEFAULT_PERMISSIONS.canViewCallReview
   const canViewWhatsApp   = u.canViewWhatsApp   ?? DEFAULT_PERMISSIONS.canViewWhatsApp
+  const canViewEmail      = u.canViewEmail      ?? DEFAULT_PERMISSIONS.canViewEmail
   const dataMasked        = u.dataMasked        ?? DEFAULT_PERMISSIONS.dataMasked
 
   return (
@@ -110,34 +119,71 @@ function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, on
 
       {/* Permission panel */}
       {expanded && (
-        <div className={`px-4 py-3 border-t ${isDark ? 'border-slate-600 bg-slate-800/40' : 'border-slate-100 bg-slate-50'}`}>
-          <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Access & Data</p>
-          <div className="flex flex-wrap gap-2">
-            <PermPill
-              label="Call Review"
-              checked={canViewCallReview}
-              onChange={(v) => onPermissionChange('canViewCallReview', v)}
-              isDark={isDark}
-              color="violet"
-            />
-            <PermPill
-              label="WhatsApp Analytics"
-              checked={canViewWhatsApp}
-              onChange={(v) => onPermissionChange('canViewWhatsApp', v)}
-              isDark={isDark}
-              color="emerald"
-            />
-            <PermPill
-              label={dataMasked ? '📵 Data Masked' : '👁 Data Visible'}
-              checked={!dataMasked}
-              onChange={(v) => onPermissionChange('dataMasked', !v)}
-              isDark={isDark}
-              color="amber"
-            />
+        <div className={`border-t ${isDark ? 'border-slate-600 bg-slate-800/40' : 'border-slate-100 bg-slate-50'}`}>
+          {/* Access section */}
+          <div className="px-4 pt-3 pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Access</p>
+            </div>
+            <div className={`divide-y rounded-xl border overflow-hidden ${isDark ? 'divide-slate-700 border-slate-700 bg-slate-800/60' : 'divide-slate-100 border-slate-200 bg-white'}`}>
+              <div className="px-3">
+                <PermToggle
+                  label="Call Review"
+                  description="Call recordings and review"
+                  checked={canViewCallReview}
+                  onChange={(v) => onPermissionChange('canViewCallReview', v)}
+                  isDark={isDark}
+                  color="violet"
+                />
+              </div>
+              <div className="px-3">
+                <PermToggle
+                  label="WhatsApp Analytics"
+                  description="WhatsApp campaign dashboard"
+                  checked={canViewWhatsApp}
+                  onChange={(v) => onPermissionChange('canViewWhatsApp', v)}
+                  isDark={isDark}
+                  color="emerald"
+                />
+              </div>
+              <div className="px-3">
+                <PermToggle
+                  label="Email Analytics"
+                  description="Email campaign dashboard"
+                  checked={canViewEmail}
+                  onChange={(v) => onPermissionChange('canViewEmail', v)}
+                  isDark={isDark}
+                  color="emerald"
+                />
+              </div>
+            </div>
           </div>
-          <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-            Active pills = permission granted. "Data Visible" means phone/email shown unmasked.
-          </p>
+
+          {/* Data section */}
+          <div className="px-4 pt-2 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Data</p>
+            </div>
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-white'}`}>
+              <div className="px-3">
+                <PermToggle
+                  label="Data Visible"
+                  description="Show phone numbers and emails unmasked"
+                  checked={!dataMasked}
+                  onChange={(v) => onPermissionChange('dataMasked', !v)}
+                  isDark={isDark}
+                  color="amber"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

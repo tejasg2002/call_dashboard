@@ -182,11 +182,31 @@ function TemplateStageLine({ templateName, stageMap, isDark, rowIndex }) {
   )
 }
 
+// ── Lead scoring ─────────────────────────────────────────────────────────────
+// hot  = has clicked at least one template button
+// warm = has read 2+ distinct templates but no click yet
+function scoreLead(events) {
+  const hasClicked  = events.some((e) => e.stage === 'clicked')
+  if (hasClicked) return 'hot'
+  const readTpls = new Set(
+    events.filter((e) => e.stage === 'read').map((e) => e.template_name || '?')
+  )
+  if (readTpls.size >= 2) return 'warm'
+  return null
+}
+
+const LEAD_TAG = {
+  hot:  { label: '🔥 Hot',  cls: 'bg-rose-500/15 text-rose-500 border-rose-500/30'   },
+  warm: { label: '⚡ Warm', cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30' },
+}
+
 /* ─── Phone card ────────────────────────────────────────────────────── */
 function PhoneCard({ phone_number, rawPhone, events, isDark }) {
   const [expanded, setExpanded] = useState(false)
   const lastEvent = events[0]
   const lastTs = formatTime(lastEvent?.event_timestamp || lastEvent?.timestamp)
+
+  const leadScore = scoreLead(events)
 
   const stageCounts = events.reduce((acc, ev) => {
     acc[ev.stage] = (acc[ev.stage] || 0) + 1
@@ -208,19 +228,39 @@ function PhoneCard({ phone_number, rawPhone, events, isDark }) {
     return map
   }, [events])
 
+  const tag = leadScore ? LEAD_TAG[leadScore] : null
+
   return (
-    <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+    <div className={`rounded-xl border overflow-hidden transition-all
+      ${leadScore === 'hot'
+        ? isDark ? 'bg-slate-800/60 border-rose-500/40'  : 'bg-white border-rose-300 shadow-sm'
+        : leadScore === 'warm'
+        ? isDark ? 'bg-slate-800/60 border-amber-500/30' : 'bg-white border-amber-200 shadow-sm'
+        : isDark ? 'bg-slate-800/60 border-slate-700'    : 'bg-white border-slate-200 shadow-sm'
+      }`}
+    >
       {/* Card header */}
       <div
         className={`flex items-center justify-between px-4 py-3 cursor-pointer select-none ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`}
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            {phone_number.replace(/\*/g, '').slice(-2) || '?'}
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
+            ${leadScore === 'hot'  ? 'bg-rose-500/20 text-rose-500'
+            : leadScore === 'warm' ? 'bg-amber-500/20 text-amber-500'
+            : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}
+          >
+            {leadScore === 'hot' ? '🔥' : leadScore === 'warm' ? '⚡' : (phone_number.replace(/\*/g, '').slice(-2) || '?')}
           </div>
           <div>
-            <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{phone_number}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{phone_number}</p>
+              {tag && (
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${tag.cls}`}>
+                  {tag.label}
+                </span>
+              )}
+            </div>
             <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               {Object.keys(byTemplate).length} template{Object.keys(byTemplate).length !== 1 ? 's' : ''}
               {lastTs && ` · Last: ${lastTs.date}`}
@@ -301,32 +341,42 @@ function PhoneCard({ phone_number, rawPhone, events, isDark }) {
 
 /* ─── Main component ────────────────────────────────────────────────── */
 export default function WAUserActivityTimeline({ byPhone, theme, isAdmin, dataMasked }) {
-  const [searchPhone, setSearchPhone] = useState('')
+  const [searchPhone, setSearchPhone]   = useState('')
+  const [leadFilter, setLeadFilter]     = useState('all')  // 'all' | 'hot' | 'warm'
   const isDark = theme === 'dark'
 
   // Apply masking when dataMasked=true; always keep rawPhone for CRM lookup
+  // Also attach leadScore to each entry so filtering and cards share the same value
   const processedByPhone = useMemo(() => {
-    if (!dataMasked) return byPhone.map((p) => ({ ...p, rawPhone: p.phone_number }))
-    return byPhone.map((p) => ({
-      ...p,
-      rawPhone: p.phone_number,              // keep original for CRM lookup
-      phone_number: maskPhone(p.phone_number),
-      events: p.events.map((ev) => ({
-        ...ev,
-        phone_number: maskPhone(ev.phone_number),
-        email: ev.email ? maskEmail(ev.email) : ev.email,
-      })),
-    }))
+    return byPhone.map((p) => {
+      const score = scoreLead(p.events)
+      if (!dataMasked) return { ...p, rawPhone: p.phone_number, leadScore: score }
+      return {
+        ...p,
+        rawPhone: p.phone_number,
+        leadScore: score,
+        phone_number: maskPhone(p.phone_number),
+        events: p.events.map((ev) => ({
+          ...ev,
+          phone_number: maskPhone(ev.phone_number),
+          email: ev.email ? maskEmail(ev.email) : ev.email,
+        })),
+      }
+    })
   }, [byPhone, dataMasked])
 
+  const hotCount  = useMemo(() => processedByPhone.filter((p) => p.leadScore === 'hot').length,  [processedByPhone])
+  const warmCount = useMemo(() => processedByPhone.filter((p) => p.leadScore === 'warm').length, [processedByPhone])
+
   const filtered = useMemo(() => {
+    // Apply lead filter first (operates on raw phone_number for accuracy)
+    let pool = processedByPhone
+    if (leadFilter !== 'all') pool = pool.filter((p) => p.leadScore === leadFilter)
+
     const q = searchPhone.trim().toLowerCase()
-    if (!q) return processedByPhone.slice(0, 8)
-    // always search against real phone numbers
-    return byPhone
-      .filter((p) => p.phone_number.toLowerCase().includes(q))
-      .map((p) => processedByPhone.find((m) => m.rawPhone === p.phone_number) || p)
-  }, [processedByPhone, byPhone, searchPhone])
+    if (!q) return pool.slice(0, 50)
+    return pool.filter((p) => (p.rawPhone || p.phone_number).toLowerCase().includes(q))
+  }, [processedByPhone, searchPhone, leadFilter])
 
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`}>
@@ -343,17 +393,45 @@ export default function WAUserActivityTimeline({ byPhone, theme, isAdmin, dataMa
             )}
           </p>
         </div>
-        <div className="relative">
-          <svg className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search phone number"
-            value={searchPhone}
-            onChange={(e) => setSearchPhone(e.target.value)}
-            className={`pl-8 pr-3 py-2 rounded-lg border text-sm w-56 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-slate-200 text-slate-900'}`}
-          />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Lead filter pills */}
+          <div className={`flex items-center gap-1 p-0.5 rounded-lg border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-100 border-slate-200'}`}>
+            {[
+              { id: 'all',  label: 'All',         count: byPhone.length },
+              { id: 'hot',  label: '🔥 Hot',       count: hotCount       },
+              { id: 'warm', label: '⚡ Warm',      count: warmCount      },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setLeadFilter(f.id)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all
+                  ${leadFilter === f.id
+                    ? f.id === 'hot'  ? 'bg-rose-500 text-white shadow-sm'
+                    : f.id === 'warm' ? 'bg-amber-500 text-white shadow-sm'
+                    : isDark ? 'bg-slate-600 text-slate-100 shadow-sm' : 'bg-white text-slate-700 shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+              >
+                {f.label}
+                <span className={`px-1 rounded text-[10px] font-bold ${leadFilter === f.id ? 'bg-white/20' : isDark ? 'bg-slate-600/60' : 'bg-slate-200'}`}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          {/* Search */}
+          <div className="relative">
+            <svg className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search phone number"
+              value={searchPhone}
+              onChange={(e) => setSearchPhone(e.target.value)}
+              className={`pl-8 pr-3 py-2 rounded-lg border text-sm w-48 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-slate-200 text-slate-900'}`}
+            />
+          </div>
         </div>
       </div>
 
@@ -361,8 +439,14 @@ export default function WAUserActivityTimeline({ byPhone, theme, isAdmin, dataMa
       <div className="p-4 max-h-[560px] overflow-y-auto space-y-2">
         {filtered.length === 0 ? (
           <div className={`py-10 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <p className="text-2xl mb-2">📭</p>
-            <p className="text-sm">{searchPhone.trim() ? 'No matching phone number found.' : 'No activity data yet.'}</p>
+            <p className="text-2xl mb-2">{leadFilter === 'hot' ? '🔥' : leadFilter === 'warm' ? '⚡' : '📭'}</p>
+            <p className="text-sm">
+              {searchPhone.trim()
+                ? 'No matching phone number found.'
+                : leadFilter === 'hot'  ? 'No hot leads yet. Hot leads have clicked at least one template.'
+                : leadFilter === 'warm' ? 'No warm leads yet. Warm leads have read 2+ templates without clicking.'
+                : 'No activity data yet.'}
+            </p>
           </div>
         ) : (
           <>
@@ -375,9 +459,9 @@ export default function WAUserActivityTimeline({ byPhone, theme, isAdmin, dataMa
                 isDark={isDark}
               />
             ))}
-            {!searchPhone.trim() && byPhone.length > 8 && (
+            {!searchPhone.trim() && leadFilter === 'all' && byPhone.length > 50 && (
               <p className={`text-xs text-center pt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                Showing 8 of {byPhone.length} users. Search to find specific users.
+                Showing 50 of {byPhone.length} users. Search or filter to find specific users.
               </p>
             )}
           </>
