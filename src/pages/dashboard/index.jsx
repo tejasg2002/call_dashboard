@@ -83,7 +83,7 @@ export default function WhatsAppDashboard({ theme, isAdmin, dataMasked }) {
       <WAKpiCards kpi={kpi} theme={theme} />
 
       {/* Template performance + preview */}
-      <WATemplatePerformanceTable rows={templateRows} ctaRows={ctaRows} theme={theme} />
+      <WATemplatePerformanceTable rows={templateRows} ctaRows={ctaRows} theme={theme} dataMasked={dataMasked} />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -36,7 +36,7 @@ function SortIcon({ dir }) {
   )
 }
 
-export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme }) {
+export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, dataMasked }) {
   const isDark = theme === 'dark'
   const [previewRow, setPreviewRow] = useState(null)
   const [previewBtnStats, setPreviewBtnStats] = useState([])
@@ -74,6 +74,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme }
           row={previewRow}
           buttonStats={previewBtnStats}
           theme={theme}
+          dataMasked={dataMasked}
           onClose={() => { setPreviewRow(null); setPreviewBtnStats([]) }}
         />
       )}
@@ -133,7 +134,30 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme }
                     <td className={tdClass}>{r.delivered}</td>
                     <td className={tdClass}>{r.read}</td>
                     <td className={tdClass}>{r.clicked}</td>
-                    <td className={tdClass}>{r.failed}</td>
+                    <td className={tdClass}>
+                      {r.failureReasons?.length > 0 ? (
+                        <span
+                          className="group relative cursor-help"
+                          title={r.failureReasons.map((f) => `${f.reason} (${f.count}×)`).join('\n')}
+                        >
+                          <span className="text-rose-500 font-semibold underline decoration-dotted">
+                            {r.failed}
+                          </span>
+                          {/* Hover tooltip */}
+                          <span className={`pointer-events-none absolute left-0 top-full mt-1 z-20 hidden group-hover:flex flex-col gap-1.5 min-w-[260px] max-w-[380px] rounded-xl px-3 py-2.5 shadow-lg text-[11px] ${isDark ? 'bg-slate-700 border border-slate-600 text-slate-200' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                            <span className={`font-semibold mb-0.5 ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>Why failed</span>
+                            {r.failureReasons.map((f) => (
+                              <span key={f.reason} className="flex items-start justify-between gap-2">
+                                <span className="whitespace-normal break-words leading-snug">{f.reason}</span>
+                                <span className={`shrink-0 font-bold ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>{f.count}×</span>
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      ) : (
+                        r.failed
+                      )}
+                    </td>
                     <td className={tdClass}>
                       <span className={r.sdr >= 80 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : ''}>
                         {r.sdr != null ? `${r.sdr.toFixed(1)}%` : '—'}

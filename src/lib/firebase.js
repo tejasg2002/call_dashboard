@@ -55,13 +55,38 @@ export function applyFilters(docs, filters = {}) {
   return result
 }
 
+// In-memory cache: normalised mobile → lead data (or null if not found)
+const _leadCache = new Map()
+
 /**
- * Look up a lead in crmSnapshot by mobile number.
- * Returns { lead_id, ...otherFields } or null if not found.
+ * Normalise a WhatsApp phone number to a bare 10-digit Indian mobile.
+ * Handles: +919876543210  →  9876543210
+ *          919876543210   →  9876543210
+ *          9876543210     →  9876543210  (already 10-digit)
+ */
+function normaliseMobile(raw) {
+  let n = String(raw).trim().replace(/\s+/g, '').replace(/^00/, '')
+  if (n.startsWith('+')) n = n.slice(1)
+  // strip 91 country code only if it leaves exactly 10 digits
+  if (n.startsWith('91') && n.length === 12) n = n.slice(2)
+  return n
+}
+
+/**
+ * Look up a lead by mobile number.
+ * 1. First checks the local Firestore crmSnapshot collection.
+ * 2. If not found there, falls back to the ITM Lead API.
+ * Returns { lead_id, name, mobile, ... } or null if not found anywhere.
  */
 export async function fetchLeadByMobile(mobileNumber) {
   if (!mobileNumber || mobileNumber === '—') return null
-  const mobile = String(mobileNumber).trim()
+  const mobile = normaliseMobile(mobileNumber)
+  if (!mobile) return null
+
+  // Return cached result immediately (including cached nulls)
+  if (_leadCache.has(mobile)) return _leadCache.get(mobile)
+
+  // --- Step 1: check Firestore crmSnapshot ---
   try {
     const q = query(
       collection(db, 'crmSnapshot'),
@@ -69,11 +94,43 @@ export async function fetchLeadByMobile(mobileNumber) {
       limit(1)
     )
     const snap = await getDocs(q)
-    if (snap.empty) return null
-    const data = snap.docs[0].data()
-    return { docId: snap.docs[0].id, ...data }
+    if (!snap.empty) {
+      const lead = { docId: snap.docs[0].id, ...snap.docs[0].data() }
+      _leadCache.set(mobile, lead)
+      return lead
+    }
   } catch (err) {
     console.error('[crmSnapshot] lookup error:', err)
+  }
+
+  // --- Step 2: fall back to ITM Lead API ---
+  const apiKey = import.meta.env.VITE_ITM_API_KEY
+  if (!apiKey) {
+    console.warn('[ITM API] VITE_ITM_API_KEY not set in .env')
+    _leadCache.set(mobile, null)
+    return null
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.itm.edu/v1/npf/lead/mobile/mba?mobile=${encodeURIComponent(mobile)}`,
+      {
+        method: 'GET',
+        headers: { 'x-api-key': apiKey },
+      }
+    )
+    if (!res.ok) {
+      console.error(`[ITM API] ${res.status} for mobile ${mobile}`)
+      _leadCache.set(mobile, null)
+      return null
+    }
+    const json = await res.json()
+    const lead = json?.results?.data?.[0] ?? null
+    _leadCache.set(mobile, lead)
+    return lead
+  } catch (err) {
+    console.error('[ITM API] fetch error:', err)
+    _leadCache.set(mobile, null)
     return null
   }
 }

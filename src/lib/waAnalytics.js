@@ -62,13 +62,86 @@ export function aggregateWebhooks(docs) {
     kpi.cost += cost
 
     if (!byTemplate[template]) {
-      byTemplate[template] = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
+      byTemplate[template] = {
+        sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0,
+        failureReasons: {},
+        // phone → latest event info, keyed so each phone appears once per stage
+        stageUsers: { sent: {}, delivered: {}, read: {}, clicked: {}, failed: {} },
+      }
     }
-    if (stage === 'sent') byTemplate[template].sent++
-    if (stage === 'delivered') byTemplate[template].delivered++
-    if (stage === 'read') byTemplate[template].read++
-    if (stage === 'clicked') byTemplate[template].clicked++
-    if (stage === 'failed') byTemplate[template].failed++
+    const ts = d.event_timestamp || d.timestamp || null
+    if (stage === 'sent') {
+      byTemplate[template].sent++
+      if (phone) byTemplate[template].stageUsers.sent[phone] = { phone, timestamp: ts }
+    }
+    if (stage === 'delivered') {
+      byTemplate[template].delivered++
+      if (phone) byTemplate[template].stageUsers.delivered[phone] = { phone, timestamp: ts }
+    }
+    if (stage === 'read') {
+      byTemplate[template].read++
+      if (phone) byTemplate[template].stageUsers.read[phone] = { phone, timestamp: ts }
+    }
+    if (stage === 'clicked') {
+      byTemplate[template].clicked++
+      if (phone) byTemplate[template].stageUsers.clicked[phone] = { phone, timestamp: ts, buttonText: button !== '—' ? button : null }
+    }
+    if (stage === 'failed') {
+      byTemplate[template].failed++
+
+      let reason = ''
+      let code = ''
+
+      // ── Primary: raw_payload.data.message.channel_failure_reason (Interakt) ─
+      if (d.raw_payload) {
+        try {
+          const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+          const msg = rp?.data?.message
+          reason = msg?.channel_failure_reason || ''
+          code   = msg?.channel_error_code     || ''
+
+          // Fallback within raw_payload
+          if (!reason) {
+            // WhatsApp Cloud API errors array
+            const msgErrors = msg?.errors
+            if (Array.isArray(msgErrors) && msgErrors.length > 0) {
+              const e = msgErrors[0]
+              reason = e.message || e.title || e.description || ''
+              if (!code) code = e.code ? String(e.code) : ''
+            }
+          }
+          if (!reason) {
+            const meta = msg?.meta_data
+            reason = meta?.error_message || meta?.failure_reason || meta?.error_title || ''
+          }
+          if (!reason) {
+            const rpErr = rp?.error || rp?.data?.error || msg?.error
+            if (rpErr) reason = typeof rpErr === 'string' ? rpErr : (rpErr.message || rpErr.title || JSON.stringify(rpErr))
+          }
+        } catch {}
+      }
+
+      // ── Fallback: top-level fields ───────────────────────────────────────────
+      if (!reason) {
+        reason =
+          d.failure_reason          ||
+          d.channel_failure_reason  ||
+          d.error_message           ||
+          d.error_title             ||
+          d.reason                  ||
+          d.delivery_error_message  ||
+          ''
+      }
+      if (!code) code = d.channel_error_code || d.error_code || ''
+
+      // Build the display label — include error code when available
+      const label = reason.trim()
+        ? (code ? `[${code}] ${reason.trim()}` : reason.trim())
+        : (code ? `Error code ${code}` : 'Unknown reason')
+
+      byTemplate[template].failureReasons[label] = (byTemplate[template].failureReasons[label] || 0) + 1
+      if (phone) byTemplate[template].stageUsers.failed[phone] = { phone, timestamp: ts, reason: label }
+    }
     byTemplate[template].cost += cost
 
     // Store raw_payload for template preview — prefer ones with raw_template (Interakt format)
@@ -100,13 +173,23 @@ export function aggregateWebhooks(docs) {
         byButton[buttonKey] = {
           clicks: 0,
           users: new Set(),
+          userEvents: [],   // { phone, template, timestamp, clickType }
           templates: new Set(),
-          links: {},    // link → count
+          links: {},
           clickTypes: new Set(),
         }
       }
       byButton[buttonKey].clicks++
       if (phone) byButton[buttonKey].users.add(phone)
+      // Store user event for the per-button clicker list
+      if (phone) {
+        byButton[buttonKey].userEvents.push({
+          phone,
+          template: template !== '—' ? template : null,
+          timestamp: d.event_timestamp || d.timestamp || null,
+          clickType: clickType || null,
+        })
+      }
       if (template && template !== '—') byButton[buttonKey].templates.add(template)
       if (link) {
         byButton[buttonKey].links[link] = (byButton[buttonKey].links[link] || 0) + 1
@@ -127,6 +210,9 @@ export function aggregateWebhooks(docs) {
   const sdr      = pct(kpi.delivered, kpi.sent)     // STD:  Delivered / Sent    (Sent→Delivered)
   const str      = pct(kpi.read,   kpi.sent)        // STR:  Read      / Sent    (Sent→Read)
 
+  const sortByTs = (arr) =>
+    arr.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+
   const templateRows = Object.entries(byTemplate)
     .filter(([name]) => name && name !== '—')
     .map(([name, t]) => ({
@@ -136,10 +222,20 @@ export function aggregateWebhooks(docs) {
       read: t.read,
       clicked: t.clicked,
       failed: t.failed,
-      ctr:      pct(t.clicked,   t.delivered),   // CTR
-      readRate: pct(t.read,     t.delivered),   // DTR
-      sdr:      pct(t.delivered, t.sent),        // STD
-      str:      pct(t.read,     t.sent),         // STR
+      failureReasons: Object.entries(t.failureReasons)
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count),
+      // Per-stage user lists (unique per phone, sorted newest first)
+      stageUsers: Object.fromEntries(
+        Object.entries(t.stageUsers).map(([stage, usersMap]) => [
+          stage,
+          sortByTs(Object.values(usersMap)),
+        ])
+      ),
+      ctr:      pct(t.clicked,   t.delivered),
+      readRate: pct(t.read,     t.delivered),
+      sdr:      pct(t.delivered, t.sent),
+      str:      pct(t.read,     t.sent),
       total_cost: t.cost,
       raw_payload: templatePayloads[name] || null,
       category: templateCategories[name] || '—',
@@ -153,6 +249,8 @@ export function aggregateWebhooks(docs) {
     template_used: [...b.templates].join(', ') || '—',
     links: Object.entries(b.links).map(([url, count]) => ({ url, count })).sort((a, b) => b.count - a.count),
     click_types: [...b.clickTypes].join(', ') || '—',
+    // Full user event list for template preview (sorted newest first)
+    user_events: b.userEvents.sort((a, c) => new Date(c.timestamp || 0) - new Date(a.timestamp || 0)),
   }))
   ctaRows.sort((a, b) => b.total_clicks - a.total_clicks)
 
