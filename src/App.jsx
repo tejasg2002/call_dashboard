@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard'
 import Analysis from './components/Analysis'
 import Login from './components/Login'
 import WhatsAppDashboard from './pages/dashboard'
+import EmailDashboard from './pages/email'
 import Settings, { ADMIN_EMAIL } from './components/Settings'
 import { auth, db, onAuthStateChanged, signOut } from './firebase'
 import { fetchUserPermissions } from './lib/userManagement'
@@ -66,6 +67,7 @@ function App() {
   // Admins see everything; non-admins see tabs based on their permissions
   const canViewCallReview = isAdmin || (userPerms?.canViewCallReview === true)
   const canViewWhatsApp   = isAdmin || (userPerms?.canViewWhatsApp   !== false)  // default true
+  const canViewEmail      = isAdmin || (userPerms?.canViewEmail      !== false)  // default true
   // dataMasked: admin = never masked; non-admin = masked unless explicitly set false
   const dataMasked = !isAdmin && (userPerms?.dataMasked !== false)
 
@@ -103,6 +105,17 @@ function App() {
       ),
     },
     {
+      id: 'email',
+      label: 'Email Analytics',
+      always: false,
+      show: canViewEmail,
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
       id: 'settings',
       label: 'Settings',
       always: false,
@@ -125,7 +138,8 @@ function App() {
   const headerTitle = {
     overview: 'Call Analytics',
     analysis: 'Call Review',
-    wa: 'WhatsApp Campaign Analytics',
+    wa:       'WhatsApp Campaign Analytics',
+    email:    'Email Campaign Analytics',
     settings: 'Settings',
   }[activeTab] || 'Dashboard'
 
@@ -231,6 +245,7 @@ function App() {
           {activeTab === 'overview'  && <Dashboard />}
           {activeTab === 'analysis'  && canViewCallReview && <Analysis />}
           {activeTab === 'wa'        && canViewWhatsApp   && <WhatsAppDashboard theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />}
+          {activeTab === 'email'     && canViewEmail      && <EmailDashboard    theme={theme} dataMasked={dataMasked} />}
           {activeTab === 'settings'  && isAdmin           && <Settings theme={theme} setTheme={setTheme} user={user} isDark={isDark} isAdmin={isAdmin} />}
         </main>
       </div>

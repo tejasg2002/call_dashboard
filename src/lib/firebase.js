@@ -135,4 +135,38 @@ export async function fetchLeadByMobile(mobileNumber) {
   }
 }
 
+// In-memory cache: normalised email → lead data (or null)
+const _leadEmailCache = new Map()
+
+/**
+ * Look up a lead by email address.
+ * Checks Firestore crmSnapshot first; no external API fallback for email yet.
+ */
+export async function fetchLeadByEmail(emailAddress) {
+  if (!emailAddress || emailAddress.includes('*')) return null
+  const email = emailAddress.trim().toLowerCase()
+  if (!email) return null
+
+  if (_leadEmailCache.has(email)) return _leadEmailCache.get(email)
+
+  try {
+    const q = query(
+      collection(db, 'crmSnapshot'),
+      where('email', '==', email),
+      limit(1)
+    )
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      const lead = { docId: snap.docs[0].id, ...snap.docs[0].data() }
+      _leadEmailCache.set(email, lead)
+      return lead
+    }
+  } catch (err) {
+    console.error('[crmSnapshot email] lookup error:', err)
+  }
+
+  _leadEmailCache.set(email, null)
+  return null
+}
+
 export { db }
