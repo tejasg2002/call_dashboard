@@ -3,12 +3,23 @@ import { maskEmail } from '../../lib/userManagement'
 import { fetchLeadByEmail } from '../../lib/firebase'
 
 const STAGES = {
-  sent:      { label: 'Sent',      dot: 'bg-blue-400',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'       },
+  sent:      { label: 'Sent',      dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'         },
   delivered: { label: 'Delivered', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
   opened:    { label: 'Opened',    dot: 'bg-violet-500',  badge: 'bg-violet-50 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'   },
   clicked:   { label: 'Clicked',   dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'       },
   bounced:   { label: 'Bounced',   dot: 'bg-rose-500',    badge: 'bg-rose-50 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'           },
   complained:{ label: 'Complaint', dot: 'bg-orange-500',  badge: 'bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'   },
+}
+
+const STAGE_ORDER = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained']
+
+const STAGE_PILL = {
+  sent:      { dot: 'bg-blue-500',    text: 'text-blue-600 dark:text-blue-300',       bg: 'bg-blue-50 dark:bg-blue-900/30',       border: 'border-blue-200 dark:border-blue-700/50',       shadow: '#3b82f6' },
+  delivered: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/30', border: 'border-emerald-200 dark:border-emerald-700/50', shadow: '#10b981' },
+  opened:    { dot: 'bg-violet-500',  text: 'text-violet-600 dark:text-violet-300',   bg: 'bg-violet-50 dark:bg-violet-900/30',   border: 'border-violet-200 dark:border-violet-700/50',   shadow: '#8b5cf6' },
+  clicked:   { dot: 'bg-amber-500',   text: 'text-amber-600 dark:text-amber-300',     bg: 'bg-amber-50 dark:bg-amber-900/30',     border: 'border-amber-200 dark:border-amber-700/50',     shadow: '#f59e0b' },
+  bounced:   { dot: 'bg-rose-500',    text: 'text-rose-600 dark:text-rose-300',       bg: 'bg-rose-50 dark:bg-rose-900/30',       border: 'border-rose-200 dark:border-rose-700/50',       shadow: '#f43f5e' },
+  complained:{ dot: 'bg-orange-500',  text: 'text-orange-600 dark:text-orange-300',   bg: 'bg-orange-50 dark:bg-orange-900/30',   border: 'border-orange-200 dark:border-orange-700/50',   shadow: '#f97316' },
 }
 
 function formatTime(ts) {
@@ -21,9 +32,9 @@ function formatTime(ts) {
   }
 }
 
-// ── CRM Lead badge ────────────────────────────────────────────────────────────
+// ── CRM Lead badge ─────────────────────────────────────────────────────────────
 function LeadInfo({ emailAddress, isDark }) {
-  const [lead, setLead]     = useState(null)   // null=loading, false=not found, obj=found
+  const [lead, setLead]     = useState(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -75,11 +86,99 @@ function LeadInfo({ emailAddress, isDark }) {
   )
 }
 
-// ── Email card ────────────────────────────────────────────────────────────────
+// ── Horizontal stage pills for one subject/campaign ────────────────────────────
+function SubjectStageLine({ subjectName, stageMap, isDark, rowIndex }) {
+  const activeStages = STAGE_ORDER.filter((s) => stageMap[s])
+
+  return (
+    <div
+      className="flex items-center gap-3 flex-wrap"
+      style={{ animation: 'emailTplRowIn 0.35s ease both', animationDelay: `${rowIndex * 65}ms` }}
+    >
+      {/* Subject chip */}
+      <div
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold w-36 flex-shrink-0 truncate
+          ${isDark ? 'bg-slate-700/60 border-slate-600 text-sky-300' : 'bg-sky-50 border-sky-200 text-sky-700'}`}
+        title={subjectName}
+        style={{ borderLeft: `3px solid ${isDark ? '#38bdf8' : '#0284c7'}` }}
+      >
+        <svg className="w-3 h-3 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <span className="truncate">{subjectName}</span>
+      </div>
+
+      {/* Stage pills with connecting arrows */}
+      <div className="flex items-center gap-1 flex-wrap flex-1">
+        {activeStages.map((s, i) => {
+          const st   = STAGE_PILL[s]
+          const meta = STAGES[s]
+          const ts   = formatTime(stageMap[s].ts)
+          const link = stageMap[s].link
+
+          return (
+            <div key={s} className="flex items-center gap-1"
+              style={{ animation: 'emailStagePillIn 0.28s ease both', animationDelay: `${rowIndex * 65 + i * 55}ms` }}
+            >
+              {/* Connector arrow */}
+              {i > 0 && (
+                <svg className={`w-3 h-3 flex-shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+
+              {/* Stage pill */}
+              <div className="group relative">
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border
+                    transition-all duration-200 cursor-default
+                    hover:scale-110 hover:shadow-md
+                    ${st.bg} ${st.border} ${st.text}`}
+                  style={{ ['--tw-shadow-color']: st.shadow + '40' }}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
+                  {meta?.label || s}
+                  {link && <span className="opacity-60 text-[9px]">🔗</span>}
+                </button>
+
+                {/* Tooltip */}
+                {(ts || link) && (
+                  <div className={`
+                    pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40
+                    hidden group-hover:flex flex-col gap-0.5
+                    min-w-[160px] max-w-[260px] rounded-xl px-3 py-2 shadow-xl
+                    transition-opacity duration-150
+                    ${isDark ? 'bg-slate-700 border border-slate-600' : 'bg-slate-900'}
+                  `}>
+                    {ts && (
+                      <>
+                        <p className="text-white text-[12px] font-bold tracking-tight">{ts.time}</p>
+                        <p className="text-slate-400 text-[10px]">{ts.date}</p>
+                      </>
+                    )}
+                    {link && (
+                      <p className="text-sky-300 text-[10px] mt-0.5 flex items-center gap-1 break-all">
+                        <span>🔗</span>
+                        <span className="truncate">{link.length > 50 ? link.slice(0, 50) + '…' : link}</span>
+                      </p>
+                    )}
+                    {/* Arrow */}
+                    <div className={`absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent ${isDark ? 'border-t-slate-700' : 'border-t-slate-900'}`} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Email card ─────────────────────────────────────────────────────────────────
 function EmailCard({ email, rawEmail, events, isDark }) {
   const [expanded, setExpanded] = useState(false)
-  const [showAll, setShowAll]   = useState(false)
-  const shown     = showAll ? events : events.slice(0, 6)
   const lastEvent = events[0]
   const lastTs    = formatTime(lastEvent?.timestamp)
 
@@ -88,8 +187,24 @@ function EmailCard({ email, rawEmail, events, isDark }) {
     return acc
   }, {})
 
+  // Group events by subject → stage → { ts, link? }
+  // Process oldest-first so later events overwrite with more recent timestamps
+  const bySubject = useMemo(() => {
+    const map = {}
+    ;[...events].reverse().forEach((ev) => {
+      const sub = ev.subject || '(no subject)'
+      if (!map[sub]) map[sub] = {}
+      map[sub][ev.stage] = {
+        ts:   ev.timestamp || null,
+        link: ev.link || null,
+      }
+    })
+    return map
+  }, [events])
+
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+      {/* Card header */}
       <div
         className={`flex items-center justify-between px-4 py-3 cursor-pointer select-none ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`}
         onClick={() => setExpanded((v) => !v)}
@@ -103,7 +218,7 @@ function EmailCard({ email, rawEmail, events, isDark }) {
           <div className="min-w-0">
             <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{email}</p>
             <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {events.length} event{events.length !== 1 ? 's' : ''}
+              {Object.keys(bySubject).length} campaign{Object.keys(bySubject).length !== 1 ? 's' : ''}
               {lastTs && ` · Last: ${lastTs.date}`}
             </p>
           </div>
@@ -123,53 +238,56 @@ function EmailCard({ email, rawEmail, events, isDark }) {
         </div>
       </div>
 
+      {/* Expanded body */}
       {expanded && (
         <div className={`border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
-          <div className="px-4 pt-3 pb-1">
-            <LeadInfo emailAddress={rawEmail || email} isDark={isDark} />
-          </div>
-          <div className="px-4 pb-4">
-            <div className="relative mt-3 ml-3">
-              <div className={`absolute left-0 top-0 bottom-0 w-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
-              <div className="space-y-0">
-                {shown.map((ev, i) => {
-                  const stage = STAGES[ev.stage] || STAGES['sent']
-                  const ts    = formatTime(ev.timestamp)
-                  return (
-                    <div key={i} className="relative flex gap-4 pl-6 pb-4">
-                      <span className={`absolute left-[-4px] top-1.5 w-2.5 h-2.5 rounded-full border-2 ${stage.dot} ${isDark ? 'border-slate-800' : 'border-white'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${stage.badge}`}>
-                              {stage.label}
-                            </span>
-                            {ev.subject && (
-                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded max-w-[200px] truncate ${isDark ? 'bg-slate-700 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title={ev.subject}>
-                                {ev.subject.length > 40 ? ev.subject.slice(0, 40) + '…' : ev.subject}
-                              </span>
-                            )}
-                          </div>
-                          {ts && (
-                            <div className={`text-[11px] whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              <span className="font-medium">{ts.time}</span>
-                              <span className="ml-1">{ts.date}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+          <style>{`
+            @keyframes emailTplRowIn {
+              from { opacity: 0; transform: translateX(-10px); }
+              to   { opacity: 1; transform: translateX(0); }
+            }
+            @keyframes emailStagePillIn {
+              from { opacity: 0; transform: scale(0.75) translateY(4px); }
+              to   { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            @keyframes emailBodyIn {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+          `}</style>
+
+          <div style={{ animation: 'emailBodyIn 0.2s ease both' }}>
+            {/* CRM Lead lookup */}
+            <div className="px-4 pt-3 pb-2">
+              <LeadInfo emailAddress={rawEmail || email} isDark={isDark} />
             </div>
-            {events.length > 6 && !showAll && (
-              <button onClick={(e) => { e.stopPropagation(); setShowAll(true) }}
-                className={`mt-1 ml-9 text-xs font-medium ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                Show all {events.length} events ↓
-              </button>
-            )}
+
+            {/* Horizontal per-subject stage rows */}
+            <div className={`mx-4 mb-4 rounded-xl p-3 space-y-3 ${isDark ? 'bg-slate-900/60 border border-slate-700/60' : 'bg-slate-50/80 border border-slate-100'}`}>
+              {/* Header */}
+              <div className="flex items-center gap-2">
+                <svg className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <p className={`text-[10px] uppercase tracking-widest font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Campaign journey · hover stage to see time
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className={`h-px ${isDark ? 'bg-slate-700/60' : 'bg-slate-200'}`} />
+
+              {/* Rows */}
+              {Object.entries(bySubject).map(([subjectName, stageMap], i) => (
+                <SubjectStageLine
+                  key={subjectName}
+                  subjectName={subjectName}
+                  stageMap={stageMap}
+                  isDark={isDark}
+                  rowIndex={i}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -177,7 +295,7 @@ function EmailCard({ email, rawEmail, events, isDark }) {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
   const isDark = theme === 'dark'
   const [search, setSearch] = useState('')
@@ -201,6 +319,7 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
 
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`}>
+      {/* Header */}
       <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'} flex flex-wrap items-center justify-between gap-3`}>
         <div>
           <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Recipient activity timeline</h3>
@@ -227,6 +346,7 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
         </div>
       </div>
 
+      {/* List */}
       <div className="p-4 max-h-[560px] overflow-y-auto space-y-2">
         {filtered.length === 0 ? (
           <div className={`py-10 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>

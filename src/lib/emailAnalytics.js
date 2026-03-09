@@ -15,6 +15,10 @@ function getMessageId(raw) { return getMail(raw).messageId || '' }
 function getTemplateId(raw) {
   return getMail(raw).tags?.templateId?.[0] || ''
 }
+function getClickLink(raw) {
+  // SES Click event stores the clicked URL at detail.click.link
+  return getDetail(raw).click?.link || ''
+}
 function getTimestamp(raw) {
   const d = getInner(raw)
   return d.time || d.createdAt || raw.timestamp || ''
@@ -68,6 +72,7 @@ export function aggregateEmailWebhooks(docs) {
     const ts         = getTimestamp(doc)
     const messageId  = getMessageId(doc)
     const templateId = getTemplateId(doc)
+    const clickLink  = stage === 'clicked' ? getClickLink(doc) : ''
 
     // Global KPIs
     kpi[stage] = (kpi[stage] || 0) + 1
@@ -92,7 +97,7 @@ export function aggregateEmailWebhooks(docs) {
     if (row._maps[stage]) {
       const prev = row._maps[stage][email]
       if (!prev || new Date(ts) > new Date(prev.timestamp)) {
-        row._maps[stage][email] = { email, timestamp: ts, messageId }
+        row._maps[stage][email] = { email, timestamp: ts, messageId, ...(clickLink && { link: clickLink }) }
       }
     }
 
@@ -100,7 +105,7 @@ export function aggregateEmailWebhooks(docs) {
     if (!byEmailMap[email]) {
       byEmailMap[email] = { email, events: [], lastActivity: ts }
     }
-    byEmailMap[email].events.push({ stage, eventType, subject, timestamp: ts, messageId })
+    byEmailMap[email].events.push({ stage, eventType, subject, timestamp: ts, messageId, ...(clickLink && { link: clickLink }) })
     if (!byEmailMap[email].lastActivity || ts > byEmailMap[email].lastActivity) {
       byEmailMap[email].lastActivity = ts
     }

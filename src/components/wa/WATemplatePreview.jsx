@@ -203,11 +203,11 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                         {u.reason}
                       </p>
                     )}
-                    {stage === 'clicked' && u.buttonText && (
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
-                        🖱 {u.buttonText}
+                    {stage === 'clicked' && (u.allButtons?.length ? u.allButtons : u.buttonText ? [u.buttonText] : []).map((btn) => (
+                      <span key={btn} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                        🖱 {btn}
                       </span>
-                    )}
+                    ))}
                   </div>
                   {ts && (
                     <span className={`shrink-0 text-[10px] whitespace-nowrap ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{ts}</span>
@@ -278,10 +278,15 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   const sent      = row?.sent      ?? 0
   const delivered = row?.delivered ?? 0
   const read      = row?.read      ?? 0
-  const clicked   = row?.clicked   ?? 0
   const failed    = row?.failed    ?? 0
   const ctr       = row?.ctr       ?? 0
   const readRate  = row?.readRate  ?? (delivered > 0 ? Math.min((read / delivered) * 100, 100) : 0)
+
+  // Unique clickers (deduplicated by phone) — consistent with the user list below
+  const clicked   = row?.stageUsers?.clicked?.length ?? row?.clicked ?? 0
+
+  // Button breakdown scoped to this template only
+  const btnStats  = row?.templateBtnStats?.length ? row.templateBtnStats : buttonStats
 
   const [activeStage, setActiveStage] = useState(null)
 
@@ -432,11 +437,11 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
                 dataMasked={dataMasked}
               />
               {/* Button breakdown shown below clicked user list */}
-              {activeStage === 'clicked' && buttonStats.length > 0 && (
+              {activeStage === 'clicked' && btnStats.length > 0 && (
                 <div className="mt-3 space-y-2">
                   <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button breakdown</p>
-                  {buttonStats.map((b) => {
-                    const maxClicks = Math.max(...buttonStats.map((x) => x.total_clicks), 1)
+                  {btnStats.map((b) => {
+                    const maxClicks = Math.max(...btnStats.map((x) => x.total_clicks), 1)
                     const pct = Math.round((b.total_clicks / maxClicks) * 100)
                     return (
                       <div key={b.button_text} className={`rounded-xl px-3 py-2 ${isDark ? 'bg-slate-800' : 'bg-slate-50 border border-slate-100'}`}>

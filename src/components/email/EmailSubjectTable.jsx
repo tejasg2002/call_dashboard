@@ -2,6 +2,24 @@ import { useState, useMemo, useEffect } from 'react'
 import { fetchLeadByEmail } from '../../lib/firebase'
 import { maskEmail } from '../../lib/userManagement'
 
+// ── Generate a stable, human-readable template ID from a subject line ─────────
+function generateTemplateId(subject) {
+  const words = subject
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+  // Simple deterministic numeric suffix from the full subject string
+  let hash = 0
+  for (let i = 0; i < subject.length; i++) {
+    hash = ((hash << 5) - hash + subject.charCodeAt(i)) | 0
+  }
+  const num = String(Math.abs(hash) % 1000).padStart(3, '0')
+  return words.join('_') + '_' + num
+}
+
 // ── Stage meta ───────────────────────────────────────────────────────────────
 const STAGE_META = {
   sent:      { title: 'Sent to',       color: 'text-blue-500',    activeCls: (d) => d ? 'bg-blue-900/30 border-blue-600'    : 'bg-blue-50 border-blue-400' },
@@ -108,6 +126,22 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
               {ts && (
                 <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{ts}</p>
               )}
+              {u.link && (
+                <a
+                  href={u.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1 text-[10px] font-mono mt-0.5 truncate max-w-[240px] hover:underline
+                    ${isDark ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'}`}
+                  title={u.link}
+                >
+                  <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  {u.link.length > 50 ? u.link.slice(0, 50) + '…' : u.link}
+                </a>
+              )}
             </div>
           )
         })}
@@ -204,7 +238,7 @@ function EmailEnvelopeCard({ mail, subject, isDark }) {
         className="px-4 py-3"
         style={{ background: isDark ? '#1a2332' : '#f0f4f8' }}
       >
-        <p className={`text-sm font-bold leading-snug ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+        <p className={`text-sm font-bold leading-snug break-words whitespace-normal w-full ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
           {subject}
         </p>
       </div>
@@ -216,7 +250,7 @@ function EmailEnvelopeCard({ mail, subject, isDark }) {
             <span className={`text-[10px] uppercase tracking-wide font-semibold w-16 flex-shrink-0 pt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               {f.label}
             </span>
-            <span className={`text-[11px] break-all leading-relaxed ${f.mono ? 'font-mono' : ''} ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+            <span className={`min-w-0 flex-1 text-[11px] break-words leading-relaxed ${f.mono ? 'font-mono break-all' : ''} ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               {f.value}
             </span>
           </div>
@@ -270,11 +304,13 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
         <div className={`sticky top-0 z-10 px-4 py-3 border-b flex items-center justify-between gap-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Email Preview</span>
-            {row.sampleMail?.templateId && (
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                {row.sampleMail.templateId.slice(0, 8)}…
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-lg border
+              ${isDark ? 'bg-slate-700/60 border-slate-600 text-sky-300' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+              <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z" />
+              </svg>
+              {generateTemplateId(row.subject)}
+            </span>
           </div>
           <button onClick={onClose}
             className={`p-1.5 rounded-full ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
@@ -359,7 +395,7 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 const COLUMNS = [
-  { key: 'subject',      label: 'Subject',        sortable: true },
+  { key: 'templateId',   label: 'Template ID',    sortable: false },
   { key: 'sent',         label: 'Sent',           sortable: true },
   { key: 'delivered',    label: 'Delivered',      sortable: true },
   { key: 'opened',       label: 'Opened',         sortable: true },
@@ -454,11 +490,17 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
               <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-50'}`}>
                 {sorted.map((row) => (
                   <tr key={row.subject} className={`${isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'} transition-colors`}>
-                    {/* Subject */}
-                    <td className="px-4 py-3">
-                      <p className={`text-xs font-medium leading-snug line-clamp-2 max-w-xs ${isDark ? 'text-slate-200' : 'text-slate-800'}`} title={row.subject}>
-                        {row.subject}
-                      </p>
+                    {/* Template ID */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-lg border
+                        ${isDark ? 'bg-slate-700/60 border-slate-600 text-sky-300' : 'bg-sky-50 border-sky-200 text-sky-700'}`}
+                        title={generateTemplateId(row.subject)}
+                      >
+                        <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z" />
+                        </svg>
+                        {generateTemplateId(row.subject)}
+                      </span>
                     </td>
                     {/* Counts */}
                     <td className="px-4 py-3">

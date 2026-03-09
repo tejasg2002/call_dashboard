@@ -67,6 +67,8 @@ export function aggregateWebhooks(docs) {
         failureReasons: {},
         // phone → latest event info, keyed so each phone appears once per stage
         stageUsers: { sent: {}, delivered: {}, read: {}, clicked: {}, failed: {} },
+        // button_text → { clicks, users } — scoped to THIS template only
+        _buttons: {},
       }
     }
     const ts = d.event_timestamp || d.timestamp || null
@@ -84,7 +86,26 @@ export function aggregateWebhooks(docs) {
     }
     if (stage === 'clicked') {
       byTemplate[template].clicked++
-      if (phone) byTemplate[template].stageUsers.clicked[phone] = { phone, timestamp: ts, buttonText: button !== '—' ? button : null }
+      if (phone) {
+        const prev = byTemplate[template].stageUsers.clicked[phone]
+        // Accumulate all unique buttons this phone has clicked (don't overwrite)
+        const allButtons = new Set(prev?.allButtons || (prev?.buttonText ? [prev.buttonText] : []))
+        if (button && button !== '—') allButtons.add(button)
+        byTemplate[template].stageUsers.clicked[phone] = {
+          phone,
+          timestamp: ts,   // keep latest timestamp
+          buttonText: button !== '—' ? button : null,  // latest button (backward compat)
+          allButtons: [...allButtons],
+        }
+      }
+      // Per-template button breakdown (separate from global byButton)
+      if (button && button !== '—') {
+        if (!byTemplate[template]._buttons[button]) {
+          byTemplate[template]._buttons[button] = { clicks: 0, users: new Set() }
+        }
+        byTemplate[template]._buttons[button].clicks++
+        if (phone) byTemplate[template]._buttons[button].users.add(phone)
+      }
     }
     if (stage === 'failed') {
       byTemplate[template].failed++
@@ -232,6 +253,15 @@ export function aggregateWebhooks(docs) {
           sortByTs(Object.values(usersMap)),
         ])
       ),
+      // Button breakdown scoped to this template only
+      templateBtnStats: Object.entries(t._buttons)
+        .filter(([text]) => text && text !== '—')
+        .map(([text, b]) => ({
+          button_text:  text,
+          total_clicks: b.clicks,
+          unique_users: b.users.size,
+        }))
+        .sort((a, b) => b.total_clicks - a.total_clicks),
       ctr:      pct(t.clicked,   t.delivered),
       readRate: pct(t.read,     t.delivered),
       sdr:      pct(t.delivered, t.sent),
