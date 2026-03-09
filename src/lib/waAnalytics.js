@@ -25,19 +25,22 @@ export function aggregateWebhooks(docs) {
   docs.forEach((d) => {
     const stage = eventStage(d)
 
-    // Extract cost: try top-level `cost` field first, then raw_payload nested structure (Interakt)
+    // Cost is only counted on delivered events (event_type === 'message_api_delivered')
+    // to avoid multiplying cost across sent/read/clicked events for the same message.
     let cost = 0
-    if (typeof d.cost === 'number' && d.cost > 0) {
-      cost = d.cost
-    } else if (d.cost && !isNaN(parseFloat(d.cost))) {
-      cost = parseFloat(d.cost)
-    } else if (d.raw_payload) {
-      try {
-        const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
-        const mc = rp?.data?.message?.meta_data?.message_cost
-        const val = mc?.actual_message_cost ?? mc?.whatsapp_cost ?? null
-        if (val != null && !isNaN(parseFloat(val))) cost = parseFloat(val)
-      } catch {}
+    if (stage === 'delivered') {
+      if (typeof d.cost === 'number' && d.cost > 0) {
+        cost = d.cost
+      } else if (d.cost && !isNaN(parseFloat(d.cost))) {
+        cost = parseFloat(d.cost)
+      } else if (d.raw_payload) {
+        try {
+          const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+          const mc = rp?.data?.message?.meta_data?.message_cost
+          const val = mc?.actual_message_cost ?? mc?.whatsapp_cost ?? null
+          if (val != null && !isNaN(parseFloat(val))) cost = parseFloat(val)
+        } catch {}
+      }
     }
     const template = d.template_name || '—'
     const phone = d.phone_number || ''
