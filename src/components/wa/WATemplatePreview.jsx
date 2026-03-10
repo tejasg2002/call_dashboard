@@ -47,7 +47,15 @@ function parsePayload(raw) {
       body: template?.body || '',
       footer: template?.footer || '',
       buttons,
-      timestamp: obj?.timestamp || '',
+      timestamp: (() => {
+        const raw = obj?.timestamp || ''
+        if (!raw) return ''
+        const s = String(raw).trim()
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !s.endsWith('Z') && !s.includes('+')) {
+          return s.replace(' ', 'T') + 'Z'
+        }
+        return s
+      })(),
       _raw: obj,
     }
   } catch {
@@ -153,7 +161,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
           const leadId = leadMap[u.phone]
           const displayPhone = dataMasked ? maskPhone(u.phone) : u.phone
           const ts = u.timestamp
-            ? new Date(u.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
+            ? new Date(u.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
             : null
           return (
             <div key={`${u.phone}-${idx}`} className={`px-3 py-2.5 ${isDark ? 'bg-slate-800/50 hover:bg-slate-700/40' : 'bg-white hover:bg-slate-50'} transition-colors`}>
@@ -373,7 +381,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
                 <div className={`px-3 pb-1 text-[12px] ${isDark ? 'text-slate-500' : 'text-[#667781]'}`}>{parsed.footer}</div>
               )}
               <div className={`px-3 pb-2 text-right text-[11px] flex items-center justify-end gap-1 ${isDark ? 'text-slate-500' : 'text-[#667781]'}`}>
-                {parsed.timestamp ? new Date(parsed.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                {parsed.timestamp ? new Date(parsed.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''}
                 <svg className="w-4 h-3.5" viewBox="0 0 16 11" fill="none">
                   <path d="M1 5.5L5 9.5L15 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M5 5.5L9 9.5" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>

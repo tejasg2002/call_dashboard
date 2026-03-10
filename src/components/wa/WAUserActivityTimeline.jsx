@@ -15,8 +15,8 @@ function formatTime(ts) {
   const d = new Date(ts)
   if (isNaN(d)) return null
   return {
-    date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }),
+    time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }),
   }
 }
 
@@ -204,7 +204,7 @@ const LEAD_TAG = {
 function PhoneCard({ phone_number, rawPhone, events, isDark }) {
   const [expanded, setExpanded] = useState(false)
   const lastEvent = events[0]
-  const lastTs = formatTime(lastEvent?.event_timestamp || lastEvent?.timestamp)
+  const lastTs = formatTime(lastEvent?._resolvedTs || lastEvent?.event_timestamp || lastEvent?.timestamp)
 
   const leadScore = scoreLead(events)
 
@@ -221,7 +221,7 @@ function PhoneCard({ phone_number, rawPhone, events, isDark }) {
       const tpl = ev.template_name && ev.template_name !== '—' ? ev.template_name : '(unknown)'
       if (!map[tpl]) map[tpl] = {}
       map[tpl][ev.stage] = {
-        ts:     ev.event_timestamp || ev.timestamp || null,
+        ts:     ev._resolvedTs || ev.event_timestamp || ev.timestamp || null,
         button: ev.button_text && ev.button_text !== '—' ? ev.button_text : null,
       }
     })

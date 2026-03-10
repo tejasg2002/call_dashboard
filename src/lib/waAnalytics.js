@@ -11,6 +11,18 @@ function eventStage(doc) {
   return null
 }
 
+// Normalise Interakt timestamp strings (no timezone suffix) to ISO UTC so new Date() is correct.
+// e.g. "2026-03-10 10:33:42.311353" → "2026-03-10T10:33:42.311353Z"
+function toUtcTs(raw) {
+  if (!raw) return null
+  if (typeof raw === 'number') return raw < 1e10 ? raw * 1000 : raw
+  const s = String(raw).trim()
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !s.endsWith('Z') && !s.includes('+')) {
+    return s.replace(' ', 'T') + 'Z'
+  }
+  return s
+}
+
 export function aggregateWebhooks(docs) {
   const kpi = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
   const byTemplate = {}
@@ -74,7 +86,24 @@ export function aggregateWebhooks(docs) {
         _buttons: {},
       }
     }
-    const ts = d.event_timestamp || d.timestamp || null
+    // For click events, prefer click_timestamp from raw_payload.data.event (UTC→IST handled at display layer)
+    let ts = toUtcTs(d.event_timestamp) || toUtcTs(d.timestamp) || null
+    if (stage === 'clicked') {
+      if (d.click_timestamp) {
+        ts = toUtcTs(d.click_timestamp)
+      } else if (d.raw_payload) {
+        try {
+          const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+          // Primary: raw_payload.data.event.click_timestamp (Interakt CTA click)
+          const clickTs = rp?.data?.event?.click_timestamp
+            || rp?.data?.message?.meta_data?.cta_click_info
+              && Object.values(rp.data.message.meta_data.cta_click_info)[0]?.clicked_at_utc
+            || rp?.data?.message?.seen_at_utc
+            || rp?.data?.message?.seen_at
+          if (clickTs) ts = toUtcTs(clickTs)
+        } catch {}
+      }
+    }
     if (stage === 'sent') {
       byTemplate[template].sent++
       if (phone) byTemplate[template].stageUsers.sent[phone] = { phone, timestamp: ts }
@@ -210,7 +239,7 @@ export function aggregateWebhooks(docs) {
         byButton[buttonKey].userEvents.push({
           phone,
           template: template !== '—' ? template : null,
-          timestamp: d.event_timestamp || d.timestamp || null,
+          timestamp: ts,
           clickType: clickType || null,
         })
       }
@@ -223,7 +252,7 @@ export function aggregateWebhooks(docs) {
 
     if (phone) {
       if (!byPhone[phone]) byPhone[phone] = []
-      byPhone[phone].push({ ...d, stage })
+      byPhone[phone].push({ ...d, stage, _resolvedTs: ts })
     }
   })
 
@@ -309,8 +338,8 @@ export function aggregateWebhooks(docs) {
       tier = 'Sent only'; tierColor = 'text-blue-500 dark:text-blue-400'; tierBg = 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
     }
 
-    const sorted = [...events].sort((a, b) => new Date(b.event_timestamp || b.timestamp || 0) - new Date(a.event_timestamp || a.timestamp || 0))
-    const lastActivity = sorted[0]?.event_timestamp || sorted[0]?.timestamp || null
+    const sorted = [...events].sort((a, b) => new Date(b._resolvedTs || b.event_timestamp || b.timestamp || 0) - new Date(a._resolvedTs || a.event_timestamp || a.timestamp || 0))
+    const lastActivity = sorted[0]?._resolvedTs || sorted[0]?.event_timestamp || sorted[0]?.timestamp || null
 
     return { phone_number: phone, stages, templates, buttons, score, tier, tierColor, tierBg, eventCount: events.length, lastActivity }
   }).sort((a, b) => b.score - a.score || b.eventCount - a.eventCount)
@@ -322,7 +351,7 @@ export function aggregateWebhooks(docs) {
     ctaRows,
     byPhone: Object.entries(byPhone).map(([phone, events]) => ({
       phone_number: phone,
-      events: events.sort((a, b) => new Date(b.event_timestamp || b.timestamp || 0) - new Date(a.event_timestamp || a.timestamp || 0)),
+      events: events.sort((a, b) => new Date(b._resolvedTs || b.event_timestamp || b.timestamp || 0) - new Date(a._resolvedTs || a.event_timestamp || a.timestamp || 0)),
     })),
     engagementRows,
     costPerClick: kpi.clicked > 0 ? kpi.cost / kpi.clicked : 0,
