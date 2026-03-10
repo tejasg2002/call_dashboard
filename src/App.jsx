@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard'
 import Analysis from './components/Analysis'
 import Login from './components/Login'
 import WhatsAppDashboard from './pages/dashboard'
+import CampaignAnalyticsPage from './pages/campaign'
 import EmailDashboard from './pages/email'
 import Settings, { ADMIN_EMAIL } from './components/Settings'
 import { auth, db, onAuthStateChanged, signOut } from './firebase'
@@ -14,6 +15,7 @@ function App() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [callSubTab, setCallSubTab] = useState('analytics')
+  const [waSubTab,   setWaSubTab]   = useState('api')
   const [navCollapsed, setNavCollapsed] = useState(true)
   const [theme, setTheme] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'))
   // Permissions for non-admin users (null = loading, object = loaded)
@@ -127,7 +129,7 @@ function App() {
 
   const headerTitle = {
     overview: callSubTab === 'review' ? 'Call Review' : 'Call Analytics',
-    wa:       'WhatsApp Campaign Analytics',
+    wa:       waSubTab === 'campaigns' ? 'WhatsApp Campaign Analytics' : 'WhatsApp API Analytics',
     email:    'Email Campaign Analytics',
     settings: 'Settings',
   }[activeTab] || 'Dashboard'
@@ -275,8 +277,49 @@ function App() {
               {callSubTab === 'review'    && canViewCallReview && <Analysis />}
             </>
           )}
-          {activeTab === 'wa'        && canViewWhatsApp   && <WhatsAppDashboard theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />}
-          {activeTab === 'email'     && canViewEmail      && <EmailDashboard    theme={theme} dataMasked={dataMasked} />}
+          {activeTab === 'wa' && canViewWhatsApp && (
+            <>
+              {/* Sub-tab bar */}
+              <div className={`border-b px-4 lg:px-8 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className="max-w-[1600px] mx-auto flex items-center gap-1">
+                  <button
+                    onClick={() => setWaSubTab('api')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      waSubTab === 'api'
+                        ? 'border-violet-500 text-violet-600 dark:text-violet-400'
+                        : `border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      API Messages
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setWaSubTab('campaigns')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      waSubTab === 'campaigns'
+                        ? 'border-violet-500 text-violet-600 dark:text-violet-400'
+                        : `border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                      </svg>
+                      Campaigns
+                    </span>
+                  </button>
+                </div>
+              </div>
+              {/* Sub-tab content */}
+              {waSubTab === 'api'       && <WhatsAppDashboard     theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />}
+              {waSubTab === 'campaigns' && <CampaignAnalyticsPage theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />}
+            </>
+          )}
+          {activeTab === 'email'       && canViewEmail   && <EmailDashboard         theme={theme} dataMasked={dataMasked} />}
           {activeTab === 'settings'  && isAdmin           && <Settings theme={theme} setTheme={setTheme} user={user} isDark={isDark} isAdmin={isAdmin} />}
         </main>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { subscribeWhatsAppWebhooks, applyFilters } from '../../lib/firebase'
-import { aggregateWebhooks, aggregateByCampaign, getFilterOptions } from '../../lib/waAnalytics'
+import { aggregateWebhooks, aggregateByCampaign, getFilterOptions, eventSource } from '../../lib/waAnalytics'
 import WAKpiCards from '../../components/wa/WAKpiCards'
 import WATemplatePerformanceTable from '../../components/wa/WATemplatePerformanceTable'
 import WATemplatePerformanceChart from '../../components/wa/WATemplatePerformanceChart'
@@ -48,17 +48,20 @@ export default function WhatsAppDashboard({ theme, isAdmin, dataMasked }) {
     return () => unsub()
   }, [])
 
-  // Filter options always come from the full unfiltered dataset → dropdown never loses options
-  const filterOptions = useMemo(() => getFilterOptions(rawDocs), [rawDocs])
+  // Only API events on this page — campaign events live on the Campaign page
+  const apiDocs = useMemo(() => rawDocs.filter((d) => eventSource(d) === 'api'), [rawDocs])
+
+  // Filter options always come from API docs so campaign templates don't bleed in
+  const filterOptions = useMemo(() => getFilterOptions(apiDocs), [apiDocs])
 
   // Active filters applied in-memory
-  const docs = useMemo(() => applyFilters(rawDocs, filters), [rawDocs, filters])
+  const docs = useMemo(() => applyFilters(apiDocs, filters), [apiDocs, filters])
 
   const { kpi, funnel, templateRows, ctaRows, byPhone, engagementRows, costPerClick, totalCost } = useMemo(
     () => aggregateWebhooks(docs), [docs]
   )
   const campaignData = useMemo(
-    () => aggregateByCampaign(rawDocs, campaigns), [rawDocs, campaigns]
+    () => aggregateByCampaign(apiDocs, campaigns), [apiDocs, campaigns]
   )
 
   return (
@@ -68,7 +71,7 @@ export default function WhatsAppDashboard({ theme, isAdmin, dataMasked }) {
         <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
         </span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">Real-time updates from Firestore · {rawDocs.length} total · {docs.length} filtered</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">Real-time updates · {apiDocs.length} API events · {docs.length} filtered</span>
       </div>
 
       <WAFilters filters={filters} setFilters={setFilters} options={filterOptions} theme={theme} />

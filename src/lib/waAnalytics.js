@@ -1,3 +1,8 @@
+/** Returns 'campaign' for message_campaign_* events, 'api' for everything else. */
+export function eventSource(doc) {
+  return (doc.event_type || '').toLowerCase().startsWith('message_campaign_') ? 'campaign' : 'api'
+}
+
 function eventStage(doc) {
   const et = (doc.event_type || '').toLowerCase()
   const ms = (doc.message_status || '').toLowerCase()
@@ -393,4 +398,87 @@ export function getFilterOptions(docs) {
     templateNames: [...templates].sort(),
     eventTypes: [...eventTypes].sort(),
   }
+}
+
+/**
+ * Aggregate campaign webhook events (message_campaign_*).
+ * Groups docs by campaign_name, runs full analytics per campaign,
+ * and returns a combined summary + per-campaign breakdown.
+ */
+export function aggregateCampaignEvents(docs) {
+  // Group docs by campaign_name (fall back to campaign_id or 'Unknown')
+  const byCampaign = {}
+  docs.forEach((d) => {
+    let name = d.campaign_name || ''
+    if (!name && d.raw_payload) {
+      try {
+        const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+        name = rp?.data?.message?.campaign_name || ''
+      } catch {}
+    }
+    if (!name) name = d.campaign_id || 'Unknown Campaign'
+
+    let id = d.campaign_id || null
+    if (!id && d.raw_payload) {
+      try {
+        const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+        id = rp?.data?.message?.campaign_id || null
+      } catch {}
+    }
+
+    if (!byCampaign[name]) byCampaign[name] = { name, id, docs: [] }
+    byCampaign[name].docs.push(d)
+  })
+
+  // Aggregate each campaign fully (reuses existing aggregateWebhooks)
+  const campaigns = Object.values(byCampaign).map((c) => {
+    const agg = aggregateWebhooks(c.docs)
+    // Date range for this campaign
+    const timestamps = c.docs
+      .map((d) => toUtcTs(d.event_timestamp) || toUtcTs(d.timestamp))
+      .filter(Boolean)
+      .map((t) => new Date(t).getTime())
+      .filter((t) => !isNaN(t))
+    const firstSent  = timestamps.length ? new Date(Math.min(...timestamps)).toISOString() : null
+    const lastEvent  = timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null
+
+    return {
+      name:           c.name,
+      id:             c.id,
+      kpi:            agg.kpi,
+      funnel:         agg.funnel,
+      templateRows:   agg.templateRows,
+      ctaRows:        agg.ctaRows,
+      byPhone:        agg.byPhone,
+      engagementRows: agg.engagementRows,
+      costPerClick:   agg.costPerClick,
+      totalCost:      agg.totalCost,
+      templateCount:  agg.templateRows.length,
+      totalMessages:  c.docs.length,
+      firstSent,
+      lastEvent,
+    }
+  }).sort((a, b) => b.kpi.sent - a.kpi.sent)
+
+  // Combined KPIs across all campaigns
+  const totalKpi = campaigns.reduce((acc, c) => {
+    acc.sent      += c.kpi.sent
+    acc.delivered += c.kpi.delivered
+    acc.read      += c.kpi.read
+    acc.clicked   += c.kpi.clicked
+    acc.failed    += c.kpi.failed
+    acc.cost      += c.kpi.cost
+    return acc
+  }, { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 })
+
+  const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
+  totalKpi.ctr      = pct(totalKpi.clicked, totalKpi.delivered)
+  totalKpi.readRate = pct(totalKpi.read,    totalKpi.delivered)
+  totalKpi.sdr      = pct(totalKpi.delivered, totalKpi.sent)
+  totalKpi.str      = pct(totalKpi.read,    totalKpi.sent)
+
+  // Merged byPhone for the combined user timeline
+  const allByPhone = aggregateWebhooks(docs).byPhone
+
+  return { campaigns, totalKpi, allByPhone, campaignCount: campaigns.length }
 }
