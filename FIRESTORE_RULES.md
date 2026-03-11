@@ -7,7 +7,7 @@ This app uses **Cloud Firestore** (not Realtime Database). Ensure **Firestore** 
 | Reason (code)        | Cause | What to do |
 |----------------------|--------|------------|
 | **permission-denied** | Firestore rules block read on `Call_logs`. | Add rules below and **Publish**. Ensure collection name is exactly `Call_logs`. |
-| **not-found**         | Collection `Call_logs` doesn’t exist or Firestore isn’t set up. | Firebase Console → **Firestore Database** → create database if needed, then create collection `Call_logs` (or fix the name). |
+| **not-found**            | Collection `Call_logs` doesn’t exist or Firestore isn’t set up. | Firebase Console → **Firestore Database** → create database if needed, then create collection `Call_logs` (or fix the name). |
 | **failed-precondition** | Firestore not enabled for this project. | Firebase Console → **Build** → **Firestore Database** → **Create database** (choose region, then use Rules below). |
 | **unavailable**      | Network or Firestore service issue. | Check internet; try again later. |
 | **unknown** / other  | Other error. | Open browser **Console** (F12) and look for `[Firestore] Error fetching Call_logs` to see the full error. |
