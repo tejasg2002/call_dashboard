@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { subscribeWhatsAppWebhooks, applyFilters } from '../../../../src/lib/firebase'
 import { aggregateCampaignEvents, getFilterOptions, eventSource } from '../../../../src/lib/waAnalytics'
+import { getCachedDocs, setCachedDocs } from '../../../../src/lib/dataCache'
 import { useAuth } from '../../../providers'
 import { useTheme } from '../../../providers'
 import WACampaignDashboard from '../../../../src/components/wa/WACampaignDashboard'
 import WAFilters from '../../../../src/components/wa/WAFilters'
+import LazySection from '../../../../src/components/LazySection'
 
 export default function WACampaignsPage() {
   const { isAdmin, dataMasked } = useAuth()
@@ -14,11 +16,23 @@ export default function WACampaignsPage() {
   const [rawDocs, setRawDocs] = useState([])
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ templateName: '', eventType: '', startDate: '', endDate: '' })
+  const hasSaved = useRef(false)
 
   useEffect(() => {
+    getCachedDocs('wa').then((cached) => {
+      if (cached.length > 0) setRawDocs(cached)
+    })
+
     const unsub = subscribeWhatsAppWebhooks((data, err) => {
       if (err) setError(err.message)
-      else { setError(null); setRawDocs(data) }
+      else {
+        setError(null)
+        setRawDocs(data)
+        if (!hasSaved.current) {
+          hasSaved.current = true
+          setCachedDocs('wa', data)
+        }
+      }
     })
     return () => unsub()
   }, [])
@@ -45,7 +59,9 @@ export default function WACampaignsPage() {
         <div className="p-4 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700 rounded-xl text-rose-800 dark:text-rose-200 text-sm">{error}</div>
       )}
 
-      <WACampaignDashboard data={data} theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />
+      <LazySection height="400px">
+        <WACampaignDashboard data={data} theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />
+      </LazySection>
     </div>
   )
 }

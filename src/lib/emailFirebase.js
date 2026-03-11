@@ -1,11 +1,4 @@
-import { collection, onSnapshot, query } from 'firebase/firestore'
-import { db } from '../firebase'
-
-const COLLECTION = 'email_webhook'
-
 // ── Field extractors ────────────────────────────────────────────────────────
-// Documents may be wrapped under a "document" key (MongoDB change-stream format)
-// or stored flat. Be defensive and handle both.
 function getInner(raw) { return raw.document || raw }
 function getEventType(raw) { return getInner(raw).detail?.eventType || '' }
 function getSubject(raw) { return getInner(raw).detail?.mail?.commonHeaders?.subject || '' }
@@ -18,21 +11,46 @@ function getTimestamp(raw) {
   return d.time || d.createdAt || raw.timestamp || ''
 }
 
-// ── Subscription ────────────────────────────────────────────────────────────
-export function subscribeEmailWebhooks(callback) {
-  const q = query(collection(db, COLLECTION))
-  const unsub = onSnapshot(
-    q,
-    (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      callback(docs, null)
-    },
-    (err) => {
-      console.error('[email_webhook] subscription error:', err)
-      callback([], err)
+// ── Fetch from Next.js API route (MongoDB) — paginated ─────────────────────
+export async function fetchEmailEvents(since, onProgress) {
+  if (since) {
+    const url = new URL('/api/email-events', window.location.origin)
+    url.searchParams.set('since', since)
+    const res = await fetch(url)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `HTTP ${res.status}`)
     }
-  )
-  return () => unsub()
+    const { docs, total } = await res.json()
+    if (onProgress) onProgress({ loaded: docs.length, total: docs.length, done: true })
+    return docs
+  }
+
+  let allDocs = []
+  let page = 0
+  let hasMore = true
+  let total = 0
+
+  while (hasMore) {
+    const url = new URL('/api/email-events', window.location.origin)
+    url.searchParams.set('page', page.toString())
+
+    const res = await fetch(url)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+    allDocs = allDocs.concat(data.docs)
+    hasMore = data.hasMore
+    total = data.total
+    page++
+
+    if (onProgress) onProgress({ loaded: allDocs.length, total, done: !hasMore })
+  }
+
+  return allDocs
 }
 
 // ── In-memory filter ────────────────────────────────────────────────────────

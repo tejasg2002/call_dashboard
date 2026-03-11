@@ -5,6 +5,7 @@ import { fetchCalls } from '../firebase'
 import MetricsCards from './MetricsCards'
 import PerformanceCards from './PerformanceCards'
 import PerformanceCharts from './PerformanceCharts'
+import LazySection from './LazySection'
 
 const POLLING_INTERVAL = 30000 // 30 seconds
 
@@ -505,13 +506,17 @@ const Dashboard = () => {
         </div>
 
         {/* Performance overview by counselor */}
-        <PerformanceCards
-          ownerStatsToday={ownerStatsToday}
-          ownerStatsMonth={ownerStatsMonth}
-        />
+        <LazySection height="220px">
+          <PerformanceCards
+            ownerStatsToday={ownerStatsToday}
+            ownerStatsMonth={ownerStatsMonth}
+          />
+        </LazySection>
 
         {/* Overall graphs */}
-        <PerformanceCharts ownerStats={ownerStatsOverall} />
+        <LazySection height="340px">
+          <PerformanceCharts ownerStats={ownerStatsOverall} />
+        </LazySection>
 
         {/* (Recent calls table + filters have been moved to In-depth view) */}
       </div>

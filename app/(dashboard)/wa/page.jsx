@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { subscribeWhatsAppWebhooks, applyFilters } from '../../../src/lib/firebase'
 import { aggregateWebhooks, aggregateByCampaign, getFilterOptions, eventSource } from '../../../src/lib/waAnalytics'
+import { getCachedDocs, setCachedDocs } from '../../../src/lib/dataCache'
 import { useAuth } from '../../providers'
 import { useTheme } from '../../providers'
 import WAKpiCards from '../../../src/components/wa/WAKpiCards'
@@ -16,6 +17,7 @@ import WAFilters from '../../../src/components/wa/WAFilters'
 import WACampaignManager from '../../../src/components/wa/WACampaignManager'
 import WACampaignAnalytics from '../../../src/components/wa/WACampaignAnalytics'
 import WAEngagementSection from '../../../src/components/wa/WAEngagementSection'
+import LazySection from '../../../src/components/LazySection'
 
 function loadCampaigns() {
   try {
@@ -34,6 +36,8 @@ export default function WAApiPage() {
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ templateName: '', eventType: '', startDate: '', endDate: '' })
   const [campaigns, _setCampaigns] = useState(loadCampaigns)
+  const [cacheHit, setCacheHit] = useState(false)
+  const hasSaved = useRef(false)
 
   function setCampaigns(updater) {
     _setCampaigns((prev) => {
@@ -44,9 +48,23 @@ export default function WAApiPage() {
   }
 
   useEffect(() => {
+    getCachedDocs('wa').then((cached) => {
+      if (cached.length > 0) {
+        setRawDocs(cached)
+        setCacheHit(true)
+      }
+    })
+
     const unsub = subscribeWhatsAppWebhooks((data, err) => {
       if (err) setError(err.message)
-      else { setError(null); setRawDocs(data) }
+      else {
+        setError(null)
+        setRawDocs(data)
+        if (!hasSaved.current) {
+          hasSaved.current = true
+          setCachedDocs('wa', data)
+        }
+      }
     })
     return () => unsub()
   }, [])
@@ -73,27 +91,44 @@ export default function WAApiPage() {
       )}
 
       <WAKpiCards kpi={kpi} theme={theme} />
-      <WATemplatePerformanceTable rows={templateRows} ctaRows={ctaRows} theme={theme} dataMasked={dataMasked} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <WATemplatePerformanceChart rows={templateRows} theme={theme} />
-        <WAMessageFunnelChart funnel={funnel} theme={theme} />
-      </div>
+      <LazySection height="320px">
+        <WATemplatePerformanceTable rows={templateRows} ctaRows={ctaRows} theme={theme} dataMasked={dataMasked} />
+      </LazySection>
 
-      <WACTAPerformanceTable rows={ctaRows} theme={theme} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <WACampaignManager campaigns={campaigns} setCampaigns={setCampaigns} templateNames={filterOptions.templateNames} theme={theme} />
+      <LazySection height="300px">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <WATemplatePerformanceChart rows={templateRows} theme={theme} />
+          <WAMessageFunnelChart funnel={funnel} theme={theme} />
         </div>
-        <div className="lg:col-span-2">
-          <WACampaignAnalytics campaignData={campaignData} theme={theme} />
-        </div>
-      </div>
+      </LazySection>
 
-      <WACostAnalytics templateRows={templateRows} totalCost={totalCost} costPerClick={costPerClick} clicked={kpi.clicked} theme={theme} />
-      <WAEngagementSection engagementRows={engagementRows} theme={theme} dataMasked={dataMasked} />
-      <WAUserActivityTimeline byPhone={byPhone} theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />
+      <LazySection height="200px">
+        <WACTAPerformanceTable rows={ctaRows} theme={theme} />
+      </LazySection>
+
+      <LazySection height="260px">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <WACampaignManager campaigns={campaigns} setCampaigns={setCampaigns} templateNames={filterOptions.templateNames} theme={theme} />
+          </div>
+          <div className="lg:col-span-2">
+            <WACampaignAnalytics campaignData={campaignData} theme={theme} />
+          </div>
+        </div>
+      </LazySection>
+
+      <LazySection height="200px">
+        <WACostAnalytics templateRows={templateRows} totalCost={totalCost} costPerClick={costPerClick} clicked={kpi.clicked} theme={theme} />
+      </LazySection>
+
+      <LazySection height="240px">
+        <WAEngagementSection engagementRows={engagementRows} theme={theme} dataMasked={dataMasked} />
+      </LazySection>
+
+      <LazySection height="300px">
+        <WAUserActivityTimeline byPhone={byPhone} theme={theme} isAdmin={isAdmin} dataMasked={dataMasked} />
+      </LazySection>
     </div>
   )
 }
