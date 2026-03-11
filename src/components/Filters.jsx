@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useMemo } from 'react'
 
 const Filters = ({ calls, filters, onFilterChange }) => {

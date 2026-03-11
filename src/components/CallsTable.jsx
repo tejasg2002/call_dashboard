@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useRef, useEffect, useMemo } from 'react'
 
 const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {

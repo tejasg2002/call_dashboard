@@ -1,3 +1,5 @@
+'use client'
+
 const PerformanceCards = ({ ownerStatsToday, ownerStatsMonth }) => {
   if (
     (!ownerStatsToday || ownerStatsToday.length === 0) &&

@@ -1,3 +1,5 @@
+'use client'
+
 export default function EmailFilters({ filters, setFilters, options, theme }) {
   const isDark = theme === 'dark'
 

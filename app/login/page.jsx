@@ -1,27 +1,43 @@
 'use client'
 
-import { useState } from 'react'
-import { signInWithEmailAndPassword, auth } from '../firebase'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { signInWithEmailAndPassword, auth } from '../../src/firebase'
+import { useAuth } from '../providers'
 
-const Login = ({ onLogin }) => {
+export default function LoginPage() {
+  const router = useRouter()
+  const { user, checkingAuth } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!checkingAuth && user) router.replace('/')
+  }, [user, checkingAuth, router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password)
-      onLogin(cred.user)
+      await signInWithEmailAndPassword(auth, email, password)
+      router.replace('/')
     } catch (err) {
       console.error(err)
       setError('Invalid email or password')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checkingAuth || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -42,9 +58,7 @@ const Login = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -56,9 +70,7 @@ const Login = ({ onLogin }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
             <input
               type="password"
               value={password}
@@ -85,6 +97,3 @@ const Login = ({ onLogin }) => {
     </div>
   )
 }
-
-export default Login
-

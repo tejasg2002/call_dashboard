@@ -1,3 +1,5 @@
+'use client'
+
 const LeadDetail = ({ call, onClose }) => {
   if (!call) return null
 

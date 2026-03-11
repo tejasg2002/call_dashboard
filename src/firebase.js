@@ -7,29 +7,13 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth'
 
-// Required for Firestore + Auth (VITE_FIREBASE_DATABASE_URL in .env is for Realtime DB only; this app uses Firestore)
-const requiredEnvVars = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_STORAGE_BUCKET',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID',
-]
-const missing = requiredEnvVars.filter((key) => !import.meta.env[key]?.trim())
-if (missing.length > 0) {
-  throw new Error(
-    `Firebase config incomplete. Missing in .env: ${missing.join(', ')}. Add them and restart the dev server.`
-  )
-}
-
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
 const app = initializeApp(firebaseConfig)
@@ -44,17 +28,16 @@ export async function fetchCalls() {
   try {
     const callsCollection = collection(db, 'Call_logs')
     const snapshot = await getDocs(callsCollection)
-    
+
     const calls = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }))
-    
+
     return calls
   } catch (error) {
     const code = error?.code
     const msg = error?.message || ''
-    // Log full error so you can see exact reason in browser Console (F12)
     console.error('[Firestore] Error fetching Call_logs:', { code, message: msg, error })
     const e = new Error(
       code === 'permission-denied'

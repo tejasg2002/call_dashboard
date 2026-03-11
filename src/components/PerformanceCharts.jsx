@@ -1,3 +1,5 @@
+'use client'
+
 const PerformanceCharts = ({ ownerStats }) => {
   if (!ownerStats || ownerStats.length === 0) return null
 

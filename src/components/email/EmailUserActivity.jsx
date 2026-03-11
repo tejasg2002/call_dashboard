@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useMemo, useEffect } from 'react'
 import { maskEmail } from '../../lib/userManagement'
 import { fetchLeadByEmail } from '../../lib/firebase'

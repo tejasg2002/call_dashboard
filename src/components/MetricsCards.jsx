@@ -1,3 +1,5 @@
+'use client'
+
 const MetricsCards = ({ calls, loading, dateLabel = 'All time' }) => {
   const totalCalls = calls.length
 

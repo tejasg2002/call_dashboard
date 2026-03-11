@@ -1,3 +1,5 @@
+'use client'
+
 const CARDS = [
   {
     key: 'sent',

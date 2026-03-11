@@ -1,3 +1,5 @@
+'use client'
+
 // Row 1: counts  Row 2: rates
 const countCards = [
   { key: 'sent',      label: 'Total Sent',      color: 'blue' },

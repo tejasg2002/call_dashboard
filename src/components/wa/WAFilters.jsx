@@ -1,3 +1,5 @@
+'use client'
+
 const EVENT_LABELS = {
   message_api_sent:      'Message Sent',
   message_api_delivered: 'Message Delivered',

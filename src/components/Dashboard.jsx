@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useMemo } from 'react'
 import { fetchCalls } from '../firebase'
 import MetricsCards from './MetricsCards'

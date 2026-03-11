@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import WAKpiCards from './WAKpiCards'
 import WATemplatePerformanceTable from './WATemplatePerformanceTable'

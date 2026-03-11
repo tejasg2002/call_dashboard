@@ -1,15 +1,20 @@
-import { useEffect, useState, useMemo } from 'react'
-import { subscribeEmailWebhooks, applyEmailFilters, getEmailFilterOptions } from '../../lib/emailFirebase'
-import { aggregateEmailWebhooks } from '../../lib/emailAnalytics'
-import EmailKpiCards    from '../../components/email/EmailKpiCards'
-import EmailFilters     from '../../components/email/EmailFilters'
-import EmailSubjectTable from '../../components/email/EmailSubjectTable'
-import EmailUserActivity from '../../components/email/EmailUserActivity'
+'use client'
 
-// ── Main page ─────────────────────────────────────────────────────────────────
-export default function EmailDashboard({ theme, dataMasked }) {
+import { useEffect, useState, useMemo } from 'react'
+import { subscribeEmailWebhooks, applyEmailFilters, getEmailFilterOptions } from '../../../src/lib/emailFirebase'
+import { aggregateEmailWebhooks } from '../../../src/lib/emailAnalytics'
+import { useAuth } from '../../providers'
+import { useTheme } from '../../providers'
+import EmailKpiCards from '../../../src/components/email/EmailKpiCards'
+import EmailFilters from '../../../src/components/email/EmailFilters'
+import EmailSubjectTable from '../../../src/components/email/EmailSubjectTable'
+import EmailUserActivity from '../../../src/components/email/EmailUserActivity'
+
+export default function EmailPage() {
+  const { dataMasked } = useAuth()
+  const { theme } = useTheme()
   const [rawDocs, setRawDocs] = useState([])
-  const [error, setError]     = useState(null)
+  const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ subject: '', eventType: '', email: '', startDate: '', endDate: '' })
 
   useEffect(() => {
@@ -21,12 +26,11 @@ export default function EmailDashboard({ theme, dataMasked }) {
   }, [])
 
   const filterOptions = useMemo(() => getEmailFilterOptions(rawDocs), [rawDocs])
-  const docs          = useMemo(() => applyEmailFilters(rawDocs, filters), [rawDocs, filters])
+  const docs = useMemo(() => applyEmailFilters(rawDocs, filters), [rawDocs, filters])
   const { kpi, templateRows, byEmail } = useMemo(() => aggregateEmailWebhooks(docs), [docs])
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Live badge */}
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
@@ -36,23 +40,14 @@ export default function EmailDashboard({ theme, dataMasked }) {
         </span>
       </div>
 
-      {/* Filters */}
       <EmailFilters filters={filters} setFilters={setFilters} options={filterOptions} theme={theme} />
 
-      {/* Error */}
       {error && (
-        <div className="p-4 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700 rounded-xl text-rose-800 dark:text-rose-200 text-sm">
-          {error}
-        </div>
+        <div className="p-4 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700 rounded-xl text-rose-800 dark:text-rose-200 text-sm">{error}</div>
       )}
 
-      {/* KPI cards */}
       <EmailKpiCards kpi={kpi} theme={theme} />
-
-      {/* Subject / campaign performance table */}
       <EmailSubjectTable rows={templateRows} theme={theme} dataMasked={dataMasked} />
-
-      {/* Recipient activity timeline */}
       <EmailUserActivity byEmail={byEmail} theme={theme} dataMasked={dataMasked} />
     </div>
   )

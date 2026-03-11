@@ -1,3 +1,5 @@
+'use client'
+
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f43f5e', '#0ea5e9', '#a855f7', '#14b8a6', '#fb923c', '#84cc16']

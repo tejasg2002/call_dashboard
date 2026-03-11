@@ -104,7 +104,7 @@ export async function fetchLeadByMobile(mobileNumber) {
   }
 
   // --- Step 2: fall back to ITM Lead API ---
-  const apiKey = import.meta.env.VITE_ITM_API_KEY
+  const apiKey = process.env.NEXT_PUBLIC_ITM_API_KEY
   if (!apiKey) {
     console.warn('[ITM API] VITE_ITM_API_KEY not set in .env')
     _leadCache.set(mobile, null)
