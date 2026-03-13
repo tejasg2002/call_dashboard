@@ -198,6 +198,43 @@ function extractTemplateCategory(d) {
   }
 }
 
+function extractTemplatePreview(d) {
+  const rp = safeParsePayload(d.raw_payload)
+  if (!rp) return null
+  const msg = rp?.data?.message
+  if (!msg) return null
+
+  let template = null
+  if (msg.raw_template) {
+    try {
+      template = typeof msg.raw_template === 'string' ? JSON.parse(msg.raw_template) : msg.raw_template
+    } catch {
+      template = null
+    }
+  }
+
+  let buttons = []
+  if (template?.buttons) {
+    try {
+      buttons = typeof template.buttons === 'string' ? JSON.parse(template.buttons) : template.buttons
+    } catch {
+      buttons = []
+    }
+  }
+
+  return {
+    name: template?.name || d.template_name || null,
+    category: template?.category || null,
+    language: template?.language || 'en',
+    header_format: template?.header_format || null,
+    header_image_url: template?.header_handle_file_url || msg.media_url || null,
+    header_text: template?.header_text || null,
+    body: template?.body || null,
+    footer: template?.footer || null,
+    buttons,
+  }
+}
+
 // ── Transform a single Firestore doc into the flat MongoDB schema ───────────
 
 function transformDoc(d) {
@@ -210,6 +247,7 @@ function transformDoc(d) {
   const { failure_reason, error_code } = stage === 'failed' ? extractFailureInfo(d) : { failure_reason: null, error_code: null }
   const { campaign_name, campaign_id } = source === 'campaign' ? extractCampaignInfo(d) : { campaign_name: null, campaign_id: null }
   const templateCategory = extractTemplateCategory(d)
+  const templatePreview = extractTemplatePreview(d)
 
   return {
     firestore_id: d.id || null,
@@ -230,7 +268,7 @@ function transformDoc(d) {
     campaign_name,
     campaign_id,
     template_category: templateCategory,
-    raw_payload: d.raw_payload || null,
+    template_preview: templatePreview,
     migrated_at: new Date(),
   }
 }

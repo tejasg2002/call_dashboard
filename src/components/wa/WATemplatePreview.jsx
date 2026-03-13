@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchLeadByMobile } from '../../lib/firebase'
 import { fetchWATemplateUsers } from '../../lib/waApi'
 import { maskPhone } from '../../lib/userManagement'
@@ -28,6 +28,25 @@ function WAText({ text }) {
 
 function parsePayload(raw) {
   if (!raw) return null
+
+  // If we already have a flattened preview object from Mongo (template_preview),
+  // normalise it into the shape the UI expects and skip deep JSON parsing.
+  if (typeof raw === 'object' && (raw.body || raw.header_text || raw.buttons)) {
+    return {
+      name: raw.name || '',
+      category: raw.category || '',
+      language: raw.language || 'en',
+      headerFormat: raw.header_format || '',
+      headerImageUrl: raw.header_image_url || raw.header_handle_file_url || raw.media_url || '',
+      headerText: raw.header_text || '',
+      body: raw.body || '',
+      footer: raw.footer || '',
+      buttons: raw.buttons || [],
+      timestamp: '',
+      _raw: raw,
+    }
+  }
+
   try {
     const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
     const msg = obj?.data?.message
@@ -51,9 +70,9 @@ function parsePayload(raw) {
       footer: template?.footer || '',
       buttons,
       timestamp: (() => {
-        const raw = obj?.timestamp || ''
-        if (!raw) return ''
-        const s = String(raw).trim()
+        const rawTs = obj?.timestamp || ''
+        if (!rawTs) return ''
+        const s = String(rawTs).trim()
         if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !s.endsWith('Z') && !s.includes('+')) {
           return s.replace(' ', 'T') + 'Z'
         }
@@ -287,17 +306,18 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   const [fetchedPayload, setFetchedPayload] = useState(null)
   const [payloadLoading, setPayloadLoading] = useState(false)
 
-  const effectivePayload = row?.raw_payload || fetchedPayload
+  const effectivePayload = row?.template_preview || fetchedPayload || row?.raw_payload
 
   useEffect(() => {
-    if (row?.raw_payload || !row?.template_name) return
+    if (row?.template_preview || row?.raw_payload || !row?.template_name) return
     setFetchedPayload(null)
     setPayloadLoading(true)
     fetch(`/api/wa-events?template_name=${encodeURIComponent(row.template_name)}&limit=5`)
       .then((r) => r.json())
       .then((data) => {
-        const doc = (data.docs || []).find((d) => d.raw_payload)
-        if (doc?.raw_payload) setFetchedPayload(doc.raw_payload)
+        const doc = (data.docs || []).find((d) => d.template_preview || d.raw_payload)
+        if (doc?.template_preview) setFetchedPayload(doc.template_preview)
+        else if (doc?.raw_payload) setFetchedPayload(doc.raw_payload)
       })
       .catch(() => {})
       .finally(() => setPayloadLoading(false))
@@ -320,10 +340,13 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   const [activeStage, setActiveStage] = useState(null)
   const [loadedStageUsers, setLoadedStageUsers] = useState(null)
   const [stageUsersLoading, setStageUsersLoading] = useState(false)
+  const scrollRef = useRef(null)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
+    // Ensure modal content starts at top on open
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
@@ -405,14 +428,14 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className={`relative z-10 w-full max-w-md max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900' : 'bg-[#f0f2f5]'}`}
+        className={`relative z-10 w-full max-w-lg max-h-[92vh] overflow-hidden rounded-3xl shadow-[0_24px_60px_rgba(15,23,42,0.6)] border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-[#f0f2f5] border-slate-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal top bar — fixed, not scrollable */}
-        <div className={`flex items-center justify-between px-4 py-3 ${isDark ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'}`}>
+        <div className={`flex items-center justify-between px-4 py-3 sm:px-5 ${isDark ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'}`}>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{parsed?.name || row?.template_name}</span>
             {parsed?.category && (
@@ -437,11 +460,15 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
         </div>
 
         {/* Scrollable content area */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 52px)' }}>
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto"
+          style={{ maxHeight: 'calc(92vh - 52px)' }}
+        >
 
         {/* Chat background */}
         <div
-          className="px-4 pt-4 pb-3 flex flex-col items-end"
+          className="px-4 pt-4 pb-3 sm:px-5 flex flex-col items-center justify-center"
           style={{ background: isDark ? '#0d1117' : '#efeae2', backgroundImage: isDark ? 'none' : "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d6cfc7' fill-opacity='0.25'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}
         >
           {payloadLoading ? (
@@ -458,7 +485,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
               {JSON.stringify(parsed?._raw ?? effectivePayload, null, 2)}
             </pre>
           ) : (
-            <div className="w-[88%] rounded-2xl rounded-tr-sm overflow-hidden shadow-md" style={{ background: isDark ? '#1f2c34' : '#ffffff' }}>
+            <div className="w-full max-w-md rounded-2xl rounded-tr-sm overflow-hidden shadow-md" style={{ background: isDark ? '#1f2c34' : '#ffffff' }}>
               {parsed.headerFormat === 'IMAGE' && parsed.headerImageUrl && (
                 <img src={parsed.headerImageUrl} alt="Template header" className="w-full object-cover" style={{ maxHeight: '220px' }} onError={(e) => { e.target.style.display = 'none' }} />
               )}

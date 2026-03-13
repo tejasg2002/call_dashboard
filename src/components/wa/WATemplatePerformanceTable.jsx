@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import WATemplatePreview from './WATemplatePreview'
+import { useRouter } from 'next/navigation'
 
 const COLUMNS = [
   { key: 'template_name', label: 'Template name',  sortable: true },
@@ -40,10 +40,9 @@ function SortIcon({ dir }) {
 
 export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, dataMasked }) {
   const isDark = theme === 'dark'
-  const [previewRow, setPreviewRow] = useState(null)
-  const [previewBtnStats, setPreviewBtnStats] = useState([])
   const [sortKey, setSortKey] = useState('ctr')
   const [sortDir, setSortDir] = useState('desc')
+  const router = useRouter()
 
   function handleSort(key) {
     if (sortKey === key) {
@@ -70,16 +69,6 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
   const tableWrap = `rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`
 
   return (
-    <>
-      {previewRow && (
-        <WATemplatePreview
-          row={previewRow}
-          buttonStats={previewBtnStats}
-          theme={theme}
-          dataMasked={dataMasked}
-          onClose={() => { setPreviewRow(null); setPreviewBtnStats([]) }}
-        />
-      )}
       <div className={tableWrap}>
         <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
           <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Template Performance</h3>
@@ -184,15 +173,12 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                     <td className={tdClass}>
                       <button
                         onClick={() => {
-                          setPreviewRow(r)
-                          setPreviewBtnStats(ctaRows.filter((c) =>
-                            c.template_used && c.template_used.split(', ').includes(r.template_name)
-                          ))
+                          router.push(`/wa/templates/${encodeURIComponent(r.template_name)}`)
                         }}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                           isDark ? 'border-violet-600 bg-violet-700/30 text-violet-300 hover:bg-violet-700/60' : 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
                         }`}
-                        title="View template details"
+                        title="View template breakdown"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -208,6 +194,5 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
           </table>
         </div>
       </div>
-    </>
   )
 }

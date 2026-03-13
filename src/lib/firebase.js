@@ -1,65 +1,28 @@
-import { collection, query, where, getDocs, limit, startAfter, getCountFromServer } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, getDocs, limit } from 'firebase/firestore'
 import { db } from '../firebase'
 
 const COLLECTION = 'whatsapp_webhooks'
-const WA_PAGE_SIZE = 5_000
 
 /**
- * Fetch only docs created after `timestamp` (ISO string or Firestore timestamp).
- * Used by the Refresh flow to get incremental data.
+ * Subscribe to ALL whatsapp_webhooks docs in real-time.
+ * All filtering (template, event type, date, phone) is done in-memory in the dashboard
+ * so that filter dropdowns always show the full option list regardless of active filters.
+ * @returns {() => void} Unsubscribe function
  */
-export async function fetchWhatsAppSince(timestamp) {
-  const col = collection(db, COLLECTION)
-  const q = query(col, where('event_timestamp', '>', timestamp))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
-}
-
-/**
- * Fetch all docs for a specific template name (for on-demand stageUsers).
- */
-export async function fetchTemplateUsers(templateName) {
-  const col = collection(db, COLLECTION)
-  const q = query(col, where('template_name', '==', templateName))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
-}
-
-/**
- * Fetch ALL whatsapp_webhooks in batches using cursor-based pagination.
- * Calls onProgress after each batch so the UI can show a progress bar.
- */
-export async function fetchWhatsAppBatched(onProgress) {
-  const col = collection(db, COLLECTION)
-
-  let total = 0
-  try {
-    const countSnap = await getCountFromServer(query(col))
-    total = countSnap.data().count
-  } catch (e) {
-    console.warn('[WA] getCountFromServer failed:', e)
-  }
-
-  let allDocs = []
-  let lastSnap = null
-  let hasMore = true
-
-  while (hasMore) {
-    const q = lastSnap
-      ? query(col, startAfter(lastSnap), limit(WA_PAGE_SIZE))
-      : query(col, limit(WA_PAGE_SIZE))
-
-    const snapshot = await getDocs(q)
-    const batch = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    allDocs = allDocs.concat(batch)
-
-    hasMore = snapshot.docs.length === WA_PAGE_SIZE
-    if (hasMore) lastSnap = snapshot.docs[snapshot.docs.length - 1]
-
-    if (onProgress) onProgress({ loaded: allDocs.length, total, done: !hasMore })
-  }
-
-  return allDocs
+export function subscribeWhatsAppWebhooks(callback) {
+  const q = query(collection(db, COLLECTION))
+  const unsub = onSnapshot(
+    q,
+    (snapshot) => {
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      callback(docs, null)
+    },
+    (err) => {
+      console.error('[whatsapp_webhooks] subscription error:', err)
+      callback([], err)
+    }
+  )
+  return () => unsub()
 }
 
 /**
@@ -140,45 +103,36 @@ export async function fetchLeadByMobile(mobileNumber) {
     console.error('[crmSnapshot] lookup error:', err)
   }
 
-  // --- Step 2: fall back to ITM Lead API (with retry on 429) ---
-  const apiKey = process.env.NEXT_PUBLIC_ITM_API_KEY
+  // --- Step 2: fall back to ITM Lead API ---
+  const apiKey = import.meta.env.VITE_ITM_API_KEY
   if (!apiKey) {
-    console.warn('[ITM API] API key not set in .env')
+    console.warn('[ITM API] VITE_ITM_API_KEY not set in .env')
     _leadCache.set(mobile, null)
     return null
   }
 
-  const MAX_RETRIES = 3
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const res = await fetch(
-        `https://api.itm.edu/v1/npf/lead/mobile/mba?mobile=${encodeURIComponent(mobile)}`,
-        { method: 'GET', headers: { 'x-api-key': apiKey } }
-      )
-      if (res.status === 429) {
-        const wait = Math.min(1000 * Math.pow(2, attempt), 8000)
-        await new Promise((r) => setTimeout(r, wait))
-        continue
+  try {
+    const res = await fetch(
+      `https://api.itm.edu/v1/npf/lead/mobile/mba?mobile=${encodeURIComponent(mobile)}`,
+      {
+        method: 'GET',
+        headers: { 'x-api-key': apiKey },
       }
-      if (!res.ok) {
-        _leadCache.set(mobile, null)
-        return null
-      }
-      const json = await res.json()
-      const lead = json?.results?.data?.[0] ?? null
-      _leadCache.set(mobile, lead)
-      return lead
-    } catch (err) {
-      if (attempt === MAX_RETRIES) {
-        console.error('[ITM API] fetch error after retries:', err)
-        _leadCache.set(mobile, null)
-        return null
-      }
-      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+    )
+    if (!res.ok) {
+      console.error(`[ITM API] ${res.status} for mobile ${mobile}`)
+      _leadCache.set(mobile, null)
+      return null
     }
+    const json = await res.json()
+    const lead = json?.results?.data?.[0] ?? null
+    _leadCache.set(mobile, lead)
+    return lead
+  } catch (err) {
+    console.error('[ITM API] fetch error:', err)
+    _leadCache.set(mobile, null)
+    return null
   }
-  _leadCache.set(mobile, null)
-  return null
 }
 
 // In-memory cache: normalised email → lead data (or null)

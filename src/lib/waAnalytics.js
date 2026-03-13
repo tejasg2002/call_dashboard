@@ -1,6 +1,10 @@
-/** Returns 'campaign' for message_campaign_* events, 'api' for everything else. */
+/** Returns 'campaign' for campaign traffic, 'api' for everything else. */
 export function eventSource(doc) {
-  return (doc.event_type || '').toLowerCase().startsWith('message_campaign_') ? 'campaign' : 'api'
+  if (doc.source) return doc.source
+  const et = (doc.event_type || '').toLowerCase()
+  if (et.startsWith('message_campaign_')) return 'campaign'
+  if (doc.campaign_name || doc.campaign_id) return 'campaign'
+  return 'api'
 }
 
 function eventStage(doc) {
@@ -40,9 +44,10 @@ export function aggregateWebhooks(docs) {
   const templateCategories = {}
 
   docs.forEach((d) => {
-    // Use pre-computed fields from MongoDB (flat schema), fallback to parsing for Firestore data
-    const stage = d.stage || eventStage(d)
+    const stage = eventStage(d)
 
+    // Cost is only counted on delivered events (event_type === 'message_api_delivered')
+    // to avoid multiplying cost across sent/read/clicked events for the same message.
     let cost = 0
     if (stage === 'delivered') {
       if (typeof d.cost === 'number' && d.cost > 0) {
@@ -63,6 +68,7 @@ export function aggregateWebhooks(docs) {
     const link = d.button_link || ''
     const clickType = d.click_type || ''
 
+    // Extract button_text: try top-level, then raw_payload nested fields (Interakt format)
     let button = d.button_text || ''
     if (!button && d.raw_payload) {
       try {
@@ -83,14 +89,13 @@ export function aggregateWebhooks(docs) {
       byTemplate[template] = {
         sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0,
         failureReasons: {},
+        // phone → latest event info, keyed so each phone appears once per stage
         stageUsers: { sent: {}, delivered: {}, read: {}, clicked: {}, failed: {} },
+        // button_text → { clicks, users } — scoped to THIS template only
         _buttons: {},
-        _source: d.source || eventSource(d),
-        _firstSeen: null,
-        _lastSeen: null,
       }
     }
-    // Use pre-computed click_timestamp from MongoDB, or extract from raw_payload
+    // For click events, prefer click_timestamp from raw_payload.data.event (UTC→IST handled at display layer)
     let ts = toUtcTs(d.event_timestamp) || toUtcTs(d.timestamp) || null
     if (stage === 'clicked') {
       if (d.click_timestamp) {
@@ -106,13 +111,6 @@ export function aggregateWebhooks(docs) {
             || rp?.data?.message?.seen_at
           if (clickTs) ts = toUtcTs(clickTs)
         } catch {}
-      }
-    }
-    if (ts) {
-      const tsMs = new Date(ts).getTime()
-      if (!isNaN(tsMs)) {
-        if (!byTemplate[template]._firstSeen || tsMs < byTemplate[template]._firstSeen) byTemplate[template]._firstSeen = tsMs
-        if (!byTemplate[template]._lastSeen || tsMs > byTemplate[template]._lastSeen) byTemplate[template]._lastSeen = tsMs
       }
     }
     if (stage === 'sent') {
@@ -153,18 +151,20 @@ export function aggregateWebhooks(docs) {
     if (stage === 'failed') {
       byTemplate[template].failed++
 
-      let reason = d.failure_reason || ''
-      let code = d.error_code || ''
+      let reason = ''
+      let code = ''
 
-      // If pre-computed fields are empty, fall back to raw_payload parsing
-      if (!reason && d.raw_payload) {
+      // ── Primary: raw_payload.data.message.channel_failure_reason (Interakt) ─
+      if (d.raw_payload) {
         try {
           const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
           const msg = rp?.data?.message
           reason = msg?.channel_failure_reason || ''
-          code   = code || msg?.channel_error_code || ''
+          code   = msg?.channel_error_code     || ''
 
+          // Fallback within raw_payload
           if (!reason) {
+            // WhatsApp Cloud API errors array
             const msgErrors = msg?.errors
             if (Array.isArray(msgErrors) && msgErrors.length > 0) {
               const e = msgErrors[0]
@@ -183,11 +183,20 @@ export function aggregateWebhooks(docs) {
         } catch {}
       }
 
+      // ── Fallback: top-level fields ───────────────────────────────────────────
       if (!reason) {
-        reason = d.channel_failure_reason || d.error_message || d.error_title || d.reason || d.delivery_error_message || ''
+        reason =
+          d.failure_reason          ||
+          d.channel_failure_reason  ||
+          d.error_message           ||
+          d.error_title             ||
+          d.reason                  ||
+          d.delivery_error_message  ||
+          ''
       }
-      if (!code) code = d.channel_error_code || ''
+      if (!code) code = d.channel_error_code || d.error_code || ''
 
+      // Build the display label — include error code when available
       const label = reason.trim()
         ? (code ? `[${code}] ${reason.trim()}` : reason.trim())
         : (code ? `Error code ${code}` : 'Unknown reason')
@@ -204,21 +213,18 @@ export function aggregateWebhooks(docs) {
       if (!existing || hasRawTemplate) {
         templatePayloads[template] = d.raw_payload
       }
-      // Use pre-computed template_category, fall back to raw_payload parsing
+      // Extract category from raw_payload
       if (!templateCategories[template]) {
-        if (d.template_category) {
-          templateCategories[template] = String(d.template_category).toUpperCase()
-        } else if (d.raw_payload) {
-          try {
-            const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
-            const rawTpl = rp?.data?.message?.raw_template
-            const tpl = rawTpl ? (typeof rawTpl === 'string' ? JSON.parse(rawTpl) : rawTpl) : null
-            const cat = tpl?.category || ''
-            if (cat) templateCategories[template] = cat.toUpperCase()
-          } catch {}
-        }
+        try {
+          const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload
+          const rawTpl = rp?.data?.message?.raw_template
+          const tpl = rawTpl ? (typeof rawTpl === 'string' ? JSON.parse(rawTpl) : rawTpl) : null
+          const cat = tpl?.category || d.template_category || ''
+          if (cat) templateCategories[template] = cat.toUpperCase()
+        } catch {}
       }
     }
+    // Also check top-level template_category field
     if (template !== '—' && !templateCategories[template] && d.template_category) {
       templateCategories[template] = String(d.template_category).toUpperCase()
     }
@@ -236,16 +242,15 @@ export function aggregateWebhooks(docs) {
         }
       }
       byButton[buttonKey].clicks++
+      if (phone) byButton[buttonKey].users.add(phone)
+      // Store user event for the per-button clicker list
       if (phone) {
-        byButton[buttonKey].users.add(phone)
-        if (byButton[buttonKey].userEvents.length < 500) {
-          byButton[buttonKey].userEvents.push({
-            phone,
-            template: template !== '—' ? template : null,
-            timestamp: ts,
-            clickType: clickType || null,
-          })
-        }
+        byButton[buttonKey].userEvents.push({
+          phone,
+          template: template !== '—' ? template : null,
+          timestamp: ts,
+          clickType: clickType || null,
+        })
       }
       if (template && template !== '—') byButton[buttonKey].templates.add(template)
       if (link) {
@@ -256,14 +261,7 @@ export function aggregateWebhooks(docs) {
 
     if (phone) {
       if (!byPhone[phone]) byPhone[phone] = []
-      byPhone[phone].push({
-        template_name: template,
-        event_type: d.event_type || '',
-        phone_number: phone,
-        stage,
-        _resolvedTs: ts,
-        button_text: stage === 'clicked' ? button : undefined,
-      })
+      byPhone[phone].push({ ...d, stage, _resolvedTs: ts })
     }
   })
 
@@ -312,9 +310,6 @@ export function aggregateWebhooks(docs) {
       total_cost: t.cost,
       raw_payload: templatePayloads[name] || null,
       category: templateCategories[name] || '—',
-      source: t._source || 'api',
-      firstSeen: t._firstSeen ? new Date(t._firstSeen).toISOString() : null,
-      lastSeen: t._lastSeen ? new Date(t._lastSeen).toISOString() : null,
     }))
   templateRows.sort((a, b) => (b.ctr || 0) - (a.ctr || 0))
 
@@ -358,43 +353,18 @@ export function aggregateWebhooks(docs) {
     return { phone_number: phone, stages, templates, buttons, score, tier, tierColor, tierBg, eventCount: events.length, lastActivity }
   }).sort((a, b) => b.score - a.score || b.eventCount - a.eventCount)
 
-  const byPhoneArr = Object.entries(byPhone)
-    .map(([phone, events]) => ({
-      phone_number: phone,
-      events: events.sort((a, b) => new Date(b._resolvedTs || 0) - new Date(a._resolvedTs || 0)),
-    }))
-    .sort((a, b) => b.events.length - a.events.length)
-    .slice(0, 500)
-
-  const buttonPhones = {}
-  for (const [text, b] of Object.entries(byButton)) {
-    if (text && text !== '—' && b.users.size > 0) {
-      buttonPhones[text] = [...b.users]
-    }
-  }
-
-  const templatePhones = {}
-  for (const [name, t] of Object.entries(byTemplate)) {
-    if (name && name !== '—') {
-      const phones = new Set()
-      for (const stage of Object.values(t.stageUsers)) {
-        for (const phone of Object.keys(stage)) phones.add(phone)
-      }
-      if (phones.size > 0) templatePhones[name] = [...phones]
-    }
-  }
-
   return {
     kpi: { ...kpi, ctr, readRate, sdr, str },
     funnel,
     templateRows,
     ctaRows,
-    byPhone: byPhoneArr,
-    engagementRows: engagementRows.slice(0, 500),
+    byPhone: Object.entries(byPhone).map(([phone, events]) => ({
+      phone_number: phone,
+      events: events.sort((a, b) => new Date(b._resolvedTs || b.event_timestamp || b.timestamp || 0) - new Date(a._resolvedTs || a.event_timestamp || a.timestamp || 0)),
+    })),
+    engagementRows,
     costPerClick: kpi.clicked > 0 ? kpi.cost / kpi.clicked : 0,
     totalCost: kpi.cost,
-    buttonPhones,
-    templatePhones,
   }
 }
 
@@ -419,25 +389,6 @@ export function aggregateByCampaign(docs, campaigns) {
       totalMessages: filtered.length,
     }
   })
-}
-
-export function stripWAForSnapshot(aggregated) {
-  const { kpi, funnel, templateRows, ctaRows, costPerClick, totalCost, engagementRows } = aggregated
-  return {
-    kpi,
-    funnel,
-    templateRows: templateRows.map(({ stageUsers, raw_payload, ...rest }) => rest),
-    ctaRows: ctaRows.map(({ user_events, ...rest }) => rest),
-    costPerClick,
-    totalCost,
-    engagementSummary: {
-      total: engagementRows?.length || 0,
-      clickedCount: engagementRows?.filter((r) => r.tier === 'Clicked').length || 0,
-      readCount: engagementRows?.filter((r) => r.tier === 'Read').length || 0,
-      deliveredCount: engagementRows?.filter((r) => r.tier === 'Delivered').length || 0,
-      sentOnlyCount: engagementRows?.filter((r) => r.tier === 'Sent only').length || 0,
-    },
-  }
 }
 
 export function getFilterOptions(docs) {
