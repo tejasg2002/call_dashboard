@@ -78,19 +78,29 @@ function StageDots({ stages, isDark }) {
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
-export default function WAEngagementSection({ engagementRows = [], theme, dataMasked }) {
+export default function WAEngagementSection({ engagementRows = [], engagementSummary, theme, dataMasked }) {
   const isDark = theme === 'dark'
   const [activeTier, setActiveTier] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
 
-  const tierCounts = useMemo(() =>
-    TIERS.reduce((acc, t) => {
+  const summaryMode = engagementRows.length === 0 && engagementSummary
+
+  const tierCounts = useMemo(() => {
+    if (summaryMode) {
+      return {
+        'Clicked': engagementSummary.clickedCount || 0,
+        'Read': engagementSummary.readCount || 0,
+        'Delivered': engagementSummary.deliveredCount || 0,
+        'Sent only': engagementSummary.sentOnlyCount || 0,
+      }
+    }
+    return TIERS.reduce((acc, t) => {
       acc[t] = engagementRows.filter((r) => r.tier === t).length
       return acc
-    }, {}),
-  [engagementRows])
+    }, {})
+  }, [engagementRows, engagementSummary, summaryMode])
 
   const filtered = useMemo(() => {
     let rows = engagementRows
@@ -122,7 +132,7 @@ export default function WAEngagementSection({ engagementRows = [], theme, dataMa
     return () => { cancelled = true }
   }, [page, pageSize, activeTier, search])
 
-  const totalUsers = engagementRows.length
+  const totalUsers = summaryMode ? (engagementSummary.total || 0) : engagementRows.length
   const clickedUsers = tierCounts['Clicked'] || 0
   const readUsers    = (tierCounts['Read'] || 0) + clickedUsers
   const deliveredUsers = (tierCounts['Delivered'] || 0) + readUsers
@@ -177,6 +187,13 @@ export default function WAEngagementSection({ engagementRows = [], theme, dataMa
         )}
       </div>
 
+      {summaryMode && (
+        <div className={`px-5 py-6 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className="text-sm">Per-user engagement details available after Recalibrate (Settings).</p>
+        </div>
+      )}
+
+      {!summaryMode && <>
       {/* Tier filter pills */}
       <div className={`px-5 py-3 flex flex-wrap gap-2 border-b ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
         <button
@@ -379,6 +396,7 @@ export default function WAEngagementSection({ engagementRows = [], theme, dataMa
           >»</button>
         </div>
       </div>
+      </>}
     </div>
   )
 }

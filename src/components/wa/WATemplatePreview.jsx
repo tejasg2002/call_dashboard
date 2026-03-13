@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { fetchLeadByMobile } from '../../lib/firebase'
+import { fetchWATemplateUsers } from '../../lib/waApi'
 import { maskPhone } from '../../lib/userManagement'
 
 // ── WhatsApp text formatter ──────────────────────────────────────────────────
@@ -282,7 +283,27 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
 // ── Main export ──────────────────────────────────────────────────────────────
 export default function WATemplatePreview({ row, buttonStats = [], theme, dataMasked, onClose }) {
   const isDark = theme === 'dark'
-  const parsed = parsePayload(row?.raw_payload)
+
+  const [fetchedPayload, setFetchedPayload] = useState(null)
+  const [payloadLoading, setPayloadLoading] = useState(false)
+
+  const effectivePayload = row?.raw_payload || fetchedPayload
+
+  useEffect(() => {
+    if (row?.raw_payload || !row?.template_name) return
+    setFetchedPayload(null)
+    setPayloadLoading(true)
+    fetch(`/api/wa-events?template_name=${encodeURIComponent(row.template_name)}&limit=5`)
+      .then((r) => r.json())
+      .then((data) => {
+        const doc = (data.docs || []).find((d) => d.raw_payload)
+        if (doc?.raw_payload) setFetchedPayload(doc.raw_payload)
+      })
+      .catch(() => {})
+      .finally(() => setPayloadLoading(false))
+  }, [row?.template_name, row?.raw_payload])
+
+  const parsed = parsePayload(effectivePayload)
   const hasStructured = parsed && (parsed.body || parsed.headerImageUrl || parsed.buttons?.length > 0)
 
   const sent      = row?.sent      ?? 0
@@ -292,13 +313,13 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   const ctr       = row?.ctr       ?? 0
   const readRate  = row?.readRate  ?? (delivered > 0 ? Math.min((read / delivered) * 100, 100) : 0)
 
-  // Unique clickers (deduplicated by phone) — consistent with the user list below
   const clicked   = row?.stageUsers?.clicked?.length ?? row?.clicked ?? 0
 
-  // Button breakdown scoped to this template only
   const btnStats  = row?.templateBtnStats?.length ? row.templateBtnStats : buttonStats
 
   const [activeStage, setActiveStage] = useState(null)
+  const [loadedStageUsers, setLoadedStageUsers] = useState(null)
+  const [stageUsersLoading, setStageUsersLoading] = useState(false)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -306,8 +327,68 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // Reset active stage when row changes
-  useEffect(() => { setActiveStage(null) }, [row?.template_name])
+  useEffect(() => { setActiveStage(null); setLoadedStageUsers(null); setFetchedPayload(null) }, [row?.template_name])
+
+  const resolveStageUsers = useCallback(async (stage) => {
+    if (row?.stageUsers?.[stage]) return
+    if (loadedStageUsers?.[stage]) return
+    if (!row?.template_name) return
+
+    setStageUsersLoading(true)
+    try {
+      const docs = await fetchWATemplateUsers(row.template_name)
+      const stageMap = { sent: {}, delivered: {}, read: {}, clicked: {}, failed: {} }
+      const getStage = (d) => {
+        if (d.stage) return d.stage
+        const et = (d.event_type || '').toLowerCase()
+        const ms = (d.message_status || '').toLowerCase()
+        if (et.includes('click')) return 'clicked'
+        if (et.includes('read') || ms === 'read') return 'read'
+        if (et.includes('deliver') || ms === 'delivered') return 'delivered'
+        if (et.includes('sent') || ms === 'sent') return 'sent'
+        if (et.includes('fail') || ms === 'failed') return 'failed'
+        return null
+      }
+      docs.forEach((d) => {
+        const s = getStage(d)
+        if (!s || !stageMap[s]) return
+        const phone = d.phone_number || ''
+        if (!phone) return
+        const ts = d.event_timestamp || d.timestamp || ''
+        const existing = stageMap[s][phone]
+        if (!existing || ts > existing.timestamp) {
+          const entry = { phone, timestamp: ts }
+          if (s === 'clicked') {
+            let button = d.button_text || ''
+            if (!button && d.raw_payload) { try { const rp = typeof d.raw_payload === 'string' ? JSON.parse(d.raw_payload) : d.raw_payload; button = rp?.data?.message?.button_text || '' } catch {} }
+            const prevButtons = existing?.allButtons || []
+            const allButtons = [...new Set([...prevButtons, ...(button ? [button] : [])])]
+            entry.buttonText = button || null
+            entry.allButtons = allButtons
+          }
+          if (s === 'failed') entry.reason = d.failure_reason || d.channel_failure_reason || ''
+          stageMap[s][phone] = entry
+        }
+      })
+      const result = {}
+      for (const [s, map] of Object.entries(stageMap)) {
+        result[s] = Object.values(map).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      }
+      setLoadedStageUsers(result)
+    } catch (err) {
+      console.error('[WATemplatePreview] fetchWATemplateUsers error:', err)
+    } finally {
+      setStageUsersLoading(false)
+    }
+  }, [row?.template_name, row?.stageUsers, loadedStageUsers])
+
+  const handleStageClick = useCallback((stage) => {
+    const isActive = activeStage === stage
+    setActiveStage(isActive ? null : stage)
+    if (!isActive) resolveStageUsers(stage)
+  }, [activeStage, resolveStageUsers])
+
+  const getStageUsers = (stage) => row?.stageUsers?.[stage] || loadedStageUsers?.[stage] || []
 
   const STAT_TILES = [
     { stage: 'sent',      value: sent,      label: 'Sent',      color: 'text-blue-500',
@@ -327,27 +408,27 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className={`relative z-10 w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col ${isDark ? 'bg-slate-900' : 'bg-[#f0f2f5]'}`}
+        className={`relative z-10 w-full max-w-md max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900' : 'bg-[#f0f2f5]'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal top bar */}
-        <div className={`sticky top-0 z-10 flex items-center justify-between px-4 py-3 ${isDark ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'}`}>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{parsed?.name || row?.template_name}</span>
+        {/* Modal top bar — fixed, not scrollable */}
+        <div className={`flex items-center justify-between px-4 py-3 ${isDark ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'}`}>
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{parsed?.name || row?.template_name}</span>
             {parsed?.category && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-amber-800/40 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-amber-800/40 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
                 {parsed.category}
               </span>
             )}
             {parsed?.language && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                 {parsed.language.toUpperCase()}
               </span>
             )}
           </div>
           <button
             onClick={onClose}
-            className={`p-1.5 rounded-full ml-2 ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+            className={`flex-shrink-0 p-1.5 rounded-full ml-2 ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -355,18 +436,26 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
           </button>
         </div>
 
+        {/* Scrollable content area */}
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 52px)' }}>
+
         {/* Chat background */}
         <div
-          className="flex-1 px-4 pt-4 pb-3 flex flex-col items-end"
+          className="px-4 pt-4 pb-3 flex flex-col items-end"
           style={{ background: isDark ? '#0d1117' : '#efeae2', backgroundImage: isDark ? 'none' : "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d6cfc7' fill-opacity='0.25'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}
         >
-          {!row?.raw_payload ? (
+          {payloadLoading ? (
+            <div className="self-stretch flex flex-col items-center justify-center py-8 gap-2">
+              <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+              <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading preview...</span>
+            </div>
+          ) : !effectivePayload ? (
             <div className={`self-stretch text-center py-8 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              No raw_payload stored for this template.
+              No preview data available for this template.
             </div>
           ) : !hasStructured ? (
             <pre className={`self-stretch text-xs rounded-xl p-3 overflow-x-auto whitespace-pre-wrap ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700'}`}>
-              {JSON.stringify(parsed?._raw ?? row?.raw_payload, null, 2)}
+              {JSON.stringify(parsed?._raw ?? effectivePayload, null, 2)}
             </pre>
           ) : (
             <div className="w-[88%] rounded-2xl rounded-tr-sm overflow-hidden shadow-md" style={{ background: isDark ? '#1f2c34' : '#ffffff' }}>
@@ -420,7 +509,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
                   key={s.stage}
                   type="button"
                   disabled={!hasData}
-                  onClick={() => setActiveStage(isActive ? null : s.stage)}
+                  onClick={() => handleStageClick(s.stage)}
                   className={`text-center py-2.5 px-1 rounded-xl border transition-all ${
                     isActive
                       ? s.activeCls
@@ -440,12 +529,19 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
           {/* User list panel */}
           {activeStage && (
             <div className="mb-3">
+              {stageUsersLoading && !getStageUsers(activeStage).length ? (
+                <div className={`flex items-center justify-center py-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  <span className={`ml-2 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading users...</span>
+                </div>
+              ) : (
               <UserListPanel
                 stage={activeStage}
-                users={row?.stageUsers?.[activeStage] || []}
+                users={getStageUsers(activeStage)}
                 isDark={isDark}
                 dataMasked={dataMasked}
               />
+              )}
               {/* Button breakdown shown below clicked user list */}
               {activeStage === 'clicked' && btnStats.length > 0 && (
                 <div className="mt-3 space-y-2">
@@ -491,6 +587,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
             ))}
           </div>
         </div>
+        </div>{/* end scrollable */}
       </div>
     </div>
   )

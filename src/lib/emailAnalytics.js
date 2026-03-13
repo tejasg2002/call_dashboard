@@ -82,22 +82,44 @@ export function aggregateEmailWebhooks(docs) {
       subjectMap[subject] = {
         subject,
         templateId,
-        sampleMail: null,   // filled below on first Send event
+        sampleMail: null,
         sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0,
         _maps: { sent: {}, delivered: {}, opened: {}, clicked: {}, bounced: {} },
+        _emailSet: new Set(),
+        _firstSeen: null,
+        _lastSeen: null,
       }
     }
     const row = subjectMap[subject]
     row[stage] = (row[stage] || 0) + 1
+    if (ts) {
+      const tsMs = new Date(ts).getTime()
+      if (!isNaN(tsMs)) {
+        if (!row._firstSeen || tsMs < row._firstSeen) row._firstSeen = tsMs
+        if (!row._lastSeen || tsMs > row._lastSeen) row._lastSeen = tsMs
+      }
+    }
+    if (email) row._emailSet.add(email)
     if (!row.templateId && templateId) row.templateId = templateId
     // Capture rich mail header info from the first Send event for the preview card
     if (!row.sampleMail && stage === 'sent') row.sampleMail = buildSampleMail(doc)
 
-    // Dedup per stage: keep only the latest event per email address
     if (row._maps[stage]) {
       const prev = row._maps[stage][email]
-      if (!prev || new Date(ts) > new Date(prev.timestamp)) {
-        row._maps[stage][email] = { email, timestamp: ts, messageId, ...(clickLink && { link: clickLink }) }
+      if (stage === 'clicked') {
+        if (!prev) {
+          row._maps[stage][email] = { email, timestamp: ts, messageId, links: clickLink ? [clickLink] : [] }
+        } else {
+          if (new Date(ts) > new Date(prev.timestamp)) { prev.timestamp = ts; prev.messageId = messageId }
+          if (clickLink && !(prev.links || []).includes(clickLink)) {
+            if (!prev.links) prev.links = []
+            prev.links.push(clickLink)
+          }
+        }
+      } else {
+        if (!prev || new Date(ts) > new Date(prev.timestamp)) {
+          row._maps[stage][email] = { email, timestamp: ts, messageId }
+        }
       }
     }
 
@@ -123,10 +145,13 @@ export function aggregateEmailWebhooks(docs) {
       stageUsers[s] = Object.values(map).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     }
 
-    const { _maps, ...rest } = row
-    // Fallback: if no Send event was seen, build sampleMail from any available map entry
+    const { _maps, _firstSeen, _lastSeen, ...rest } = row
     const sampleMail = rest.sampleMail || null
-    return { ...rest, sampleMail, deliveryRate, openRate, clickRate, bounceRate, stageUsers }
+    return {
+      ...rest, sampleMail, deliveryRate, openRate, clickRate, bounceRate, stageUsers,
+      firstSeen: _firstSeen ? new Date(_firstSeen).toISOString() : null,
+      lastSeen: _lastSeen ? new Date(_lastSeen).toISOString() : null,
+    }
   }).sort((a, b) => b.sent - a.sent)
 
   // ── Overall rates ────────────────────────────────────────────────────────
@@ -135,11 +160,11 @@ export function aggregateEmailWebhooks(docs) {
   kpi.clickRate    = kpi.delivered > 0 ? (kpi.clicked   / kpi.delivered) * 100 : 0
   kpi.bounceRate   = kpi.sent      > 0 ? (kpi.bounced   / kpi.sent)      * 100 : 0
 
-  // ── Build byEmail timeline array ─────────────────────────────────────────
+  // ── Build byEmail timeline array (capped to top 500 most recent) ────────
   const byEmail = Object.values(byEmailMap).map((u) => ({
     ...u,
-    events: u.events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
-  })).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity))
+    events: u.events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 100),
+  })).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity)).slice(0, 500)
 
   // ── Funnel for chart ─────────────────────────────────────────────────────
   const funnel = [
@@ -150,5 +175,22 @@ export function aggregateEmailWebhooks(docs) {
     { label: 'Bounced',    value: kpi.bounced    },
   ]
 
-  return { kpi, templateRows, byEmail, funnel }
+  const subjectEmails = {}
+  for (const row of Object.values(subjectMap)) {
+    if (row._emailSet.size > 0) {
+      subjectEmails[row.subject] = [...row._emailSet]
+    }
+  }
+
+  return { kpi, templateRows, byEmail, funnel, subjectEmails }
+}
+
+export function stripEmailForSnapshot(aggregated) {
+  const { kpi, templateRows, funnel, byEmail } = aggregated
+  return {
+    kpi,
+    funnel,
+    templateRows: templateRows.map(({ stageUsers, ...rest }) => rest),
+    byEmailSummary: { totalUsers: byEmail?.length || 0 },
+  }
 }

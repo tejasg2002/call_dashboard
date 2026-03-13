@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { fetchLeadByEmail } from '../../lib/firebase'
 import { maskEmail } from '../../lib/userManagement'
 
@@ -128,21 +128,44 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
               {ts && (
                 <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{ts}</p>
               )}
-              {u.link && (
+              {/* Single link (legacy format) */}
+              {u.link && !u.links && (
                 <a
                   href={u.link}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className={`inline-flex items-center gap-1 text-[10px] font-mono mt-0.5 truncate max-w-[240px] hover:underline
-                    ${isDark ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'}`}
+                  className={`inline-flex items-center gap-1.5 text-[10px] font-mono mt-1 px-2 py-1 rounded-lg border truncate max-w-full hover:underline
+                    ${isDark ? 'text-sky-400 hover:text-sky-300 bg-sky-900/20 border-sky-800/40' : 'text-sky-600 hover:text-sky-700 bg-sky-50 border-sky-200'}`}
                   title={u.link}
                 >
-                  <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
-                  {u.link.length > 50 ? u.link.slice(0, 50) + '…' : u.link}
+                  {u.link.length > 60 ? u.link.slice(0, 60) + '…' : u.link}
                 </a>
+              )}
+              {/* Multiple links */}
+              {u.links?.length > 0 && (
+                <div className="mt-1 space-y-1">
+                  {u.links.map((link, li) => (
+                    <a
+                      key={li}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border break-all hover:underline
+                        ${isDark ? 'text-sky-400 hover:text-sky-300 bg-sky-900/20 border-sky-800/40' : 'text-sky-600 hover:text-sky-700 bg-sky-50 border-sky-200'}`}
+                      title={link}
+                    >
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <span className="break-all">{link.length > 70 ? link.slice(0, 70) + '…' : link}</span>
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
           )
@@ -278,6 +301,8 @@ function EmailEnvelopeCard({ mail, subject, isDark }) {
 // ── Preview modal ─────────────────────────────────────────────────────────────
 function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
   const [activeStage, setActiveStage] = useState(null)
+  const [loadedStageUsers, setLoadedStageUsers] = useState(null)
+  const [stageUsersLoading, setStageUsersLoading] = useState(false)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -285,7 +310,69 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  useEffect(() => { setActiveStage(null) }, [row?.subject])
+  useEffect(() => { setActiveStage(null); setLoadedStageUsers(null) }, [row?.subject])
+
+  const STAGE_TO_SES = { sent: 'Send', delivered: 'Delivery', opened: 'Open', clicked: 'Click', bounced: 'Bounce' }
+
+  const resolveStageUsers = useCallback(async (stage) => {
+    if (row?.stageUsers?.[stage]) return
+    if (loadedStageUsers?.[stage]) return
+    if (!row?.subject) return
+
+    setStageUsersLoading(true)
+    try {
+      const url = new URL('/api/email-events', window.location.origin)
+      url.searchParams.set('subject', row.subject)
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const { docs } = await res.json()
+
+      const stageMap = { sent: {}, delivered: {}, opened: {}, clicked: {}, bounced: {} }
+      for (const d of docs) {
+        const inner = d.document || d
+        const eventType = inner.detail?.eventType || ''
+        const sesStage = { Send: 'sent', Delivery: 'delivered', Open: 'opened', Click: 'clicked', Bounce: 'bounced' }[eventType]
+        if (!sesStage) continue
+        const mail = inner.detail?.mail || {}
+        const email = (mail.destination?.[0] || mail.commonHeaders?.to?.[0] || '').toLowerCase().trim()
+        if (!email) continue
+        const ts = inner.time || inner.createdAt || d.timestamp || ''
+        const clickLink = sesStage === 'clicked' ? (inner.detail?.click?.link || '') : ''
+        const messageId = mail.messageId || ''
+        const existing = stageMap[sesStage][email]
+        if (sesStage === 'clicked') {
+          if (!existing) {
+            stageMap[sesStage][email] = { email, timestamp: ts, messageId, links: clickLink ? [clickLink] : [] }
+          } else {
+            if (ts > existing.timestamp) { existing.timestamp = ts; existing.messageId = messageId }
+            if (clickLink && !existing.links.includes(clickLink)) existing.links.push(clickLink)
+          }
+        } else {
+          if (!existing || ts > existing.timestamp) {
+            stageMap[sesStage][email] = { email, timestamp: ts, messageId }
+          }
+        }
+      }
+
+      const result = {}
+      for (const [s, map] of Object.entries(stageMap)) {
+        result[s] = Object.values(map).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      }
+      setLoadedStageUsers(result)
+    } catch (err) {
+      console.error('[EmailPreviewModal] fetch stageUsers error:', err)
+    } finally {
+      setStageUsersLoading(false)
+    }
+  }, [row?.subject, row?.stageUsers, loadedStageUsers])
+
+  const handleStageClick = useCallback((stage) => {
+    const isActive = activeStage === stage
+    setActiveStage(isActive ? null : stage)
+    if (!isActive) resolveStageUsers(stage)
+  }, [activeStage, resolveStageUsers])
+
+  const getStageUsers = (stage) => row?.stageUsers?.[stage] || loadedStageUsers?.[stage] || []
 
   const TILES = [
     { stage: 'sent',      value: row.sent,      label: 'Sent',      color: 'text-blue-500'    },
@@ -348,7 +435,7 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
                   key={t.stage}
                   type="button"
                   disabled={!hasData}
-                  onClick={() => setActiveStage(isActive ? null : t.stage)}
+                  onClick={() => handleStageClick(t.stage)}
                   className={`text-center py-2.5 px-1 rounded-xl border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                     isActive
                       ? meta.activeCls(isDark)
@@ -366,12 +453,19 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
           {/* User list */}
           {activeStage && (
             <div className="mb-3">
+              {stageUsersLoading && !getStageUsers(activeStage).length ? (
+                <div className={`flex items-center justify-center py-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  <span className={`ml-2 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading users...</span>
+                </div>
+              ) : (
               <UserListPanel
                 stage={activeStage}
-                users={row.stageUsers?.[activeStage] || []}
+                users={getStageUsers(activeStage)}
                 isDark={isDark}
                 dataMasked={dataMasked}
               />
+              )}
             </div>
           )}
 

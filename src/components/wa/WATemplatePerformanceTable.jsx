@@ -190,12 +190,9 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                           ))
                         }}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                          r.raw_payload
-                            ? isDark ? 'border-violet-600 bg-violet-700/30 text-violet-300 hover:bg-violet-700/60' : 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
-                            : isDark ? 'border-slate-600 text-slate-500 cursor-not-allowed opacity-40' : 'border-slate-200 text-slate-400 cursor-not-allowed opacity-40'
+                          isDark ? 'border-violet-600 bg-violet-700/30 text-violet-300 hover:bg-violet-700/60' : 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
                         }`}
-                        disabled={!r.raw_payload}
-                        title={r.raw_payload ? 'View template content' : 'No raw_payload captured for this template'}
+                        title="View template details"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
