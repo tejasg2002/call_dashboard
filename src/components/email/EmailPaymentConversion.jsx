@@ -168,12 +168,12 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <div className={`px-6 py-5 ${isDark ? 'bg-gradient-to-r from-slate-800 to-slate-800/50' : 'bg-gradient-to-r from-violet-50/80 to-white'}`}>
+      <div className={`px-6 py-5 ${isDark ? 'bg-gradient-to-r from-slate-800 to-slate-800/50' : 'bg-gradient-to-r from-brand-50/80 to-white'}`}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-violet-500/10' : 'bg-violet-100'}`}>
-                <svg className={`w-4 h-4 ${isDark ? 'text-violet-400' : 'text-violet-600'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-brand-500/10' : 'bg-brand-100'}`}>
+                <svg className={`w-4 h-4 ${isDark ? 'text-brand-400' : 'text-brand-600'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
               </div>
@@ -196,7 +196,7 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
               onClick={compute}
               disabled={status === 'loading'}
               className={`text-[11px] px-3 py-1.5 rounded-lg font-semibold transition-all disabled:opacity-50 ${
-                isDark ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white shadow-sm'
+                isDark ? 'bg-brand-600 hover:bg-brand-500 text-white' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm'
               }`}
             >
               {status === 'loading' ? 'Computing...' : 'Recompute'}
@@ -208,9 +208,9 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
         {status === 'done' && (
           <div className={`mt-5 grid grid-cols-4 gap-4 py-4 px-2 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-white/80 shadow-inner'}`}>
             <HeroMetric value={totalReached.toLocaleString('en-IN')} label="Recipients" accent={isDark ? 'text-blue-400' : 'text-blue-600'} isDark={isDark} />
-            <HeroMetric value={totalLeads.toLocaleString('en-IN')} label="Leads Identified" sub={totalReached > 0 ? `${((totalLeads / totalReached) * 100).toFixed(0)}% match rate` : ''} accent={isDark ? 'text-violet-400' : 'text-violet-600'} isDark={isDark} />
-            <HeroMetric value={totalPaid.toLocaleString('en-IN')} label="Payments Done" sub={totalLeads > 0 ? `${((totalPaid / totalLeads) * 100).toFixed(1)}% of leads` : ''} accent={isDark ? 'text-emerald-400' : 'text-emerald-600'} isDark={isDark} />
-            <HeroMetric value={`${overallRate}%`} label="Conversion Rate" sub="recipients → payment" accent={totalPaid > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-slate-500' : 'text-slate-400')} isDark={isDark} />
+            <HeroMetric value={totalLeads.toLocaleString('en-IN')} label="Leads Identified" sub={totalReached > 0 ? `${((totalLeads / totalReached) * 100).toFixed(0)}% match rate` : ''} accent={isDark ? 'text-brand-400' : 'text-brand-600'} isDark={isDark} />
+            <HeroMetric value={totalPaid.toLocaleString('en-IN')} label="Payments Done" sub={totalLeads > 0 ? `${((totalPaid / totalLeads) * 100).toFixed(1)}% of leads` : ''} accent={isDark ? 'text-brand-400' : 'text-brand-600'} isDark={isDark} />
+            <HeroMetric value={`${overallRate}%`} label="Conversion Rate" sub="recipients → payment" accent={totalPaid > 0 ? (isDark ? 'text-brand-400' : 'text-brand-600') : (isDark ? 'text-slate-500' : 'text-slate-400')} isDark={isDark} />
           </div>
         )}
 
@@ -218,8 +218,8 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
         {status === 'done' && (
           <div className="flex items-center gap-2 mt-4">
             <FunnelStep label="Recipients" value={totalReached} total={totalReached} color="text-blue-500" isDark={isDark} />
-            <FunnelStep label="Leads" value={totalLeads} total={totalReached} color="text-violet-500" isDark={isDark} />
-            <FunnelStep label="Paid" value={totalPaid} total={totalReached} color="text-emerald-500" isLast isDark={isDark} />
+            <FunnelStep label="Leads" value={totalLeads} total={totalReached} color="text-brand-500" isDark={isDark} />
+            <FunnelStep label="Paid" value={totalPaid} total={totalReached} color="text-brand-500" isLast isDark={isDark} />
           </div>
         )}
       </div>
@@ -227,7 +227,7 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
       {/* ── Loading state ─────────────────────────────────────────────── */}
       {status === 'loading' && (
         <div className="flex items-center justify-center gap-3 py-8">
-          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{progress || 'Starting...'}</span>
         </div>
       )}
@@ -280,13 +280,13 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
                           </svg>
                           <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={name}>{name}</span>
                           {stats.paid > 0 && (
-                            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
                               {stats.paid} paid
                             </span>
                           )}
                         </div>
                         <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-emerald-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-brand-500 to-brand-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
                         </div>
                       </div>
 
@@ -296,15 +296,15 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Users</p>
                         </div>
                         <div className="text-center w-14">
-                          <p className={`text-sm font-bold ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>{stats.leadsFound.toLocaleString('en-IN')}</p>
+                          <p className={`text-sm font-bold ${isDark ? 'text-brand-400' : 'text-brand-600'}`}>{stats.leadsFound.toLocaleString('en-IN')}</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Leads</p>
                         </div>
                         <div className="text-center w-14">
-                          <p className={`text-sm font-bold ${stats.paid > 0 ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.paid.toLocaleString('en-IN')}</p>
+                          <p className={`text-sm font-bold ${stats.paid > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.paid.toLocaleString('en-IN')}</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Paid</p>
                         </div>
-                        <div className={`text-center w-14 px-2 py-1 rounded-lg ${stats.rate > 0 ? (isDark ? 'bg-emerald-900/30' : 'bg-emerald-50') : ''}`}>
-                          <p className={`text-sm font-bold ${stats.rate > 0 ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.rate}%</p>
+                        <div className={`text-center w-14 px-2 py-1 rounded-lg ${stats.rate > 0 ? (isDark ? 'bg-brand-900/30' : 'bg-brand-50') : ''}`}>
+                          <p className={`text-sm font-bold ${stats.rate > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.rate}%</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Rate</p>
                         </div>
                       </div>
@@ -336,7 +336,7 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
                                     <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{u.email}</td>
                                     <td className={`px-4 py-2 font-mono ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{u.leadId}</td>
                                     <td className="px-4 py-2">
-                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                         Paid
                                       </span>
@@ -362,7 +362,7 @@ export default function EmailPaymentConversion({ subjectEmails = {}, cachedConve
       {status === 'error' && (
         <div className="text-center py-6 px-6">
           <p className={`text-xs ${isDark ? 'text-rose-400' : 'text-rose-500'}`}>Failed to compute conversion data</p>
-          <button onClick={compute} className="mt-2 text-[11px] font-semibold text-violet-500 hover:underline">Retry</button>
+          <button onClick={compute} className="mt-2 text-[11px] font-semibold text-brand-500 hover:underline">Retry</button>
         </div>
       )}
     </div>

@@ -104,9 +104,9 @@ export async function fetchLeadByMobile(mobileNumber) {
   }
 
   // --- Step 2: fall back to ITM Lead API ---
-  const apiKey = import.meta.env.VITE_ITM_API_KEY
+  const apiKey = import.meta.env.NEXT_PUBLIC_ITM_API_KEY
   if (!apiKey) {
-    console.warn('[ITM API] VITE_ITM_API_KEY not set in .env')
+    console.warn('[ITM API] NEXT_PUBLIC_ITM_API_KEY not set in .env')
     _leadCache.set(mobile, null)
     return null
   }
@@ -133,6 +133,32 @@ export async function fetchLeadByMobile(mobileNumber) {
     _leadCache.set(mobile, null)
     return null
   }
+}
+
+/**
+ * Look up a lead in the callerDetails collection by mobile number.
+ * Returns the first matching callerDetails document (with lead_id) or null.
+ */
+export async function fetchLeadFromCallerDetailsByMobile(mobileNumber) {
+  if (!mobileNumber || mobileNumber === '—') return null
+  const mobile = normaliseMobile(mobileNumber)
+  if (!mobile) return null
+
+  try {
+    const q = query(
+      collection(db, 'callerDetails'),
+      where('mobile', '==', mobile),
+      limit(1)
+    )
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      return { docId: snap.docs[0].id, ...snap.docs[0].data() }
+    }
+  } catch (err) {
+    console.error('[callerDetails] lookup error:', err)
+  }
+
+  return null
 }
 
 // In-memory cache: normalised email → lead data (or null)
@@ -167,6 +193,43 @@ export async function fetchLeadByEmail(emailAddress) {
 
   _leadEmailCache.set(email, null)
   return null
+}
+
+/**
+ * Count how many unique mobiles from a list have a matching callerDetails doc
+ * with lead_stage === 'form submitted'.
+ */
+export async function countFormSubmittedLeadsByPhones(phones = []) {
+  const uniques = [...new Set(phones.filter(Boolean))]
+  if (uniques.length === 0) return 0
+
+  let count = 0
+
+  for (let i = 0; i < uniques.length; i++) {
+    const mobile = normaliseMobile(uniques[i])
+    if (!mobile) continue
+
+    try {
+      const q = query(
+        collection(db, 'callerDetails'),
+        where('mobile', '==', mobile),
+        where('lead_stage', '==', 'form submitted')
+      )
+      const snap = await getDocs(q)
+      if (!snap.empty) {
+        count += 1
+      }
+    } catch (err) {
+      console.error('[callerDetails] lookup error:', err)
+    }
+
+    // Small pause every 15 lookups to avoid hammering Firestore
+    if ((i + 1) % 15 === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+  }
+
+  return count
 }
 
 export { db }

@@ -34,7 +34,9 @@ function toUtcTs(raw) {
 
 export function aggregateWebhooks(docs) {
   const kpi = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
+  // Keyed by `${source}::${template_name}` so we can separate API vs campaign views later
   const byTemplate = {}
+  // Keyed by `${source}::${button_text}`
   const byButton = {}
   const byPhone = {}
   const funnel = { sent: 0, delivered: 0, read: 0, clicked: 0 }
@@ -45,6 +47,7 @@ export function aggregateWebhooks(docs) {
 
   docs.forEach((d) => {
     const stage = eventStage(d)
+    const source = eventSource(d) || 'api'
 
     // Cost is only counted on delivered events (event_type === 'message_api_delivered')
     // to avoid multiplying cost across sent/read/clicked events for the same message.
@@ -85,8 +88,10 @@ export function aggregateWebhooks(docs) {
     else if (stage === 'failed') { kpi.failed++ }
     kpi.cost += cost
 
-    if (!byTemplate[template]) {
-      byTemplate[template] = {
+    const templateKey = `${source}::${template}`
+
+    if (!byTemplate[templateKey]) {
+      byTemplate[templateKey] = {
         sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0,
         failureReasons: {},
         // phone → latest event info, keyed so each phone appears once per stage
@@ -114,25 +119,25 @@ export function aggregateWebhooks(docs) {
       }
     }
     if (stage === 'sent') {
-      byTemplate[template].sent++
-      if (phone) byTemplate[template].stageUsers.sent[phone] = { phone, timestamp: ts }
+      byTemplate[templateKey].sent++
+      if (phone) byTemplate[templateKey].stageUsers.sent[phone] = { phone, timestamp: ts }
     }
     if (stage === 'delivered') {
-      byTemplate[template].delivered++
-      if (phone) byTemplate[template].stageUsers.delivered[phone] = { phone, timestamp: ts }
+      byTemplate[templateKey].delivered++
+      if (phone) byTemplate[templateKey].stageUsers.delivered[phone] = { phone, timestamp: ts }
     }
     if (stage === 'read') {
-      byTemplate[template].read++
-      if (phone) byTemplate[template].stageUsers.read[phone] = { phone, timestamp: ts }
+      byTemplate[templateKey].read++
+      if (phone) byTemplate[templateKey].stageUsers.read[phone] = { phone, timestamp: ts }
     }
     if (stage === 'clicked') {
-      byTemplate[template].clicked++
+      byTemplate[templateKey].clicked++
       if (phone) {
-        const prev = byTemplate[template].stageUsers.clicked[phone]
+        const prev = byTemplate[templateKey].stageUsers.clicked[phone]
         // Accumulate all unique buttons this phone has clicked (don't overwrite)
         const allButtons = new Set(prev?.allButtons || (prev?.buttonText ? [prev.buttonText] : []))
         if (button && button !== '—') allButtons.add(button)
-        byTemplate[template].stageUsers.clicked[phone] = {
+        byTemplate[templateKey].stageUsers.clicked[phone] = {
           phone,
           timestamp: ts,   // keep latest timestamp
           buttonText: button !== '—' ? button : null,  // latest button (backward compat)
@@ -141,15 +146,15 @@ export function aggregateWebhooks(docs) {
       }
       // Per-template button breakdown (separate from global byButton)
       if (button && button !== '—') {
-        if (!byTemplate[template]._buttons[button]) {
-          byTemplate[template]._buttons[button] = { clicks: 0, users: new Set() }
+        if (!byTemplate[templateKey]._buttons[button]) {
+          byTemplate[templateKey]._buttons[button] = { clicks: 0, users: new Set() }
         }
-        byTemplate[template]._buttons[button].clicks++
-        if (phone) byTemplate[template]._buttons[button].users.add(phone)
+        byTemplate[templateKey]._buttons[button].clicks++
+        if (phone) byTemplate[templateKey]._buttons[button].users.add(phone)
       }
     }
     if (stage === 'failed') {
-      byTemplate[template].failed++
+      byTemplate[templateKey].failed++
 
       let reason = ''
       let code = ''
@@ -201,10 +206,10 @@ export function aggregateWebhooks(docs) {
         ? (code ? `[${code}] ${reason.trim()}` : reason.trim())
         : (code ? `Error code ${code}` : 'Unknown reason')
 
-      byTemplate[template].failureReasons[label] = (byTemplate[template].failureReasons[label] || 0) + 1
-      if (phone) byTemplate[template].stageUsers.failed[phone] = { phone, timestamp: ts, reason: label }
+      byTemplate[templateKey].failureReasons[label] = (byTemplate[templateKey].failureReasons[label] || 0) + 1
+      if (phone) byTemplate[templateKey].stageUsers.failed[phone] = { phone, timestamp: ts, reason: label }
     }
-    byTemplate[template].cost += cost
+    byTemplate[templateKey].cost += cost
 
     // Store raw_payload for template preview — prefer ones with raw_template (Interakt format)
     if (d.raw_payload && template !== '—') {
@@ -230,7 +235,7 @@ export function aggregateWebhooks(docs) {
     }
 
     if (stage === 'clicked') {
-      const buttonKey = button
+      const buttonKey = `${source}::${button}`
       if (!byButton[buttonKey]) {
         byButton[buttonKey] = {
           clicks: 0,
@@ -276,9 +281,12 @@ export function aggregateWebhooks(docs) {
     arr.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
 
   const templateRows = Object.entries(byTemplate)
-    .filter(([name]) => name && name !== '—')
-    .map(([name, t]) => ({
-      template_name: name,
+    .filter(([key]) => key && key !== '::—')
+    .map(([key, t]) => {
+      const [source, name] = key.split('::')
+      return {
+        template_name: name,
+        source,
       sent: t.sent,
       delivered: t.delivered,
       read: t.read,
@@ -303,26 +311,33 @@ export function aggregateWebhooks(docs) {
           unique_users: b.users.size,
         }))
         .sort((a, b) => b.total_clicks - a.total_clicks),
-      ctr:      pct(t.clicked,   t.delivered),
-      readRate: pct(t.read,     t.delivered),
-      sdr:      pct(t.delivered, t.sent),
-      str:      pct(t.read,     t.sent),
-      total_cost: t.cost,
-      raw_payload: templatePayloads[name] || null,
-      category: templateCategories[name] || '—',
-    }))
+        ctr:      pct(t.clicked,   t.delivered),
+        readRate: pct(t.read,     t.delivered),
+        sdr:      pct(t.delivered, t.sent),
+        str:      pct(t.read,     t.sent),
+        total_cost: t.cost,
+        raw_payload: templatePayloads[name] || null,
+        category: templateCategories[name] || '—',
+      }
+    })
   templateRows.sort((a, b) => (b.ctr || 0) - (a.ctr || 0))
 
-  const ctaRows = Object.entries(byButton).filter(([text]) => text && text !== '—').map(([text, b]) => ({
-    button_text: text,
-    total_clicks: b.clicks,
-    unique_users: b.users.size,
-    template_used: [...b.templates].join(', ') || '—',
-    links: Object.entries(b.links).map(([url, count]) => ({ url, count })).sort((a, b) => b.count - a.count),
-    click_types: [...b.clickTypes].join(', ') || '—',
-    // Full user event list for template preview (sorted newest first)
-    user_events: b.userEvents.sort((a, c) => new Date(c.timestamp || 0) - new Date(a.timestamp || 0)),
-  }))
+  const ctaRows = Object.entries(byButton)
+    .filter(([key]) => key && key !== '::—')
+    .map(([key, b]) => {
+      const [source, text] = key.split('::')
+      return {
+        button_text: text,
+        source,
+        total_clicks: b.clicks,
+        unique_users: b.users.size,
+        template_used: [...b.templates].join(', ') || '—',
+        links: Object.entries(b.links).map(([url, count]) => ({ url, count })).sort((a, b) => b.count - a.count),
+        click_types: [...b.clickTypes].join(', ') || '—',
+        // Full user event list for template preview (sorted newest first)
+        user_events: b.userEvents.sort((a, c) => new Date(c.timestamp || 0) - new Date(a.timestamp || 0)),
+      }
+    })
   ctaRows.sort((a, b) => b.total_clicks - a.total_clicks)
 
   // Build per-user engagement rows

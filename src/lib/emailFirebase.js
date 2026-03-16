@@ -1,86 +1,64 @@
-import { collection, onSnapshot, query } from 'firebase/firestore'
-import { db } from '../firebase'
+/**
+ * Email analytics data fetching via the /api/email-events MongoDB API route.
+ */
 
-const COLLECTION = 'email_webhook'
+const PAGE_SIZE = 50_000
 
-// ── Field extractors ────────────────────────────────────────────────────────
-// Documents may be wrapped under a "document" key (MongoDB change-stream format)
-// or stored flat. Be defensive and handle both.
-function getInner(raw) { return raw.document || raw }
-function getEventType(raw) { return getInner(raw).detail?.eventType || '' }
-function getSubject(raw) { return getInner(raw).detail?.mail?.commonHeaders?.subject || '' }
-function getRecipient(raw) {
-  const m = getInner(raw).detail?.mail || {}
-  return (m.destination?.[0] || m.commonHeaders?.to?.[0] || '').toLowerCase()
-}
-function getTimestamp(raw) {
-  const d = getInner(raw)
-  return d.time || d.createdAt || raw.timestamp || ''
-}
+/**
+ * Fetch ALL email events (or events since a timestamp) from MongoDB.
+ * @param {string|null} since - ISO timestamp for incremental fetch, or null for full fetch
+ * @param {function|null} onProgress - progress callback { loaded, total, done }
+ */
+export async function fetchEmailEvents(since, onProgress) {
+  let allDocs = []
+  let page = 0
+  let total = 0
+  let hasMore = true
 
-// ── Subscription ────────────────────────────────────────────────────────────
-export function subscribeEmailWebhooks(callback) {
-  const q = query(collection(db, COLLECTION))
-  const unsub = onSnapshot(
-    q,
-    (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      callback(docs, null)
-    },
-    (err) => {
-      console.error('[email_webhook] subscription error:', err)
-      callback([], err)
-    }
-  )
-  return () => unsub()
-}
+  while (hasMore) {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
+    if (since) params.set('since', since)
 
-// ── In-memory filter ────────────────────────────────────────────────────────
-export function applyEmailFilters(docs, filters = {}) {
-  let result = docs
+    const res = await fetch(`/api/email-events?${params.toString()}`)
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
 
-  if (filters.subject)
-    result = result.filter((d) => getSubject(d) === filters.subject)
+    allDocs = allDocs.concat(data.docs)
+    total = data.total
+    hasMore = data.hasMore
+    page++
 
-  if (filters.eventType)
-    result = result.filter((d) => getEventType(d) === filters.eventType)
-
-  if (filters.email?.trim()) {
-    const em = filters.email.trim().toLowerCase()
-    result = result.filter((d) => getRecipient(d).includes(em))
+    if (onProgress) onProgress({ loaded: allDocs.length, total, done: !hasMore })
   }
 
-  if (filters.startDate || filters.endDate) {
-    result = result.filter((d) => {
-      const ts = getTimestamp(d)
-      if (!ts) return true
-      const date = new Date(ts)
-      if (isNaN(date.getTime())) return true
-      if (filters.startDate) {
-        const [sy, sm, sd] = filters.startDate.split('-').map(Number)
-        if (date < new Date(sy, sm - 1, sd)) return false
-      }
-      if (filters.endDate) {
-        const [ey, em2, ed] = filters.endDate.split('-').map(Number)
-        if (date > new Date(ey, em2 - 1, ed, 23, 59, 59, 999)) return false
-      }
-      return true
-    })
-  }
-
-  return result
+  return allDocs
 }
 
-// ── Filter option helpers ────────────────────────────────────────────────────
-export function getEmailFilterOptions(docs) {
-  const subjects = new Set()
-  const eventTypes = new Set()
-  docs.forEach((d) => {
-    const s = getSubject(d); if (s) subjects.add(s)
-    const e = getEventType(d); if (e) eventTypes.add(e)
-  })
-  return {
-    subjects:   [...subjects].sort(),
-    eventTypes: [...eventTypes].sort(),
+/**
+ * Fetch email events within a specific date range (server-side filtering).
+ */
+export async function fetchEmailEventsRange(startDate, endDate, onProgress) {
+  let allDocs = []
+  let page = 0
+  let total = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+
+    const res = await fetch(`/api/email-events?${params.toString()}`)
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+
+    allDocs = allDocs.concat(data.docs)
+    total = data.total
+    hasMore = data.hasMore
+    page++
+
+    if (onProgress) onProgress({ loaded: allDocs.length, total, done: !hasMore })
   }
+
+  return allDocs
 }

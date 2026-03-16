@@ -6,8 +6,8 @@ import { fetchLeadByMobile } from '../../lib/firebase'
 
 const STAGES = {
   sent:      { label: 'Sent',      dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-  delivered: { label: 'Delivered', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
-  read:      { label: 'Read',      dot: 'bg-violet-500',  badge: 'bg-violet-50 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+  delivered: { label: 'Delivered', dot: 'bg-brand-500', badge: 'bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300' },
+  read:      { label: 'Read',      dot: 'bg-brand-500',  badge: 'bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300' },
   clicked:   { label: 'Clicked',   dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
   failed:    { label: 'Failed',    dot: 'bg-rose-500',    badge: 'bg-rose-50 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
 }
@@ -50,7 +50,7 @@ function LeadInfo({ phoneNumber, isDark }) {
   if (lead === null) {
     return (
       <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs ${isDark ? 'bg-slate-700/50 border border-slate-600' : 'bg-slate-50 border border-slate-200'}`}>
-        <div className="w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+        <div className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
         <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Looking up CRM...</span>
       </div>
     )
@@ -78,7 +78,7 @@ function LeadInfo({ phoneNumber, isDark }) {
         className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-indigo-800/50 text-indigo-400' : 'hover:bg-indigo-100 text-indigo-500'}`}
       >
         {copied ? (
-          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <svg className="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
         ) : (
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
         )}
@@ -91,8 +91,8 @@ const STAGE_ORDER = ['sent', 'delivered', 'read', 'clicked', 'failed']
 
 const STAGE_PILL = {
   sent:      { dot: 'bg-blue-500',    text: 'text-blue-600 dark:text-blue-300',    bg: 'bg-blue-50 dark:bg-blue-900/30',    border: 'border-blue-200 dark:border-blue-700/50',    shadow: '#3b82f6' },
-  delivered: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/30', border: 'border-emerald-200 dark:border-emerald-700/50', shadow: '#10b981' },
-  read:      { dot: 'bg-violet-500',  text: 'text-violet-600 dark:text-violet-300',  bg: 'bg-violet-50 dark:bg-violet-900/30',  border: 'border-violet-200 dark:border-violet-700/50',  shadow: '#8b5cf6' },
+  delivered: { dot: 'bg-brand-500', text: 'text-brand-600 dark:text-brand-300', bg: 'bg-brand-50 dark:bg-brand-900/30', border: 'border-brand-200 dark:border-brand-700/50', shadow: '#10b981' },
+  read:      { dot: 'bg-brand-500',  text: 'text-brand-600 dark:text-brand-300',  bg: 'bg-brand-50 dark:bg-brand-900/30',  border: 'border-brand-200 dark:border-brand-700/50',  shadow: '#8b5cf6' },
   clicked:   { dot: 'bg-amber-500',   text: 'text-amber-600 dark:text-amber-300',   bg: 'bg-amber-50 dark:bg-amber-900/30',   border: 'border-amber-200 dark:border-amber-700/50',   shadow: '#f59e0b' },
   failed:    { dot: 'bg-rose-500',    text: 'text-rose-600 dark:text-rose-300',    bg: 'bg-rose-50 dark:bg-rose-900/30',    border: 'border-rose-200 dark:border-rose-700/50',    shadow: '#f43f5e' },
 }
@@ -107,7 +107,7 @@ function TemplateStageLine({ templateName, stageMap, isDark, rowIndex }) {
       style={{ animation: 'waTplRowIn 0.35s ease both', animationDelay: `${rowIndex * 65}ms` }}
     >
       {/* Template chip */}
-      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold w-36 flex-shrink-0 truncate ${isDark ? 'bg-slate-700/60 border-slate-600 text-violet-300' : 'bg-violet-50 border-violet-200 text-violet-700'}`}
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold w-36 flex-shrink-0 truncate ${isDark ? 'bg-slate-700/60 border-slate-600 text-brand-300' : 'bg-brand-50 border-brand-200 text-brand-700'}`}
         title={templateName}
         style={{ borderLeft: `3px solid ${isDark ? '#a78bfa' : '#7c3aed'}` }}
       >

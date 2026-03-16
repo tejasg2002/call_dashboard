@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { fetchCalls } from '../firebase'
+import { cn } from '../lib/utils'
 import MetricsCards from './MetricsCards'
 import PerformanceCards from './PerformanceCards'
 import PerformanceCharts from './PerformanceCharts'
 import LazySection from './LazySection'
 
-const POLLING_INTERVAL = 30000 // 30 seconds
+const POLLING_INTERVAL = 30000
 
 const initialFilters = {
   search: '',
@@ -26,6 +27,14 @@ const initialFilters = {
   endDate: '',
 }
 
+const RANGE_OPTIONS = [
+  { key: 'all', label: 'All time' },
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+  { key: 'custom', label: 'Custom' },
+]
+
 const Dashboard = () => {
   const [calls, setCalls] = useState([])
   const [loading, setLoading] = useState(true)
@@ -33,10 +42,8 @@ const Dashboard = () => {
   const [selectedCall, setSelectedCall] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [filters, setFilters] = useState(initialFilters)
-  const [rangePreset, setRangePreset] = useState('all') // all | today | week | month | custom
-  const [showPresetMenu, setShowPresetMenu] = useState(false)
+  const [rangePreset, setRangePreset] = useState('all')
 
-  // Fetch calls data
   const loadCalls = async () => {
     try {
       setLoading(true)
@@ -56,469 +63,218 @@ const Dashboard = () => {
     }
   }
 
-  // Load data on mount and set up polling
   useEffect(() => {
-    // Initial load
     loadCalls()
-
-    // Set up polling interval
-    const intervalId = setInterval(() => {
-      loadCalls()
-    }, POLLING_INTERVAL)
-
-    // Cleanup interval on unmount
-    return () => {
-      clearInterval(intervalId)
-    }
+    const intervalId = setInterval(() => { loadCalls() }, POLLING_INTERVAL)
+    return () => { clearInterval(intervalId) }
   }, [])
 
   const getCallDate = (call) => {
-    // Support Firestore Timestamp or JS Date / ISO string
-    const raw =
-      call.Date || // Firestore field 'Date'
-      call.call_timestamp ||
-      call.created_at ||
-      call.createdAt ||
-      call.call_date ||
-      call.callDate ||
-      null
+    const raw = call.Date || call.call_timestamp || call.created_at || call.createdAt || call.call_date || call.callDate || null
     if (!raw) return null
-    if (typeof raw.toDate === 'function') {
-      return raw.toDate()
-    }
+    if (typeof raw.toDate === 'function') return raw.toDate()
     return new Date(raw)
   }
 
-  // Apply filters to calls
   const filteredCalls = useMemo(() => {
     return calls.filter((call) => {
-      // Search filter (name or Lead ID)
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase()
-        const nameMatch = call.Name?.toLowerCase().includes(searchLower)
-        const leadIdMatch = call.Lead_id?.toLowerCase().includes(searchLower)
-        if (!nameMatch && !leadIdMatch) return false
+        const s = filters.search.toLowerCase()
+        if (!call.Name?.toLowerCase().includes(s) && !call.Lead_id?.toLowerCase().includes(s)) return false
       }
-
-      // Lead Owner filter
-      if (filters.leadOwner && call.Lead_owner !== filters.leadOwner) {
-        return false
-      }
-
-      // City filter
-      if (filters.city && call.City !== filters.city) {
-        return false
-      }
-
-      // State filter
-      if (filters.state && call.State !== filters.state) {
-        return false
-      }
-
-      // Course filter
-      if (filters.course && call.course !== filters.course) {
-        return false
-      }
-
-      // Call Type filter
-      if (filters.callType && call.Call_type !== filters.callType) {
-        return false
-      }
-
-      // Lead Stage filter
-      if (filters.leadStage && call.lead_stage !== filters.leadStage) {
-        return false
-      }
-
-      // Disposition filter
-      if (filters.disposition && call.Disposition?.counselor !== filters.disposition) {
-        return false
-      }
-
-      // Score range filter
+      if (filters.leadOwner && call.Lead_owner !== filters.leadOwner) return false
+      if (filters.city && call.City !== filters.city) return false
+      if (filters.state && call.State !== filters.state) return false
+      if (filters.course && call.course !== filters.course) return false
+      if (filters.callType && call.Call_type !== filters.callType) return false
+      if (filters.leadStage && call.lead_stage !== filters.leadStage) return false
+      if (filters.disposition && call.Disposition?.counselor !== filters.disposition) return false
       const score = call.scores?.overall || 0
-      if (filters.minScore !== '' && score < Number(filters.minScore)) {
-        return false
-      }
-      if (filters.maxScore !== '' && score > Number(filters.maxScore)) {
-        return false
-      }
-
-      // Duration range filter
+      if (filters.minScore !== '' && score < Number(filters.minScore)) return false
+      if (filters.maxScore !== '' && score > Number(filters.maxScore)) return false
       const duration = call.Duration?.seconds || 0
-      if (filters.minDuration !== '' && duration < Number(filters.minDuration)) {
-        return false
-      }
-      if (filters.maxDuration !== '' && duration > Number(filters.maxDuration)) {
-        return false
-      }
-
-      // Date range filter (parse as local midnight to avoid UTC offset issues)
+      if (filters.minDuration !== '' && duration < Number(filters.minDuration)) return false
+      if (filters.maxDuration !== '' && duration > Number(filters.maxDuration)) return false
       const callDate = getCallDate(call)
       if (filters.startDate) {
         const [sy, sm, sd] = filters.startDate.split('-').map(Number)
-        const start = new Date(sy, sm - 1, sd)
-        if (callDate && callDate < start) return false
+        if (callDate && callDate < new Date(sy, sm - 1, sd)) return false
       }
       if (filters.endDate) {
-        // Add 1 day to make end date inclusive
         const [ey, em, ed] = filters.endDate.split('-').map(Number)
-        const end = new Date(ey, em - 1, ed + 1)
-        if (callDate && callDate >= end) return false
+        if (callDate && callDate >= new Date(ey, em - 1, ed + 1)) return false
       }
-
       return true
     })
   }, [calls, filters])
 
   const buildOwnerStats = (sourceCalls) => {
     const map = {}
-
     sourceCalls.forEach((call) => {
       const owner = call.Lead_owner || 'Unassigned'
-      if (!map[owner]) {
-        map[owner] = {
-          owner,
-          totalCalls: 0,
-          totalScore: 0,
-          maxScore: 0,
-        }
-      }
+      if (!map[owner]) map[owner] = { owner, totalCalls: 0, totalScore: 0, maxScore: 0 }
       const score = call.scores?.overall || 0
       map[owner].totalCalls += 1
       map[owner].totalScore += score
       if (score > map[owner].maxScore) map[owner].maxScore = score
     })
-
-    const list = Object.values(map).map((item) => ({
-      ...item,
-      avgScore: item.totalCalls > 0 ? Math.round(item.totalScore / item.totalCalls) : 0,
-    }))
-
-    list.sort((a, b) => b.totalCalls - a.totalCalls)
-
-    return list
+    return Object.values(map)
+      .map((item) => ({ ...item, avgScore: item.totalCalls > 0 ? Math.round(item.totalScore / item.totalCalls) : 0 }))
+      .sort((a, b) => b.totalCalls - a.totalCalls)
   }
 
-  // Aggregate performance by lead owner / counselor
   const ownerStatsToday = useMemo(() => {
-    // If a custom date range is selected, treat this card as
-    // "top performer in selected range" and use filteredCalls directly.
-    if (filters.startDate || filters.endDate) {
-      return buildOwnerStats(filteredCalls)
-    }
-
-    const today = new Date()
-    const startOfToday = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    )
-
-    const callsToday = filteredCalls.filter((call) => {
-      const date = getCallDate(call)
-      return date && date >= startOfToday
-    })
-
-    return buildOwnerStats(callsToday)
+    if (filters.startDate || filters.endDate) return buildOwnerStats(filteredCalls)
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+    return buildOwnerStats(filteredCalls.filter((c) => { const d = getCallDate(c); return d && d >= startOfToday }))
   }, [filteredCalls, filters.startDate, filters.endDate])
 
   const ownerStatsMonth = useMemo(() => {
-    // With a custom range, reuse the same aggregated stats so both
-    // cards reflect that selected period.
-    if (filters.startDate || filters.endDate) {
-      return buildOwnerStats(filteredCalls)
-    }
-
-    const today = new Date()
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-
-    const callsThisMonth = filteredCalls.filter((call) => {
-      const date = getCallDate(call)
-      return date && date >= monthStart
-    })
-
-    return buildOwnerStats(callsThisMonth)
+    if (filters.startDate || filters.endDate) return buildOwnerStats(filteredCalls)
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    return buildOwnerStats(filteredCalls.filter((c) => { const d = getCallDate(c); return d && d >= monthStart }))
   }, [filteredCalls, filters.startDate, filters.endDate])
 
   const ownerStatsOverall = useMemo(() => buildOwnerStats(filteredCalls), [filteredCalls])
 
-  const formatLastUpdated = (date) => {
-    if (!date) return ''
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }
-
   const formatDateInput = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
   }
 
   const handleQuickRange = (range) => {
     const today = new Date()
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    setRangePreset(range)
 
     if (range === 'today') {
-      const d = startOfToday
-      const value = formatDateInput(d)
-      setFilters((prev) => ({ ...prev, startDate: value, endDate: value }))
-      setRangePreset('today')
-      return
-    }
-
-    if (range === 'week') {
-      // Monday as start of week
-      const day = today.getDay() // 0=Sun
+      const v = formatDateInput(startOfToday)
+      setFilters((p) => ({ ...p, startDate: v, endDate: v }))
+    } else if (range === 'week') {
+      const day = today.getDay()
       const diff = day === 0 ? 6 : day - 1
-      const weekStart = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate() - diff
-      )
-      setFilters((prev) => ({
-        ...prev,
-        startDate: formatDateInput(weekStart),
-        endDate: formatDateInput(startOfToday),
-      }))
-      setRangePreset('week')
-      return
-    }
-
-    if (range === 'month') {
+      const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - diff)
+      setFilters((p) => ({ ...p, startDate: formatDateInput(weekStart), endDate: formatDateInput(startOfToday) }))
+    } else if (range === 'month') {
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-      setFilters((prev) => ({
-        ...prev,
-        startDate: formatDateInput(monthStart),
-        endDate: formatDateInput(startOfToday),
-      }))
-      setRangePreset('month')
-      return
+      setFilters((p) => ({ ...p, startDate: formatDateInput(monthStart), endDate: formatDateInput(startOfToday) }))
+    } else if (range === 'all') {
+      setFilters((p) => ({ ...p, startDate: '', endDate: '' }))
     }
-
-    if (range === 'all') {
-      setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
-      setRangePreset('all')
-    }
-
-    if (range === 'custom') {
-      setRangePreset('custom')
-    }
-
-    setShowPresetMenu(false)
   }
 
-  return (
-    <div className="min-h-screen p-4 lg:p-8 bg-[#f5f3f7] dark:bg-slate-950">
-      <div className="max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100">
-                Analytics
-              </h1>
-              <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base">
-                Overview of your call performance and lead engagement
-              </p>
-            </div>
+  const dateLabel = filters.startDate || filters.endDate
+    ? (filters.startDate === filters.endDate ? 'Today' : 'Selected range')
+    : 'All time'
 
-            <div className="hidden md:flex items-center space-x-3">
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="max-w-[1600px] mx-auto px-4 lg:px-8 py-6 lg:py-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Overview
+            </h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+                <span className={cn("w-1.5 h-1.5 rounded-full", loading ? "bg-amber-400 animate-pulse" : "bg-brand-600")} />
+                {loading ? 'Refreshing' : 'Live'}
+              </span>
               {lastUpdated && (
-                <span className="text-xs text-slate-500 dark:text-slate-400 bg-white/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1">
-                  Last updated: {formatLastUpdated(lastUpdated)}
+                <span className="text-xs text-slate-400 dark:text-slate-600">
+                  Updated {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
-              <button
-                onClick={loadCalls}
-                disabled={loading}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-black dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-full text-sm transition-all duration-200 disabled:opacity-50"
-              >
-                <svg
-                  className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                <span>Refresh data</span>
-              </button>
+              <span className="text-xs text-slate-400 dark:text-slate-600">
+                {calls.length > 0 && `${calls.length.toLocaleString('en-IN')} records`}
+              </span>
             </div>
           </div>
 
-          {/* Secondary row (mobile refresh only) */}
-          <div className="flex items-center justify-end gap-4">
+          <div className="flex items-center gap-2">
             <button
               onClick={loadCalls}
               disabled={loading}
-              className="md:hidden inline-flex items-center space-x-2 px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-full text-xs transition-all duration-200 disabled:opacity-50"
+              className={cn(
+                "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50",
+                "bg-brand-700 hover:bg-brand-800 text-white shadow-sm shadow-brand-700/20"
+              )}
             >
-              <svg
-                className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
+              <svg className={cn("w-3.5 h-3.5", loading && "animate-spin")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
               </svg>
-              <span>Refresh</span>
+              {loading ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
 
-        {/* Error Banner */}
-        {error && (
-          <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 flex flex-col gap-2">
-            <div className="flex items-center space-x-3">
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{typeof error === 'string' ? error : error.message}</span>
-            </div>
-            {typeof error === 'object' && error?.code && (
-              <p className="text-sm pl-8 font-medium">Reason: <code className="bg-rose-100 px-1.5 py-0.5 rounded">{error.code}</code>
-                {error.rawMessage && <span className="font-normal text-rose-600"> — {error.rawMessage}</span>}
-              </p>
-            )}
-            {(typeof error === 'object' && ['permission-denied', 'not-found', 'unavailable', 'failed-precondition'].includes(error?.code)) && (
-              <p className="text-sm pl-8">Check <code className="bg-rose-100 px-1 rounded">FIRESTORE_RULES.md</code>: enable Firestore, create collection <code className="bg-rose-100 px-1 rounded">Call_logs</code>, and set rules to allow read for signed-in users.</p>
-            )}
-          </div>
-        )}
-
-        {/* Metrics - uses filtered data */}
-        <MetricsCards
-          calls={filteredCalls}
-          loading={loading}
-          dateLabel={
-            filters.startDate || filters.endDate
-              ? filters.startDate &&
-                filters.endDate &&
-                filters.startDate === filters.endDate
-                ? 'Today'
-                : 'Selected range'
-              : 'All time'
-          }
-        />
-
-        {/* Date filter row for overview (affects everything below) */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>Date:</span>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowPresetMenu((v) => !v)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px]"
-              >
-                <span>
-                  {rangePreset === 'all' && 'All time'}
-                  {rangePreset === 'today' && 'Today'}
-                  {rangePreset === 'week' && 'This week'}
-                  {rangePreset === 'month' && 'This month'}
-                  {rangePreset === 'custom' && 'Custom'}
-                </span>
-                <svg
-                  className="w-3 h-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-              {showPresetMenu && (
-                <div className="absolute z-10 mt-1 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-[11px]">
-                  {['today', 'week', 'month', 'custom', 'all'].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => handleQuickRange(r)}
-                      className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                    >
-                      {r === 'today' && 'Today'}
-                      {r === 'week' && 'This week'}
-                      {r === 'month' && 'This month'}
-                      {r === 'custom' && 'Custom'}
-                      {r === 'all' && 'All time'}
-                    </button>
-                  ))}
-                </div>
+        {/* Date range pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => handleQuickRange(opt.key)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                rangePreset === opt.key
+                  ? "bg-brand-700 text-white shadow-sm"
+                  : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-slate-600"
               )}
-            </div>
-          </div>
-
+            >
+              {opt.label}
+            </button>
+          ))}
           {rangePreset === 'custom' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-1">
               <input
                 type="date"
                 value={filters.startDate}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    startDate: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
+                onChange={(e) => setFilters((p) => ({ ...p, startDate: e.target.value }))}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-400"
               />
-              <span className="text-slate-400 dark:text-slate-500 text-xs">to</span>
+              <span className="text-slate-300 dark:text-slate-600 text-xs">to</span>
               <input
                 type="date"
                 value={filters.endDate}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    endDate: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
+                onChange={(e) => setFilters((p) => ({ ...p, endDate: e.target.value }))}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-400"
               />
-              {(filters.startDate || filters.endDate) && (
-                <button
-                  onClick={() => handleQuickRange('all')}
-                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                >
-                  Clear
-                </button>
-              )}
             </div>
           )}
         </div>
 
-        {/* Performance overview by counselor */}
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300 space-y-1">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <span>{typeof error === 'string' ? error : error.message}</span>
+            </div>
+            {typeof error === 'object' && error?.code && (
+              <p className="text-xs pl-6 opacity-80">
+                Code: <code className="bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded text-[11px]">{error.code}</code>
+                {error.rawMessage && <span> — {error.rawMessage}</span>}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        <MetricsCards calls={filteredCalls} loading={loading} dateLabel={dateLabel} />
+
+        {/* Performance */}
         <LazySection height="220px">
-          <PerformanceCards
-            ownerStatsToday={ownerStatsToday}
-            ownerStatsMonth={ownerStatsMonth}
-          />
+          <PerformanceCards ownerStatsToday={ownerStatsToday} ownerStatsMonth={ownerStatsMonth} />
         </LazySection>
 
-        {/* Overall graphs */}
         <LazySection height="340px">
           <PerformanceCharts ownerStats={ownerStatsOverall} />
         </LazySection>
-
-        {/* (Recent calls table + filters have been moved to In-depth view) */}
       </div>
     </div>
   )

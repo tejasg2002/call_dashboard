@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '../providers'
 import { useTheme } from '../providers'
 import Dashboard from '../../src/components/Dashboard'
+import { cn } from '../../src/lib/utils'
 
 export default function CallAnalyticsPage() {
   const pathname = usePathname()
@@ -14,19 +15,23 @@ export default function CallAnalyticsPage() {
   return (
     <>
       {/* Sub-tab bar */}
-      <div className={`border-b px-4 lg:px-8 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={cn(
+        "border-b px-4 lg:px-8",
+        isDark ? "bg-slate-900/50 border-slate-800" : "bg-white/60 border-slate-200/80"
+      )}>
         <div className="max-w-[1600px] mx-auto flex items-center gap-1">
           <Link
             href="/"
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
               pathname === '/'
-                ? 'border-violet-500 text-violet-600 dark:text-violet-400'
-                : `border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
-            }`}
+                ? "border-brand-700 text-brand-700 dark:text-brand-400 dark:border-brand-400"
+                : cn("border-transparent", isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800")
+            )}
           >
             <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
               </svg>
               Analytics
             </span>
@@ -34,11 +39,16 @@ export default function CallAnalyticsPage() {
           {canViewCallReview && (
             <Link
               href="/call-review"
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+              className={cn(
+                "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                pathname === '/call-review'
+                  ? "border-brand-700 text-brand-700 dark:text-brand-400 dark:border-brand-400"
+                  : cn("border-transparent", isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800")
+              )}
             >
               <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
                 </svg>
                 Call Review
               </span>

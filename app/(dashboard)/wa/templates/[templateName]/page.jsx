@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getSnapshot } from '../../../../../src/lib/snapshotService'
+import { fetchWADashboard } from '../../../../../src/lib/waDashboardApi'
 import { useTheme } from '../../../../providers'
 
 import WATemplatePreview from '../../../../../src/components/wa/WATemplatePreview'
@@ -21,7 +21,7 @@ export default function WATemplateTemplatePage() {
     let mounted = true
     ;(async () => {
       try {
-        const snap = await getSnapshot('wa')
+        const snap = await fetchWADashboard({ mode: 'cached' })
         if (!mounted) return
         setSnapshot(snap)
       } catch (err) {
@@ -65,7 +65,7 @@ export default function WATemplateTemplatePage() {
 
       {loading && (
         <div className="flex items-center justify-center py-16 gap-3">
-          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           <span className={isDark ? 'text-slate-400 text-sm' : 'text-slate-600 text-sm'}>Loading template analytics…</span>
         </div>
       )}

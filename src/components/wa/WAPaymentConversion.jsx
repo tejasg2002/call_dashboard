@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { fetchLeadByMobile } from '../../lib/firebase'
+import { fetchLeadByMobile, fetchLeadFromCallerDetailsByMobile } from '../../lib/firebase'
 
 function buildPhoneMap(buttonPhones, templatePhones) {
   const allPhones = new Set()
@@ -91,11 +91,20 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
 
       for (let i = 0; i < allUniquePhones.length; i += BATCH) {
         const batch = allUniquePhones.slice(i, i + BATCH)
-        const results = await Promise.all(batch.map((phone) => fetchLeadByMobile(phone)))
+
+        // IMPORTANT: For consistency with the debug script and Mongo schema,
+        // we ONLY trust lead_id from Firebase callerDetails here.
+        const results = await Promise.all(
+          batch.map((phone) => fetchLeadFromCallerDetailsByMobile(phone))
+        )
+
         batch.forEach((phone, idx) => {
           resolved++
           const lead = results[idx]
-          if (lead?.lead_id) { phoneToLeadId.set(phone, lead.lead_id); leadFoundCount++ }
+          if (lead?.lead_id) {
+            phoneToLeadId.set(phone, lead.lead_id)
+            leadFoundCount++
+          }
         })
         setProgress(`Resolving lead IDs: ${resolved} / ${allUniquePhones.length} (${leadFoundCount} found)`)
         if (i + BATCH < allUniquePhones.length) await new Promise((r) => setTimeout(r, 300))
@@ -118,6 +127,21 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
       const debugRes = await fetch('/api/npf-payments?debug=true')
       const debugData = await debugRes.json()
 
+      // New: check submitted applications in npfMbaApplications using mobiles directly.
+      let formSubmittedCount = 0
+      let formSubmittedMobiles = new Set()
+      try {
+        const appRes = await fetch(
+          `/api/npf-applications?mobiles=${encodeURIComponent(allUniquePhones.join(','))}`,
+        )
+        const appData = await appRes.json()
+        const mobs = Array.isArray(appData.mobiles) ? appData.mobiles : []
+        formSubmittedMobiles = new Set(mobs)
+        formSubmittedCount = mobs.length
+      } catch (e) {
+        console.error('[WAPaymentConversion] npf-applications lookup failed', e)
+      }
+
       function computeStats(items) {
         const out = {}
         for (const { name, phones } of items) {
@@ -131,11 +155,38 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
         return out
       }
 
+      // Build per-user breakdown for form-submitted users:
+      // - phone number
+      // - how many templates they received (proxy for messages sent)
+      // - which templates and buttons they clicked
+      const formSubmittedUsers = []
+      if (formSubmittedMobiles.size > 0) {
+        for (const phone of allUniquePhones) {
+          if (!formSubmittedMobiles.has(phone)) continue
+
+          const templatesForUser = templateList
+            .filter((t) => t.phones.includes(phone))
+            .map((t) => t.name)
+
+          const buttonsForUser = buttonList
+            .filter((b) => b.phones.includes(phone))
+            .map((b) => b.name)
+
+          formSubmittedUsers.push({
+            phone,
+            messagesSent: templatesForUser.length,
+            templates: [...new Set(templatesForUser)],
+            buttons: [...new Set(buttonsForUser)],
+          })
+        }
+      }
+
       const data = {
         perButton: computeStats(buttonList),
         perTemplate: computeStats(templateList),
         phoneToLeadId: Object.fromEntries(phoneToLeadId),
         completedLeadIds: [...completedLeadIds],
+        formSubmittedUsers,
         diagnostics: {
           totalPaymentsInDB: debugData.totalDocuments || 0,
           statusDistribution: (debugData.statusDistribution || []).reduce((acc, s) => { acc[s.status] = s.count; return acc }, {}),
@@ -144,6 +195,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
           resolvedCount: resolved,
           leadFoundCount,
           uniqueLeadIds: allLeadIds.length,
+          formSubmittedCount,
         },
       }
 
@@ -167,6 +219,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
   const perButton = result?.perButton || {}
   const perTemplate = result?.perTemplate || {}
   const diag = result?.diagnostics || {}
+  const formUsers = result?.formSubmittedUsers || []
   const activeItems = tab === 'button' ? buttonList : templateList
   const activeStats = tab === 'button' ? perButton : perTemplate
   const phoneMap = result?.phoneToLeadId || {}
@@ -175,6 +228,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
   const totalReached = diag.totalUniquePhones || allUniquePhones.length
   const totalLeads = diag.leadFoundCount || 0
   const totalPaid = diag.completedPaymentsMatched || 0
+  const totalFormSubmitted = diag.formSubmittedCount || 0
   const overallRate = totalReached > 0 ? ((totalPaid / totalReached) * 100).toFixed(1) : '0.0'
 
   const sortedItems = useMemo(() => {
@@ -191,12 +245,12 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <div className={`px-6 py-5 ${isDark ? 'bg-gradient-to-r from-slate-800 to-slate-800/50' : 'bg-gradient-to-r from-emerald-50/80 to-white'}`}>
+      <div className={`px-6 py-5 ${isDark ? 'bg-gradient-to-r from-slate-800 to-slate-800/50' : 'bg-gradient-to-r from-brand-50/80 to-white'}`}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-100'}`}>
-                <svg className={`w-4 h-4 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-brand-500/10' : 'bg-brand-100'}`}>
+                <svg className={`w-4 h-4 ${isDark ? 'text-brand-400' : 'text-brand-600'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -219,7 +273,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
               onClick={compute}
               disabled={status === 'loading'}
               className={`text-[11px] px-3 py-1.5 rounded-lg font-semibold transition-all disabled:opacity-50 ${
-                isDark ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                isDark ? 'bg-brand-600 hover:bg-brand-500 text-white' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm'
               }`}
             >
               {status === 'loading' ? 'Computing...' : 'Recompute'}
@@ -229,11 +283,18 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
 
         {/* ── Hero Metrics ────────────────────────────────────────────── */}
         {status === 'done' && (
-          <div className={`mt-5 grid grid-cols-4 gap-4 py-4 px-2 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-white/80 shadow-inner'}`}>
+          <div className={`mt-5 grid grid-cols-5 gap-4 py-4 px-2 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-white/80 shadow-inner'}`}>
             <HeroMetric value={totalReached.toLocaleString('en-IN')} label="Users Reached" accent={isDark ? 'text-blue-400' : 'text-blue-600'} isDark={isDark} />
-            <HeroMetric value={totalLeads.toLocaleString('en-IN')} label="Leads Identified" sub={totalReached > 0 ? `${((totalLeads / totalReached) * 100).toFixed(0)}% match rate` : ''} accent={isDark ? 'text-violet-400' : 'text-violet-600'} isDark={isDark} />
-            <HeroMetric value={totalPaid.toLocaleString('en-IN')} label="Payments Done" sub={totalLeads > 0 ? `${((totalPaid / totalLeads) * 100).toFixed(1)}% of leads` : ''} accent={isDark ? 'text-emerald-400' : 'text-emerald-600'} isDark={isDark} />
-            <HeroMetric value={`${overallRate}%`} label="Conversion Rate" sub="users → payment" accent={totalPaid > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-slate-500' : 'text-slate-400')} isDark={isDark} />
+            <HeroMetric value={totalLeads.toLocaleString('en-IN')} label="Leads Identified" sub={totalReached > 0 ? `${((totalLeads / totalReached) * 100).toFixed(0)}% match rate` : ''} accent={isDark ? 'text-brand-400' : 'text-brand-600'} isDark={isDark} />
+            <HeroMetric
+              value={totalFormSubmitted.toLocaleString('en-IN')}
+              label="Form Submitted"
+              sub={totalLeads > 0 ? `${((totalFormSubmitted / totalLeads) * 100).toFixed(1)}% of leads` : ''}
+              accent={isDark ? 'text-amber-400' : 'text-amber-600'}
+              isDark={isDark}
+            />
+            <HeroMetric value={totalPaid.toLocaleString('en-IN')} label="Payments Done" sub={totalLeads > 0 ? `${((totalPaid / totalLeads) * 100).toFixed(1)}% of leads` : ''} accent={isDark ? 'text-brand-400' : 'text-brand-600'} isDark={isDark} />
+            <HeroMetric value={`${overallRate}%`} label="Conversion Rate" sub="users → payment" accent={totalPaid > 0 ? (isDark ? 'text-brand-400' : 'text-brand-600') : (isDark ? 'text-slate-500' : 'text-slate-400')} isDark={isDark} />
           </div>
         )}
 
@@ -241,8 +302,8 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
         {status === 'done' && (
           <div className="flex items-center gap-2 mt-4">
             <FunnelStep label="Reached" value={totalReached} total={totalReached} color="text-blue-500" isDark={isDark} />
-            <FunnelStep label="Leads" value={totalLeads} total={totalReached} color="text-violet-500" isDark={isDark} />
-            <FunnelStep label="Paid" value={totalPaid} total={totalReached} color="text-emerald-500" isLast isDark={isDark} />
+            <FunnelStep label="Leads" value={totalLeads} total={totalReached} color="text-brand-500" isDark={isDark} />
+            <FunnelStep label="Paid" value={totalPaid} total={totalReached} color="text-brand-500" isLast isDark={isDark} />
           </div>
         )}
       </div>
@@ -250,7 +311,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
       {/* ── Loading state ─────────────────────────────────────────────── */}
       {status === 'loading' && (
         <div className="flex items-center justify-center gap-3 py-8">
-          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{progress || 'Starting...'}</span>
         </div>
       )}
@@ -318,13 +379,13 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
                           </svg>
                           <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={name}>{name}</span>
                           {stats.paid > 0 && (
-                            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
                               {stats.paid} paid
                             </span>
                           )}
                         </div>
                         <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-emerald-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-brand-500 to-brand-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
                         </div>
                       </div>
 
@@ -334,15 +395,15 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Users</p>
                         </div>
                         <div className="text-center w-14">
-                          <p className={`text-sm font-bold ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>{stats.leadsFound.toLocaleString('en-IN')}</p>
+                          <p className={`text-sm font-bold ${isDark ? 'text-brand-400' : 'text-brand-600'}`}>{stats.leadsFound.toLocaleString('en-IN')}</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Leads</p>
                         </div>
                         <div className="text-center w-14">
-                          <p className={`text-sm font-bold ${stats.paid > 0 ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.paid.toLocaleString('en-IN')}</p>
+                          <p className={`text-sm font-bold ${stats.paid > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.paid.toLocaleString('en-IN')}</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Paid</p>
                         </div>
-                        <div className={`text-center w-14 px-2 py-1 rounded-lg ${stats.rate > 0 ? (isDark ? 'bg-emerald-900/30' : 'bg-emerald-50') : ''}`}>
-                          <p className={`text-sm font-bold ${stats.rate > 0 ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.rate}%</p>
+                        <div className={`text-center w-14 px-2 py-1 rounded-lg ${stats.rate > 0 ? (isDark ? 'bg-brand-900/30' : 'bg-brand-50') : ''}`}>
+                          <p className={`text-sm font-bold ${stats.rate > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{stats.rate}%</p>
                           <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Rate</p>
                         </div>
                       </div>
@@ -374,7 +435,7 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
                                     <td className={`px-4 py-2 font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{u.phone}</td>
                                     <td className={`px-4 py-2 font-mono ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{u.leadId}</td>
                                     <td className="px-4 py-2">
-                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                         Paid
                                       </span>
@@ -397,10 +458,78 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
         </div>
       )}
 
+      {/* ── Form Submitted Breakdown ───────────────────────────────────── */}
+      {status === 'done' && formUsers.length > 0 && (
+        <div className="px-6 pb-5">
+          <h4 className={`text-xs font-semibold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+            Form submitted breakdown
+          </h4>
+          <div className={`rounded-xl border ${isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="w-full text-[11px]">
+                <thead className={isDark ? 'bg-slate-800' : 'bg-white'}>
+                  <tr>
+                    <th className={`px-4 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
+                    <th className={`px-4 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>User (mobile)</th>
+                    <th className={`px-4 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Messages sent*</th>
+                    <th className={`px-4 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Templates engaged</th>
+                    <th className={`px-4 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Buttons clicked</th>
+                  </tr>
+                </thead>
+                <tbody className={isDark ? 'divide-y divide-slate-800' : 'divide-y divide-slate-200'}>
+                  {formUsers.map((u, idx) => (
+                    <tr key={u.phone}>
+                      <td className={`px-4 py-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
+                      <td className={`px-4 py-1.5 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{u.phone}</td>
+                      <td className={`px-4 py-1.5 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{u.messagesSent}</td>
+                      <td className="px-4 py-1.5">
+                        {u.templates.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {u.templates.map((t) => (
+                              <span
+                                key={t}
+                                className={`px-1.5 py-0.5 rounded-full border ${isDark ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-700'}`}
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-1.5">
+                        {u.buttons.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {u.buttons.map((b) => (
+                              <span
+                                key={b}
+                                className={`px-1.5 py-0.5 rounded-full border ${isDark ? 'border-brand-700 text-brand-300' : 'border-brand-300 text-brand-700'}`}
+                              >
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className={`px-4 py-2 text-[10px] border-t ${isDark ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-500'}`}>
+              *Messages sent is approximated as the number of templates this user received/engaged via WhatsApp.
+            </p>
+          </div>
+        </div>
+      )}
+
       {status === 'error' && (
         <div className="text-center py-6 px-6">
           <p className={`text-xs ${isDark ? 'text-rose-400' : 'text-rose-500'}`}>Failed to compute conversion data</p>
-          <button onClick={compute} className="mt-2 text-[11px] font-semibold text-emerald-500 hover:underline">Retry</button>
+          <button onClick={compute} className="mt-2 text-[11px] font-semibold text-brand-500 hover:underline">Retry</button>
         </div>
       )}
     </div>

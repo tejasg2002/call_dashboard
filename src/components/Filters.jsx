@@ -49,8 +49,8 @@ const Filters = ({ calls, filters, onFilterChange }) => {
       .join(' ')
   }
 
-  const selectClass = 'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300 transition-all appearance-none cursor-pointer'
-  const inputClass = 'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-300 transition-all'
+  const selectClass = 'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-300 transition-all appearance-none cursor-pointer'
+  const inputClass = 'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-300 transition-all'
   const labelClass = 'block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2'
 
   return (
@@ -61,14 +61,14 @@ const Filters = ({ calls, filters, onFilterChange }) => {
         className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
       >
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-violet-50 dark:bg-violet-900/30 rounded-lg">
-            <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="p-2 bg-brand-50 dark:bg-brand-900/30 rounded-lg">
+            <svg className="w-5 h-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
           </div>
           <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">Filters</span>
           {activeFiltersCount > 0 && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-full">
               {activeFiltersCount} active
             </span>
           )}
@@ -97,7 +97,7 @@ const Filters = ({ calls, filters, onFilterChange }) => {
                 placeholder="Search by lead name..."
                 value={filters.search}
                 onChange={(e) => handleChange('search', e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-300 focus:ring-1 focus:ring-violet-200 transition-all`}
+                className={`w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-300 focus:ring-1 focus:ring-brand-200 transition-all`}
               />
             </div>
           </div>

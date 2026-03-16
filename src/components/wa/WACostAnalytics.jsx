@@ -24,8 +24,8 @@ export default function WACostAnalytics({ templateRows, totalCost, costPerClick,
         {[
           { label: 'Total spend',    value: `₹${(totalCost ?? 0).toFixed(2)}`,                        color: 'text-indigo-600 dark:text-indigo-400' },
           { label: 'Cost per click', value: clicked > 0 ? `₹${(costPerClick ?? 0).toFixed(4)}` : '—', color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Templates',      value: sorted.length,                                             color: 'text-violet-600 dark:text-violet-400' },
-          { label: 'Avg per template', value: sorted.length > 0 ? `₹${((totalCost ?? 0) / sorted.length).toFixed(2)}` : '—', color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'Templates',      value: sorted.length,                                             color: 'text-brand-600 dark:text-brand-400' },
+          { label: 'Avg per template', value: sorted.length > 0 ? `₹${((totalCost ?? 0) / sorted.length).toFixed(2)}` : '—', color: 'text-brand-600 dark:text-brand-400' },
         ].map((s) => (
           <div key={s.label} className={`${card} border-l-4 border-slate-300/50`}>
             <p className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{s.label}</p>

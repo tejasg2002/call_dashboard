@@ -1,5 +1,7 @@
 'use client'
 
+import { cn } from '../lib/utils'
+
 const PerformanceCharts = ({ ownerStats }) => {
   if (!ownerStats || ownerStats.length === 0) return null
 
@@ -13,61 +15,71 @@ const PerformanceCharts = ({ ownerStats }) => {
   const formatOwner = (owner) =>
     owner.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-      {/* Calls graph */}
-      <div className="bg-white dark:bg-slate-800 rounded-3xl px-6 py-5 border border-slate-200 dark:border-slate-700 shadow-sm">
-        <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 dark:text-slate-400 uppercase mb-3">
-          Calls by counselor
-        </p>
-        <div className="space-y-3">
-          {topByCalls.map((item) => (
-            <div key={item.owner} className="space-y-1">
+  const chartCard = (title, data, maxVal, getVal, getLabel, barColor) => (
+    <div className={cn(
+      "rounded-xl border p-5 transition-all duration-200",
+      "bg-white dark:bg-slate-900/60",
+      "border-slate-200/80 dark:border-slate-800",
+      "hover:shadow-card-hover hover:border-slate-300 dark:hover:border-slate-700"
+    )}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">
+        {title}
+      </p>
+      <div className="space-y-3">
+        {data.map((item, i) => {
+          const val = getVal(item)
+          const pct = Math.max(8, Math.round((val / maxVal) * 100))
+          return (
+            <div key={item.owner} className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-slate-300 truncate max-w-[160px]">
-                  {formatOwner(item.owner)}
-                </span>
-                <span className="text-slate-500 dark:text-slate-400 font-mono">
-                  {item.totalCalls} calls
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={cn(
+                    "w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0",
+                    i === 0
+                      ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  )}>
+                    {i + 1}
+                  </span>
+                  <span className="text-slate-700 dark:text-slate-300 truncate text-[12px]">
+                    {formatOwner(item.owner)}
+                  </span>
+                </div>
+                <span className="text-slate-500 dark:text-slate-400 font-mono text-[12px] shrink-0 ml-2">
+                  {getLabel(item)}
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/50 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-slate-900 dark:bg-slate-200"
-                  style={{ width: `${Math.max(8, Math.round((item.totalCalls / maxCalls) * 100))}%` }}
+                  className={cn("h-full rounded-full transition-all duration-700", barColor)}
+                  style={{ width: `${pct}%` }}
                 />
               </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
+    </div>
+  )
 
-      {/* Score graph */}
-      <div className="bg-white dark:bg-slate-800 rounded-3xl px-6 py-5 border border-slate-200 dark:border-slate-700 shadow-sm">
-        <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 dark:text-slate-400 uppercase mb-3">
-          Call score by counselor
-        </p>
-        <div className="space-y-3">
-          {topByScore.map((item) => (
-            <div key={item.owner} className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-700 dark:text-slate-300 truncate max-w-[160px]">
-                  {formatOwner(item.owner)}
-                </span>
-                <span className="text-slate-500 dark:text-slate-400 font-mono">
-                  {item.avgScore}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${Math.max(8, Math.round((item.avgScore / maxScore) * 100))}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      {chartCard(
+        'Calls by Counselor',
+        topByCalls,
+        maxCalls,
+        (item) => item.totalCalls,
+        (item) => `${item.totalCalls} calls`,
+        'bg-brand-600'
+      )}
+      {chartCard(
+        'Score by Counselor',
+        topByScore,
+        maxScore,
+        (item) => item.avgScore,
+        (item) => `${item.avgScore} avg`,
+        'bg-blue-500'
+      )}
     </div>
   )
 }

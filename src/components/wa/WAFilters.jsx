@@ -37,7 +37,7 @@ export default function WAFilters({ filters, setFilters, options, theme, onApply
             type="button"
             onClick={onApply}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-              isDark ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              isDark ? 'bg-brand-600 hover:bg-brand-500 text-white' : 'bg-brand-600 hover:bg-brand-700 text-white'
             }`}
           >
             Apply

@@ -4,13 +4,13 @@ const LeadDetail = ({ call, onClose }) => {
   if (!call) return null
 
   const getScoreColor = (score) => {
-    if (score >= 70) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 70) return 'text-brand-600 dark:text-brand-400'
     if (score >= 40) return 'text-amber-600 dark:text-amber-400'
     return 'text-rose-600 dark:text-rose-400'
   }
 
   const getConfidenceColor = (confidence) => {
-    if (confidence === 'high') return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700'
+    if (confidence === 'high') return 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 border-brand-200 dark:border-brand-700'
     if (confidence === 'medium') return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700'
     return 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-700'
   }
@@ -72,7 +72,7 @@ const LeadDetail = ({ call, onClose }) => {
         {/* Lead Info */}
         <div className="space-y-4">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg uppercase shadow-sm">
+            <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg uppercase shadow-sm">
               {call.Name?.charAt(0) || '?'}
             </div>
             <div className="space-y-1">
@@ -166,9 +166,9 @@ const LeadDetail = ({ call, onClose }) => {
           {call.summary && (
             <div className="space-y-3">
               {normalizeSummaryList(call.summary.what_went_right || call.summary['What Went Right']).length > 0 && (
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-3 text-xs space-y-2">
-                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">What went right</p>
-                  <ul className="list-disc list-inside space-y-1 text-emerald-700 dark:text-emerald-400">
+                <div className="bg-brand-50 dark:bg-brand-900/20 rounded-2xl border border-brand-200 dark:border-brand-800 p-3 text-xs space-y-2">
+                  <p className="font-semibold text-brand-800 dark:text-brand-300">What went right</p>
+                  <ul className="list-disc list-inside space-y-1 text-brand-700 dark:text-brand-400">
                     {normalizeSummaryList(call.summary.what_went_right || call.summary['What Went Right']).map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}

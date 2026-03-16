@@ -16,8 +16,8 @@ function fmtDate(iso) {
 function StatPill({ label, value, color }) {
   const colors = {
     blue:    'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/50',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700/50',
-    violet:  'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700/50',
+    brand: 'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-700/50',
+    brand:  'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-700/50',
     amber:   'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
     rose:    'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700/50',
     indigo:  'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700/50',
@@ -32,7 +32,7 @@ function StatPill({ label, value, color }) {
 
 // ── Campaign row card ─────────────────────────────────────────────────────────
 const CAMPAIGN_COLORS = [
-  'bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500',
+  'bg-brand-500', 'bg-blue-500', 'bg-brand-500', 'bg-amber-500',
   'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-pink-500',
 ]
 
@@ -70,8 +70,8 @@ function CampaignCard({ campaign, index, theme, dataMasked }) {
             {/* Right: stat pills */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <StatPill label="Sent"      value={kpi.sent.toLocaleString()}      color="blue" />
-              <StatPill label="Delivered" value={kpi.delivered.toLocaleString()} color="emerald" />
-              <StatPill label="Read"      value={kpi.read.toLocaleString()}       color="violet" />
+              <StatPill label="Delivered" value={kpi.delivered.toLocaleString()} color="brand" />
+              <StatPill label="Read"      value={kpi.read.toLocaleString()}       color="brand" />
               <StatPill label="Clicked"   value={kpi.clicked.toLocaleString()}    color="amber" />
               {kpi.failed > 0 && (
                 <StatPill label="Failed" value={kpi.failed.toLocaleString()} color="rose" />
@@ -84,8 +84,8 @@ function CampaignCard({ campaign, index, theme, dataMasked }) {
           {/* Rate bar */}
           <div className="mt-2.5 flex items-center gap-3 flex-wrap">
             {[
-              { label: 'STD', value: kpi.sdr,      color: 'bg-emerald-500' },
-              { label: 'STR', value: kpi.str,       color: 'bg-violet-500' },
+              { label: 'STD', value: kpi.sdr,      color: 'bg-brand-500' },
+              { label: 'STR', value: kpi.str,       color: 'bg-brand-500' },
               { label: 'DTR', value: kpi.readRate,  color: 'bg-cyan-500' },
               { label: 'CTR', value: kpi.ctr,       color: 'bg-amber-500' },
             ].map((r) => (
@@ -170,8 +170,8 @@ export default function WACampaignDashboard({ data, theme, isAdmin, dataMasked }
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <StatPill label="Total Sent"      value={totalKpi.sent.toLocaleString()}       color="blue" />
-              <StatPill label="Total Delivered" value={totalKpi.delivered.toLocaleString()}  color="emerald" />
-              <StatPill label="Total Read"      value={totalKpi.read.toLocaleString()}        color="violet" />
+              <StatPill label="Total Delivered" value={totalKpi.delivered.toLocaleString()}  color="brand" />
+              <StatPill label="Total Read"      value={totalKpi.read.toLocaleString()}        color="brand" />
               <StatPill label="Total Clicked"   value={totalKpi.clicked.toLocaleString()}     color="amber" />
               <StatPill label="Overall CTR"     value={`${totalKpi.ctr.toFixed(1)}%`}         color="indigo" />
               <StatPill label="Total Cost"      value={`₹${totalKpi.cost.toFixed(2)}`}        color="indigo" />

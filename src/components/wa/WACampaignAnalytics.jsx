@@ -76,7 +76,7 @@ function CampaignCard({ data, isDark, color }) {
                     <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-100'}`}>
                       {data.templateRows.map((r) => (
                         <tr key={r.template_name}>
-                          <td className={`py-1.5 pr-4 font-mono ${isDark ? 'text-violet-300' : 'text-violet-700'}`}>{r.template_name}</td>
+                          <td className={`py-1.5 pr-4 font-mono ${isDark ? 'text-brand-300' : 'text-brand-700'}`}>{r.template_name}</td>
                           <td className={`text-right py-1.5 pr-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.sent}</td>
                           <td className={`text-right py-1.5 pr-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.delivered}</td>
                           <td className={`text-right py-1.5 pr-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.clicked}</td>

@@ -13,14 +13,14 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
 
   const getDispositionColor = (disposition) => {
     const status = disposition?.counselor?.toLowerCase()
-    if (status === 'interested') return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+    if (status === 'interested') return 'bg-brand-500/20 text-brand-400 border-brand-500/30'
     if (status === 'not_interested') return 'bg-rose-500/20 text-rose-400 border-rose-500/30'
     if (status === 'callback') return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
     return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
   }
 
   const getScoreColor = (score) => {
-    if (score >= 70) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 70) return 'text-brand-600 dark:text-brand-400'
     if (score >= 40) return 'text-amber-600 dark:text-amber-400'
     return 'text-rose-600 dark:text-rose-400'
   }
@@ -75,8 +75,8 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-8 flex flex-col items-center justify-center space-y-4">
           <div className="relative">
-            <div className="w-16 h-16 border-4 border-violet-300 rounded-full" />
-            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-violet-500 rounded-full animate-spin" />
+            <div className="w-16 h-16 border-4 border-brand-300 rounded-full" />
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-brand-500 rounded-full animate-spin" />
           </div>
           <p className="text-slate-500 dark:text-slate-400 text-sm">Loading calls data...</p>
         </div>
@@ -106,8 +106,8 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent Calls</h2>
         <div className="flex items-center space-x-2">
           {loading && (
-            <span className="flex items-center space-x-2 text-xs text-violet-600 dark:text-violet-400">
-              <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
+            <span className="flex items-center space-x-2 text-xs text-brand-600 dark:text-brand-400">
+              <div className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
               <span>Syncing...</span>
             </span>
           )}
@@ -134,7 +134,7 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
                 onClick={() => onSelectCall(call)}
                 className={`table-row-hover cursor-pointer ${
                   selectedCallId === call.id
-                    ? 'bg-violet-50 dark:bg-violet-900/20'
+                    ? 'bg-brand-50 dark:bg-brand-900/20'
                     : 'bg-white dark:bg-slate-800'
                 }`}
               >
@@ -177,7 +177,7 @@ const CallsTable = ({ calls, loading, onSelectCall, selectedCallId }) => {
                       <button
                         type="button"
                         onClick={() => handleTogglePlay(call.id)}
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 hover:border-violet-300 hover:text-violet-700 transition-colors"
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 hover:border-brand-300 hover:text-brand-700 transition-colors"
                       >
                         {playingId === call.id ? (
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

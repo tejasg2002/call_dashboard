@@ -106,7 +106,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                 sortedRows.map((r) => (
                   <tr key={r.template_name} className={isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}>
                     <td className={tdClass}>
-                      <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-violet-300' : 'bg-violet-50 text-violet-700'}`}>
+                      <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
                         {r.template_name}
                       </span>
                     </td>
@@ -150,12 +150,12 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                       )}
                     </td>
                     <td className={tdClass}>
-                      <span className={r.sdr >= 80 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : ''}>
+                      <span className={r.sdr >= 80 ? 'text-brand-600 dark:text-brand-400 font-semibold' : ''}>
                         {r.sdr != null ? `${r.sdr.toFixed(1)}%` : '—'}
                       </span>
                     </td>
                     <td className={tdClass}>
-                      <span className={r.str >= 50 ? 'text-violet-600 dark:text-violet-400 font-semibold' : ''}>
+                      <span className={r.str >= 50 ? 'text-brand-600 dark:text-brand-400 font-semibold' : ''}>
                         {r.str != null ? `${r.str.toFixed(1)}%` : '—'}
                       </span>
                     </td>
@@ -176,7 +176,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                           router.push(`/wa/templates/${encodeURIComponent(r.template_name)}`)
                         }}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                          isDark ? 'border-violet-600 bg-violet-700/30 text-violet-300 hover:bg-violet-700/60' : 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                          isDark ? 'border-brand-600 bg-brand-700/30 text-brand-300 hover:bg-brand-700/60' : 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
                         }`}
                         title="View template breakdown"
                       >

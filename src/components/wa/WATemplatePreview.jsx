@@ -110,8 +110,8 @@ function ButtonPreview({ btn }) {
 // ── User list panel ──────────────────────────────────────────────────────────
 const STAGE_META = {
   sent:      { title: 'Sent to',      color: 'text-blue-500',    headerBg: (d) => d ? 'bg-blue-900/20 border-blue-800'    : 'bg-blue-50 border-blue-200' },
-  delivered: { title: 'Delivered to', color: 'text-emerald-500', headerBg: (d) => d ? 'bg-emerald-900/20 border-emerald-800' : 'bg-emerald-50 border-emerald-200' },
-  read:      { title: 'Read by',      color: 'text-violet-500',  headerBg: (d) => d ? 'bg-violet-900/20 border-violet-800'  : 'bg-violet-50 border-violet-200' },
+  delivered: { title: 'Delivered to', color: 'text-brand-500', headerBg: (d) => d ? 'bg-brand-900/20 border-brand-800' : 'bg-brand-50 border-brand-200' },
+  read:      { title: 'Read by',      color: 'text-brand-500',  headerBg: (d) => d ? 'bg-brand-900/20 border-brand-800'  : 'bg-brand-50 border-brand-200' },
   clicked:   { title: 'Clicked by',   color: 'text-amber-500',   headerBg: (d) => d ? 'bg-amber-900/20 border-amber-800'   : 'bg-amber-50 border-amber-200' },
   failed:    { title: 'Failed for',   color: 'text-rose-500',    headerBg: (d) => d ? 'bg-rose-900/20 border-rose-800'     : 'bg-rose-50 border-rose-200' },
 }
@@ -209,7 +209,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                       className={`ml-0.5 p-0.5 rounded transition-colors ${isDark ? 'hover:bg-indigo-700/50' : 'hover:bg-indigo-100'}`}
                     >
                       {copiedId === leadId ? (
-                        <svg className="w-2.5 h-2.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-2.5 h-2.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       ) : (
@@ -275,7 +275,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                   onClick={() => setPage(p)}
                   className={`w-6 h-6 rounded-lg text-[11px] font-medium border transition-colors ${
                     p === page
-                      ? isDark ? 'bg-violet-600 text-white border-violet-600' : 'bg-violet-600 text-white border-violet-600'
+                      ? isDark ? 'bg-brand-600 text-white border-brand-600' : 'bg-brand-600 text-white border-brand-600'
                       : isDark ? 'border-slate-700 text-slate-400 hover:bg-slate-700' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
                   }`}
                 >
@@ -416,10 +416,10 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
   const STAT_TILES = [
     { stage: 'sent',      value: sent,      label: 'Sent',      color: 'text-blue-500',
       activeCls: isDark ? 'bg-blue-900/30 border-blue-600' : 'bg-blue-50 border-blue-400' },
-    { stage: 'delivered', value: delivered, label: 'Delivered', color: 'text-emerald-500',
-      activeCls: isDark ? 'bg-emerald-900/30 border-emerald-600' : 'bg-emerald-50 border-emerald-400' },
-    { stage: 'read',      value: read,      label: 'Read',      color: 'text-violet-500',
-      activeCls: isDark ? 'bg-violet-900/30 border-violet-600' : 'bg-violet-50 border-violet-400' },
+    { stage: 'delivered', value: delivered, label: 'Delivered', color: 'text-brand-500',
+      activeCls: isDark ? 'bg-brand-900/30 border-brand-600' : 'bg-brand-50 border-brand-400' },
+    { stage: 'read',      value: read,      label: 'Read',      color: 'text-brand-500',
+      activeCls: isDark ? 'bg-brand-900/30 border-brand-600' : 'bg-brand-50 border-brand-400' },
     { stage: 'clicked',   value: clicked,   label: 'Clicked',   color: 'text-amber-500',
       activeCls: isDark ? 'bg-amber-900/30 border-amber-600' : 'bg-amber-50 border-amber-400' },
     { stage: 'failed',    value: failed,    label: 'Failed',
@@ -473,7 +473,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
         >
           {payloadLoading ? (
             <div className="self-stretch flex flex-col items-center justify-center py-8 gap-2">
-              <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
               <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading preview...</span>
             </div>
           ) : !effectivePayload ? (
@@ -558,7 +558,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
             <div className="mb-3">
               {stageUsersLoading && !getStageUsers(activeStage).length ? (
                 <div className={`flex items-center justify-center py-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
                   <span className={`ml-2 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading users...</span>
                 </div>
               ) : (
@@ -602,8 +602,8 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
           {/* Rate metrics — always visible */}
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: 'STD (Sent→Del)',  value: `${(row?.sdr ?? 0).toFixed(1)}%`, color: 'text-emerald-500' },
-              { label: 'STR (Sent→Read)', value: `${(row?.str ?? 0).toFixed(1)}%`, color: 'text-violet-500' },
+              { label: 'STD (Sent→Del)',  value: `${(row?.sdr ?? 0).toFixed(1)}%`, color: 'text-brand-500' },
+              { label: 'STR (Sent→Read)', value: `${(row?.str ?? 0).toFixed(1)}%`, color: 'text-brand-500' },
               { label: 'DTR (Del→Read)',  value: `${readRate.toFixed(1)}%`,         color: 'text-cyan-500' },
               { label: 'CTR (Click/Del)', value: `${ctr.toFixed(1)}%`,             color: 'text-indigo-500' },
             ].map((s) => (

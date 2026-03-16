@@ -19,17 +19,17 @@ const TIER_META = {
     icon: '👁️',
     label: 'Read',
     desc: 'Received & opened the message',
-    dot: 'bg-violet-500',
-    badge: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700',
-    bar: 'bg-violet-400',
+    dot: 'bg-brand-500',
+    badge: 'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-700',
+    bar: 'bg-brand-400',
   },
   'Delivered': {
     icon: '✅',
     label: 'Delivered',
     desc: 'Delivered but not yet read',
-    dot: 'bg-emerald-500',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
-    bar: 'bg-emerald-400',
+    dot: 'bg-brand-500',
+    badge: 'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-700',
+    bar: 'bg-brand-400',
   },
   'Sent only': {
     icon: '📤',
@@ -59,8 +59,8 @@ function StageDots({ stages, isDark }) {
   const order = ['sent', 'delivered', 'read', 'clicked']
   const colors = {
     sent: 'bg-blue-400',
-    delivered: 'bg-emerald-500',
-    read: 'bg-violet-500',
+    delivered: 'bg-brand-500',
+    read: 'bg-brand-500',
     clicked: 'bg-amber-500',
   }
   return (
@@ -166,8 +166,8 @@ export default function WAEngagementSection({ engagementRows = [], engagementSum
         {totalUsers > 0 && (
           <div className="mt-4 space-y-2">
             {[
-              { label: 'Delivered', count: deliveredUsers, color: 'bg-emerald-500' },
-              { label: 'Read',      count: readUsers,      color: 'bg-violet-500' },
+              { label: 'Delivered', count: deliveredUsers, color: 'bg-brand-500' },
+              { label: 'Read',      count: readUsers,      color: 'bg-brand-500' },
               { label: 'Clicked',   count: clickedUsers,   color: 'bg-amber-500' },
             ].map(({ label, count, color }) => (
               <div key={label} className="flex items-center gap-3">
@@ -284,7 +284,7 @@ export default function WAEngagementSection({ engagementRows = [], engagementSum
                     <td className="px-4 py-3 max-w-[200px]">
                       <div className="flex flex-wrap gap-1">
                         {row.templates.slice(0, 2).map((t) => (
-                          <span key={t} className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-violet-300' : 'bg-violet-50 text-violet-700'}`}>
+                          <span key={t} className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
                             {t}
                           </span>
                         ))}
@@ -375,7 +375,7 @@ export default function WAEngagementSection({ engagementRows = [], engagementSum
                 onClick={() => setPage(pageNum)}
                 className={`w-7 h-7 rounded-lg text-xs font-medium border transition-colors ${
                   pageNum === page
-                    ? 'bg-violet-600 text-white border-violet-600'
+                    ? 'bg-brand-600 text-white border-brand-600'
                     : isDark ? 'border-slate-700 text-slate-400 hover:bg-slate-700' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
                 }`}
               >

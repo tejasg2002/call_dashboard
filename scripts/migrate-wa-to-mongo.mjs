@@ -198,6 +198,26 @@ function extractTemplateCategory(d) {
   }
 }
 
+function extractTemplateName(d) {
+  if (d.template_name) return d.template_name
+  const rp = safeParsePayload(d.raw_payload)
+  if (!rp) return null
+  const msg = rp?.data?.message
+  if (!msg) return null
+
+  if (msg.template_name) return msg.template_name
+
+  try {
+    const rawTpl = msg.raw_template
+    const tpl = rawTpl ? (typeof rawTpl === 'string' ? JSON.parse(rawTpl) : rawTpl) : null
+    if (tpl?.name) return tpl.name
+  } catch {
+    // ignore parse errors
+  }
+
+  return null
+}
+
 function extractTemplatePreview(d) {
   const rp = safeParsePayload(d.raw_payload)
   if (!rp) return null
@@ -223,7 +243,7 @@ function extractTemplatePreview(d) {
   }
 
   return {
-    name: template?.name || d.template_name || null,
+    name: template?.name || extractTemplateName(d) || null,
     category: template?.category || null,
     language: template?.language || 'en',
     header_format: template?.header_format || null,
@@ -248,10 +268,20 @@ function transformDoc(d) {
   const { campaign_name, campaign_id } = source === 'campaign' ? extractCampaignInfo(d) : { campaign_name: null, campaign_id: null }
   const templateCategory = extractTemplateCategory(d)
   const templatePreview = extractTemplatePreview(d)
+  const templateName = extractTemplateName(d)
+
+  // Basic validation: skip docs that truly have no template identifier
+  if (!templateName) {
+    console.warn('[migrate-wa-to-mongo] Skipping doc without template_name or template id', {
+      firestore_id: d.id || null,
+      event_type: d.event_type || null,
+    })
+    return null
+  }
 
   return {
     firestore_id: d.id || null,
-    template_name: d.template_name || null,
+    template_name: templateName || null,
     phone_number: d.phone_number || null,
     event_type: d.event_type || null,
     message_status: d.message_status || null,

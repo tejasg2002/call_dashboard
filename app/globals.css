@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Circular Std font faces */
+/* ── Font faces ─────────────────────────────────────────────────────── */
+
 @font-face {
   font-family: 'CircularStd';
   src:
@@ -33,82 +34,75 @@
   font-display: swap;
 }
 
+/* ── Base ────────────────────────────────────────────────────────────── */
+
 * {
   box-sizing: border-box;
 }
 
 body {
   font-family: 'CircularStd', system-ui, sans-serif;
-  background: #f9fafb;
+  background: #f8fafc;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
+.dark body {
+  background: #0a0f1a;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────── */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 3px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.4);
-  border-radius: 3px;
+  background: rgba(169, 29, 84, 0.2);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.6);
+  background: rgba(169, 29, 84, 0.4);
 }
 
-/* Table row hover animation */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(169, 29, 84, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(169, 29, 84, 0.5);
+}
+
+/* ── Table row hover ────────────────────────────────────────────────── */
+
 .table-row-hover {
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .table-row-hover:hover {
-  background: rgba(59, 130, 246, 0.06);
-  transform: translateX(4px);
+  background: rgba(169, 29, 84, 0.04);
 }
 
-/* Pulse animation for loading */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.6);
-  }
+.dark .table-row-hover:hover {
+  background: rgba(169, 29, 84, 0.08);
 }
 
-.pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Stagger animation for cards */
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.5s ease-out forwards;
-}
+/* ── Animation delays ───────────────────────────────────────────────── */
 
 .animation-delay-100 { animation-delay: 100ms; }
 .animation-delay-200 { animation-delay: 200ms; }
 .animation-delay-300 { animation-delay: 300ms; }
 .animation-delay-400 { animation-delay: 400ms; }
 
-/* LazySection reveal animation */
+/* ── LazySection reveal ─────────────────────────────────────────────── */
+
 @keyframes fadeSlideIn {
   from {
     opacity: 0;
@@ -117,5 +111,13 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ── Focus ring utility ─────────────────────────────────────────────── */
+
+@layer utilities {
+  .focus-brand {
+    @apply focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700;
   }
 }

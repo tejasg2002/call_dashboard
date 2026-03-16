@@ -1,133 +1,152 @@
 'use client'
 
+import { cn } from '../lib/utils'
+
 const MetricsCards = ({ calls, loading, dateLabel = 'All time' }) => {
   const totalCalls = calls.length
-
   const averageScore = totalCalls > 0
     ? Math.round(calls.reduce((acc, call) => acc + (call.scores?.overall || 0), 0) / totalCalls)
     : 0
-
-  const notInterestedCount = calls.filter(
-    (call) => call.Disposition?.counselor === 'not_interested' || call.lead_stage === 'Not Interested'
-  ).length
 
   const interestedCount = calls.filter(
     (call) => call.Disposition?.counselor === 'interested' || call.lead_stage === 'Interested'
   ).length
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-      {/* Total Calls */}
-      <div className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-3xl px-7 py-6 shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold tracking-[0.18em] uppercase text-slate-500 dark:text-slate-400">
-            Total Calls
-          </p>
-          <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] uppercase tracking-wide text-slate-700 dark:text-slate-300">
-            {dateLabel}
-          </span>
+  const notInterestedCount = calls.filter(
+    (call) => call.Disposition?.counselor === 'not_interested' || call.lead_stage === 'Not Interested'
+  ).length
+
+  const interestedPct = totalCalls > 0 ? Math.round((interestedCount / totalCalls) * 100) : 0
+  const notInterestedPct = totalCalls > 0 ? Math.round((notInterestedCount / totalCalls) * 100) : 0
+  const scorePct = Math.min(averageScore, 100)
+  const isEmpty = loading && calls.length === 0
+
+  const cards = [
+    {
+      label: 'Total Calls',
+      value: isEmpty ? '—' : totalCalls.toLocaleString('en-IN'),
+      sub: dateLabel,
+      accent: 'brand',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+        </svg>
+      ),
+      detail: totalCalls > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden flex">
+            <div className="h-full bg-brand-600 rounded-full transition-all duration-700" style={{ width: `${interestedPct}%` }} />
+            <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${notInterestedPct}%` }} />
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-600" />
+              Interested {interestedCount}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              Not interested {notInterestedCount}
+            </span>
+          </div>
         </div>
-        <p className="text-4xl font-bold font-mono mb-4">
-          {loading && calls.length === 0 ? '—' : totalCalls}
-        </p>
+      ),
+    },
+    {
+      label: 'Avg. Score',
+      value: isEmpty ? '—' : averageScore,
+      sub: `out of 100`,
+      accent: 'blue',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+        </svg>
+      ),
+      detail: !isEmpty && (
         <div className="mt-4">
-          <div className="flex items-center justify-between text-xs mb-2 text-slate-500 dark:text-slate-400">
-            <span>Interested vs Not Interested</span>
-          </div>
-          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
+          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden">
             <div
-              className="h-full bg-emerald-500"
-              style={{ width: totalCalls === 0 ? '0%' : `${(interestedCount / totalCalls) * 100}%` }}
-            />
-            <div
-              className="h-full bg-rose-500"
-              style={{ width: totalCalls === 0 ? '0%' : `${(notInterestedCount / totalCalls) * 100}%` }}
+              className="h-full bg-blue-500 rounded-full transition-all duration-700"
+              style={{ width: `${scorePct}%` }}
             />
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-300" />
-              <span>Interested {interestedCount}</span>
-            </span>
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-rose-300" />
-              <span>Not interested {notInterestedCount}</span>
-            </span>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">{scorePct}% of max</p>
+        </div>
+      ),
+    },
+    {
+      label: 'Interested',
+      value: isEmpty ? '—' : interestedCount.toLocaleString('en-IN'),
+      sub: totalCalls > 0 ? `${interestedPct}% of total` : '—',
+      accent: 'green',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      detail: totalCalls > 0 && (
+        <div className="mt-4">
+          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden">
+            <div className="h-full bg-green-500 rounded-full transition-all duration-700" style={{ width: `${interestedPct}%` }} />
           </div>
         </div>
-      </div>
+      ),
+    },
+    {
+      label: 'Not Interested',
+      value: isEmpty ? '—' : notInterestedCount.toLocaleString('en-IN'),
+      sub: totalCalls > 0 ? `${notInterestedPct}% of total` : '—',
+      accent: 'red',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      detail: totalCalls > 0 && (
+        <div className="mt-4">
+          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden">
+            <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${notInterestedPct}%` }} />
+          </div>
+        </div>
+      ),
+    },
+  ]
 
-      {/* Average score */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl px-6 py-6 shadow-sm flex flex-col justify-between">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-xs font-semibold tracking-[0.18em] uppercase text-slate-500 dark:text-slate-400">
-            Average Score
-          </p>
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19h16M5 17V9m4 8V5m4 12v-7m4 7v-3" />
-            </svg>
-          </div>
-        </div>
-        <div className="flex items-center space-x-6">
-          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            {loading && calls.length === 0 ? '—' : averageScore}
-          </p>
-          <div className="relative w-16 h-16">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-700" />
-            <div
-              className="absolute inset-1 rounded-full border-4 border-cyan-500 border-t-transparent"
-              style={{ transform: `rotate(${(averageScore / 100) * 180}deg)` }}
-            />
-          </div>
-        </div>
-      </div>
+  const iconBg = {
+    brand: 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',
+    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+    green: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+    red: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+  }
 
-      {/* Not interested */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl px-6 py-6 shadow-sm">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-xs font-semibold tracking-[0.18em] uppercase text-slate-500 dark:text-slate-400">
-            Not Interested
-          </p>
-          <div className="w-9 h-9 rounded-2xl bg-rose-500 flex items-center justify-center text-white">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className={cn(
+            "relative rounded-xl border p-5 transition-all duration-200",
+            "bg-white dark:bg-slate-900/60",
+            "border-slate-200/80 dark:border-slate-800",
+            "hover:shadow-card-hover hover:border-slate-300 dark:hover:border-slate-700"
+          )}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {card.label}
+              </p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1 font-mono tracking-tight">
+                {card.value}
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{card.sub}</p>
+            </div>
+            <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", iconBg[card.accent])}>
+              {card.icon}
+            </div>
           </div>
+          {card.detail}
         </div>
-        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 font-mono mb-3">
-          {loading && calls.length === 0 ? '—' : notInterestedCount}
-        </p>
-        <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-rose-500"
-            style={{ width: totalCalls === 0 ? '0%' : `${(notInterestedCount / totalCalls) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Interested */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl px-6 py-6 shadow-sm">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-xs font-semibold tracking-[0.16em] uppercase text-slate-500 dark:text-slate-400">
-            Interested
-          </p>
-          <div className="w-9 h-9 rounded-2xl bg-emerald-500 flex items-center justify-center text-white">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-        </div>
-        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 font-mono mb-3">
-          {loading && calls.length === 0 ? '—' : interestedCount}
-        </p>
-        <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-emerald-500"
-            style={{ width: totalCalls === 0 ? '0%' : `${(interestedCount / totalCalls) * 100}%` }}
-          />
-        </div>
-      </div>
+      ))}
     </div>
   )
 }

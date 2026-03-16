@@ -7,7 +7,7 @@ function generateId() {
 }
 
 const COLORS = [
-  'bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500',
+  'bg-brand-500', 'bg-blue-500', 'bg-brand-500', 'bg-amber-500',
   'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-pink-500',
 ]
 
@@ -67,7 +67,7 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
         <button
           onClick={openCreate}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-            isDark ? 'bg-violet-700/40 border-violet-600 text-violet-300 hover:bg-violet-700/70' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
+            isDark ? 'bg-brand-700/40 border-brand-600 text-brand-300 hover:bg-brand-700/70' : 'bg-brand-50 border-brand-300 text-brand-700 hover:bg-brand-100'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,8 +123,8 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
 
         {/* Form */}
         {showForm && (
-          <div className={`rounded-xl border p-4 space-y-3 mt-2 ${isDark ? 'border-violet-700/50 bg-slate-700/30' : 'border-violet-200 bg-violet-50/50'}`}>
-            <p className={`text-xs font-semibold ${isDark ? 'text-violet-300' : 'text-violet-700'}`}>{editId ? 'Edit campaign' : 'New campaign'}</p>
+          <div className={`rounded-xl border p-4 space-y-3 mt-2 ${isDark ? 'border-brand-700/50 bg-slate-700/30' : 'border-brand-200 bg-brand-50/50'}`}>
+            <p className={`text-xs font-semibold ${isDark ? 'text-brand-300' : 'text-brand-700'}`}>{editId ? 'Edit campaign' : 'New campaign'}</p>
             <div>
               <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Campaign name</label>
               <input
@@ -152,8 +152,8 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
                         onClick={() => toggleTemplate(t)}
                         className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors font-mono ${
                           selected
-                            ? isDark ? 'bg-violet-700 border-violet-500 text-violet-100' : 'bg-violet-600 border-violet-600 text-white'
-                            : isDark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-violet-500' : 'bg-white border-slate-300 text-slate-600 hover:border-violet-400'
+                            ? isDark ? 'bg-brand-700 border-brand-500 text-brand-100' : 'bg-brand-600 border-brand-600 text-white'
+                            : isDark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-brand-500' : 'bg-white border-slate-300 text-slate-600 hover:border-brand-400'
                         }`}
                       >
                         {selected && <span className="mr-1">✓</span>}{t}
@@ -169,8 +169,8 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
                 disabled={!formName.trim() || formTemplates.length === 0}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   !formName.trim() || formTemplates.length === 0
-                    ? 'opacity-40 cursor-not-allowed bg-violet-500 text-white'
-                    : isDark ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-violet-600 text-white hover:bg-violet-700'
+                    ? 'opacity-40 cursor-not-allowed bg-brand-500 text-white'
+                    : isDark ? 'bg-brand-600 text-white hover:bg-brand-500' : 'bg-brand-600 text-white hover:bg-brand-700'
                 }`}
               >
                 {editId ? 'Save changes' : 'Create campaign'}

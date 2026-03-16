@@ -25,8 +25,8 @@ function generateTemplateId(subject) {
 // ── Stage meta ───────────────────────────────────────────────────────────────
 const STAGE_META = {
   sent:      { title: 'Sent to',       color: 'text-blue-500',    activeCls: (d) => d ? 'bg-blue-900/30 border-blue-600'    : 'bg-blue-50 border-blue-400' },
-  delivered: { title: 'Delivered to',  color: 'text-emerald-500', activeCls: (d) => d ? 'bg-emerald-900/30 border-emerald-600' : 'bg-emerald-50 border-emerald-400' },
-  opened:    { title: 'Opened by',     color: 'text-violet-500',  activeCls: (d) => d ? 'bg-violet-900/30 border-violet-600'  : 'bg-violet-50 border-violet-400' },
+  delivered: { title: 'Delivered to',  color: 'text-brand-500', activeCls: (d) => d ? 'bg-brand-900/30 border-brand-600' : 'bg-brand-50 border-brand-400' },
+  opened:    { title: 'Opened by',     color: 'text-brand-500',  activeCls: (d) => d ? 'bg-brand-900/30 border-brand-600'  : 'bg-brand-50 border-brand-400' },
   clicked:   { title: 'Clicked by',    color: 'text-amber-500',   activeCls: (d) => d ? 'bg-amber-900/30 border-amber-600'   : 'bg-amber-50 border-amber-400' },
   bounced:   { title: 'Bounced for',   color: 'text-rose-500',    activeCls: (d) => d ? 'bg-rose-900/30 border-rose-600'     : 'bg-rose-50 border-rose-400' },
 }
@@ -105,7 +105,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                 </span>
                 {/* Lead ID */}
                 {leadId === 'loading' ? (
-                  <span className="inline-block w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="inline-block w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
                 ) : leadId ? (
                   <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-700/40 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>
                     <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,7 +116,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                       className={`ml-0.5 p-0.5 rounded transition-colors ${isDark ? 'hover:bg-indigo-700/50' : 'hover:bg-indigo-100'}`}
                     >
                       {copiedId === leadId
-                        ? <svg className="w-2.5 h-2.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        ? <svg className="w-2.5 h-2.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         : <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                       }
                     </button>
@@ -164,7 +164,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
               else p = page - 2 + i
               return (
                 <button key={p} type="button" onClick={() => setPage(p)}
-                  className={`w-6 h-6 rounded-lg text-[11px] font-medium border transition-colors ${p === page ? 'bg-violet-600 text-white border-violet-600' : isDark ? 'border-slate-700 text-slate-400 hover:bg-slate-700' : 'border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                  className={`w-6 h-6 rounded-lg text-[11px] font-medium border transition-colors ${p === page ? 'bg-brand-600 text-white border-brand-600' : isDark ? 'border-slate-700 text-slate-400 hover:bg-slate-700' : 'border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                 >{p + 1}</button>
               )
             })}
@@ -289,8 +289,8 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
 
   const TILES = [
     { stage: 'sent',      value: row.sent,      label: 'Sent',      color: 'text-blue-500'    },
-    { stage: 'delivered', value: row.delivered, label: 'Delivered', color: 'text-emerald-500' },
-    { stage: 'opened',    value: row.opened,    label: 'Opened',    color: 'text-violet-500'  },
+    { stage: 'delivered', value: row.delivered, label: 'Delivered', color: 'text-brand-500' },
+    { stage: 'opened',    value: row.opened,    label: 'Opened',    color: 'text-brand-500'  },
     { stage: 'clicked',   value: row.clicked,   label: 'Clicked',   color: 'text-amber-500'   },
     { stage: 'bounced',   value: row.bounced,   label: 'Bounced',   color: 'text-rose-500'    },
   ]
@@ -378,8 +378,8 @@ function EmailPreviewModal({ row, isDark, onClose, dataMasked }) {
           {/* Rate metrics */}
           <div className={`grid grid-cols-4 gap-2 pt-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
             {[
-              { label: 'Delivery',  value: `${row.deliveryRate.toFixed(1)}%`, color: 'text-emerald-500' },
-              { label: 'Open',      value: `${row.openRate.toFixed(1)}%`,     color: 'text-violet-500'  },
+              { label: 'Delivery',  value: `${row.deliveryRate.toFixed(1)}%`, color: 'text-brand-500' },
+              { label: 'Open',      value: `${row.openRate.toFixed(1)}%`,     color: 'text-brand-500'  },
               { label: 'Click',     value: `${row.clickRate.toFixed(1)}%`,    color: 'text-amber-500'   },
               { label: 'Bounce',    value: `${row.bounceRate.toFixed(1)}%`,   color: 'text-rose-500'    },
             ].map((m) => (
@@ -509,10 +509,10 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
                       <span className={`text-xs font-semibold text-blue-500`}>{row.sent.toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold text-emerald-500`}>{row.delivered.toLocaleString()}</span>
+                      <span className={`text-xs font-semibold text-brand-500`}>{row.delivered.toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold text-violet-500`}>{row.opened.toLocaleString()}</span>
+                      <span className={`text-xs font-semibold text-brand-500`}>{row.opened.toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold text-amber-500`}>{row.clicked.toLocaleString()}</span>
@@ -523,8 +523,8 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
                       </span>
                     </td>
                     {/* Rate bars */}
-                    <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.deliveryRate} color="text-emerald-500" /></td>
-                    <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.openRate}     color="text-violet-500" /></td>
+                    <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.deliveryRate} color="text-brand-500" /></td>
+                    <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.openRate}     color="text-brand-500" /></td>
                     <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.clickRate}    color="text-amber-500"  /></td>
                     <td className="px-4 py-3 min-w-[130px]"><RateBar value={row.bounceRate}   color="text-rose-500"   /></td>
                     {/* Actions */}

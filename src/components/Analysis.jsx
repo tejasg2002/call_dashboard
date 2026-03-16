@@ -285,7 +285,7 @@ const Analysis = () => {
                   onChange={(e) =>
                     setFilters((prev) => ({ ...prev, search: e.target.value }))
                   }
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-300"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-300"
                 />
               </div>
             </div>
@@ -338,7 +338,7 @@ const Analysis = () => {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, startDate: e.target.value }))
                 }
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-300"
               />
               <span className="text-slate-400 dark:text-slate-500">to</span>
               <input
@@ -347,7 +347,7 @@ const Analysis = () => {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, endDate: e.target.value }))
                 }
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-300"
               />
               {(filters.startDate || filters.endDate) && (
                 <button
@@ -374,7 +374,7 @@ const Analysis = () => {
                 key={key}
                 value={value}
                 onChange={(e) => setFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-300"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-300"
               >
                 <option value="">{placeholder}</option>
                 {options.map((o) => (
@@ -389,7 +389,7 @@ const Analysis = () => {
         {(filteredCalls.length !== calls.length) && calls.length > 0 && (
           <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
             Showing{' '}
-            <span className="text-violet-600 dark:text-violet-400 font-medium">{filteredCalls.length}</span>{' '}
+            <span className="text-brand-600 dark:text-brand-400 font-medium">{filteredCalls.length}</span>{' '}
             of <span className="text-slate-900 dark:text-slate-100 font-medium">{calls.length}</span>{' '}
             calls
           </div>

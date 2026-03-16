@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { fetchWAEventsBatched, fetchWAEventsSince, fetchWAEventsRange } from '../../../src/lib/waApi'
-import { aggregateWebhooks, aggregateByCampaign, getFilterOptions, eventSource, stripWAForSnapshot } from '../../../src/lib/waAnalytics'
-import { getSnapshot, saveSnapshot, buildWASnapshot, mergeWASnapshots } from '../../../src/lib/snapshotService'
+import { fetchWADashboard } from '../../../src/lib/waDashboardApi'
 import { useAuth } from '../../providers'
 import { useTheme } from '../../providers'
 import WAKpiCards from '../../../src/components/wa/WAKpiCards'
@@ -12,12 +10,11 @@ import WATemplatePerformanceChart from '../../../src/components/wa/WATemplatePer
 import WAMessageFunnelChart from '../../../src/components/wa/WAMessageFunnelChart'
 import WACTAPerformanceTable from '../../../src/components/wa/WACTAPerformanceTable'
 import WACostAnalytics from '../../../src/components/wa/WACostAnalytics'
-import WAUserActivityTimeline from '../../../src/components/wa/WAUserActivityTimeline'
 import WAFilters from '../../../src/components/wa/WAFilters'
 import WACampaignManager from '../../../src/components/wa/WACampaignManager'
 import WACampaignAnalytics from '../../../src/components/wa/WACampaignAnalytics'
 import WAEngagementSection from '../../../src/components/wa/WAEngagementSection'
-import WAPaymentConversion from '../../../src/components/wa/WAPaymentConversion'
+import WAPaymentConversionServer from '../../../src/components/wa/WAPaymentConversionServer'
 import LazySection from '../../../src/components/LazySection'
 
 function loadCampaigns() {
@@ -34,15 +31,6 @@ function formatCount(n) {
   return (n || 0).toLocaleString('en-IN')
 }
 
-function getLatestTimestamp(docs) {
-  let latest = null
-  for (const d of docs) {
-    const ts = d.event_timestamp || d.timestamp || ''
-    if (ts && (!latest || ts > latest)) latest = ts
-  }
-  return latest
-}
-
 function SectionHeader({ title, description, isDark }) {
   return (
     <div className="pt-2">
@@ -57,14 +45,13 @@ export default function WAApiPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [snapshot, setSnapshot] = useState(null)
-  const [rangeSnapshot, setRangeSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ templateName: '', eventType: '', startDate: '', endDate: '' })
   const [campaigns, _setCampaigns] = useState(loadCampaigns)
-  const [progress, setProgress] = useState(null)
   const [toast, setToast] = useState(null)
+  const [elapsed, setElapsed] = useState(null)
 
   function setCampaigns(updater) {
     _setCampaigns((prev) => {
@@ -77,53 +64,15 @@ export default function WAApiPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
-      const existing = await getSnapshot('wa')
-      if (existing) {
-        setSnapshot(existing)
-        setLoading(false)
-        return
-      }
-
-      setFetching(true)
-      setProgress({ loaded: 0, total: 0, done: false })
-      const allDocs = await fetchWAEventsBatched((p) => setProgress(p))
-      const aggregated = aggregateWebhooks(allDocs)
-      const lastTs = getLatestTimestamp(allDocs)
-      const snap = buildWASnapshot(aggregated, allDocs.length, lastTs)
-      await saveSnapshot('wa', snap)
-      setSnapshot(snap)
+      const data = await fetchWADashboard({ mode: 'cached' })
+      setSnapshot(data)
+      setElapsed(data.elapsed)
       setError(null)
     } catch (err) {
       console.error('[WAPage] load error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
-      setFetching(false)
-      setProgress(null)
-    }
-  }, [])
-
-  const handleRecomputeAll = useCallback(async () => {
-    try {
-      setFetching(true)
-      setToast(null)
-      setRangeSnapshot(null)
-      setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
-      setProgress({ loaded: 0, total: 0, done: false })
-
-      const allDocs = await fetchWAEventsBatched((p) => setProgress(p))
-      const aggregated = aggregateWebhooks(allDocs)
-      const lastTs = getLatestTimestamp(allDocs)
-      const snap = buildWASnapshot(aggregated, allDocs.length, lastTs)
-      await saveSnapshot('wa', snap)
-      setSnapshot(snap)
-      setError(null)
-    } catch (err) {
-      console.error('[WAPage] full recompute error:', err)
-      setError(err.message)
-    } finally {
-      setFetching(false)
-      setProgress(null)
     }
   }, [])
 
@@ -131,60 +80,121 @@ export default function WAApiPage() {
     try {
       setFetching(true)
       setToast(null)
-
-      const existing = snapshot || (await getSnapshot('wa'))
-      if (!existing?.lastRawDocTime) {
-        setProgress({ loaded: 0, total: 0, done: false })
-        const allDocs = await fetchWAEventsBatched((p) => setProgress(p))
-        const aggregated = aggregateWebhooks(allDocs)
-        const lastTs = getLatestTimestamp(allDocs)
-        const snap = buildWASnapshot(aggregated, allDocs.length, lastTs)
-        await saveSnapshot('wa', snap)
-        setSnapshot(snap)
-        setProgress(null)
-        return
-      }
-
-      const newDocs = await fetchWAEventsSince(existing.lastRawDocTime)
-      if (newDocs.length === 0) {
-        setToast('Up to date — no new events found')
-        setTimeout(() => setToast(null), 3000)
-        return
-      }
-
-      const deltaAggregated = aggregateWebhooks(newDocs)
-      const lastTs = getLatestTimestamp(newDocs)
-      const deltaSnap = buildWASnapshot(deltaAggregated, newDocs.length, lastTs)
-      const merged = mergeWASnapshots(existing, deltaSnap)
-      await saveSnapshot('wa', merged)
-      setSnapshot(merged)
-      setToast(`Merged ${formatCount(newDocs.length)} new events`)
-      setTimeout(() => setToast(null), 3000)
+      const data = await fetchWADashboard({ mode: 'full' })
+      setSnapshot(data)
+      setElapsed(data.elapsed)
+      setToast(`Loaded ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
+      setTimeout(() => setToast(null), 4000)
+      setError(null)
     } catch (err) {
       console.error('[WAPage] refresh error:', err)
       setError(err.message)
     } finally {
       setFetching(false)
     }
-  }, [snapshot])
+  }, [])
+
+  const handleRecomputeAll = useCallback(async () => {
+    try {
+      setFetching(true)
+      setToast(null)
+      setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
+      const data = await fetchWADashboard({ mode: 'full' })
+      setSnapshot(data)
+      setElapsed(data.elapsed)
+      setToast(`Recomputed ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
+      setTimeout(() => setToast(null), 4000)
+      setError(null)
+    } catch (err) {
+      console.error('[WAPage] recompute error:', err)
+      setError(err.message)
+    } finally {
+      setFetching(false)
+    }
+  }, [])
+
+  const recalibrateForDateRange = useCallback(async () => {
+    const hasRange = filters.startDate || filters.endDate
+    if (!hasRange) {
+      if (snapshot?.fromCache === undefined) return
+      handleRefresh()
+      return
+    }
+    try {
+      setFetching(true)
+      const data = await fetchWADashboard({
+        mode: 'range',
+        startDate: filters.startDate || '',
+        endDate: filters.endDate || '',
+      })
+      setSnapshot(data)
+      setElapsed(data.elapsed)
+      setToast(`Date range loaded in ${(data.elapsed / 1000).toFixed(1)}s`)
+      setTimeout(() => setToast(null), 4000)
+    } catch (err) {
+      console.error('[WAPage] range recalibrate error:', err)
+    } finally {
+      setFetching(false)
+    }
+  }, [filters.startDate, filters.endDate, snapshot, handleRefresh])
 
   useEffect(() => { loadData() }, [loadData])
 
-  const activeSnapshot = rangeSnapshot || snapshot
-
   const apiTemplateRows = useMemo(
-    () => (activeSnapshot?.templateRows || []).filter((r) => r.source === 'api'),
-    [activeSnapshot]
+    () => (snapshot?.templateRows || []).filter((r) => r.source === 'api'),
+    [snapshot]
   )
   const apiCtaRows = useMemo(
-    () => activeSnapshot?.ctaRows || [],
-    [activeSnapshot]
+    () => (snapshot?.ctaRows || []).filter((r) => r.source === 'api'),
+    [snapshot]
   )
-  const kpi = activeSnapshot?.kpi || { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0, ctr: 0, readRate: 0, sdr: 0, str: 0 }
-  const funnel = activeSnapshot?.funnel || { sent: 0, delivered: 0, read: 0, clicked: 0 }
-  const costPerClick = activeSnapshot?.costPerClick || 0
-  const totalCost = activeSnapshot?.totalCost || 0
-  const engagementSummary = activeSnapshot?.engagementSummary || {}
+
+  const apiKpi = useMemo(() => {
+    const rows = apiTemplateRows
+    const k = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
+    rows.forEach((r) => {
+      k.sent += r.sent
+      k.delivered += r.delivered
+      k.read += r.read
+      k.clicked += r.clicked
+      k.failed += r.failed
+      k.cost += r.total_cost || 0
+    })
+    const p = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
+    k.ctr = p(k.clicked, k.delivered)
+    k.readRate = p(k.read, k.delivered)
+    k.sdr = p(k.delivered, k.sent)
+    k.str = p(k.read, k.sent)
+    return k
+  }, [apiTemplateRows])
+
+  const baseKpi = apiKpi
+  const totalCost = useMemo(
+    () => apiTemplateRows.reduce((s, r) => s + (r.total_cost || 0), 0),
+    [apiTemplateRows]
+  )
+  const totalClicked = useMemo(
+    () => apiTemplateRows.reduce((s, r) => s + (r.clicked || 0), 0),
+    [apiTemplateRows]
+  )
+  const costPerClick = totalClicked > 0 ? totalCost / totalClicked : 0
+  const formSubmitted = snapshot?.formSubmittedCount || 0
+  const failureRate =
+    baseKpi.sent > 0 ? Math.min(((baseKpi.failed || 0) / baseKpi.sent) * 100, 100) : 0
+  const kpi = { ...baseKpi, failureRate, costPerClick, formSubmitted }
+
+  const funnel = useMemo(() => {
+    const f = { sent: 0, delivered: 0, read: 0, clicked: 0 }
+    apiTemplateRows.forEach((r) => {
+      f.sent += r.sent
+      f.delivered += r.delivered
+      f.read += r.read
+      f.clicked += r.clicked
+    })
+    return f
+  }, [apiTemplateRows])
+
+  const engagementSummary = snapshot?.engagementSummary || {}
 
   const filterOptions = useMemo(() => ({
     templateNames: apiTemplateRows.map((r) => r.template_name).sort(),
@@ -207,40 +217,8 @@ export default function WAApiPage() {
     return rows
   }, [apiTemplateRows, filters.templateName, filters.startDate, filters.endDate, hasDates])
 
-  // ── Recalculate analytics for date range when date filter is used ─────────────
-
-  const recalibrateForDateRange = useCallback(async () => {
-    const hasRange = filters.startDate || filters.endDate
-    if (!hasRange) {
-      setRangeSnapshot(null)
-      return
-    }
-    try {
-      setFetching(true)
-      setProgress({ loaded: 0, total: 0, done: false })
-
-      // Fetch only events in the desired date range (server-side filtering)
-      const rangeDocs = await fetchWAEventsRange(filters.startDate || '', filters.endDate || '', (p) => setProgress(p))
-      const aggregated = aggregateWebhooks(rangeDocs)
-      const lastTs = getLatestTimestamp(rangeDocs)
-      const snap = buildWASnapshot(aggregated, rangeDocs.length, lastTs)
-      setRangeSnapshot(snap)
-    } catch (err) {
-      console.error('[WAPage] range recalibrate error:', err)
-    } finally {
-      setFetching(false)
-      setProgress(null)
-    }
-  }, [filters.startDate, filters.endDate])
-
-  const campaignTemplateRows = useMemo(
-    () => (activeSnapshot?.templateRows || []).filter((r) => r.source === 'campaign'),
-    [activeSnapshot]
-  )
-
-  const pct = progress && progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0
-  const lastUpdated = snapshot?.updatedAt
-    ? new Date(snapshot.updatedAt.seconds ? snapshot.updatedAt.seconds * 1000 : snapshot.updatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const lastUpdated = snapshot?.computedAt
+    ? new Date(snapshot.computedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
     : null
 
   return (
@@ -254,7 +232,7 @@ export default function WAApiPage() {
           </h1>
           <div className="flex items-center gap-3 mt-1.5">
             <span className={`inline-flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${fetching ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${fetching ? 'bg-amber-400 animate-pulse' : 'bg-brand-500'}`} />
               {fetching ? 'Syncing' : 'Live'}
             </span>
             {snapshot?.rawDocCount && (
@@ -267,6 +245,11 @@ export default function WAApiPage() {
                 · Updated {lastUpdated}
               </span>
             )}
+            {elapsed != null && (
+              <span className={`text-xs ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                · {(elapsed / 1000).toFixed(1)}s
+              </span>
+            )}
           </div>
         </div>
 
@@ -276,8 +259,8 @@ export default function WAApiPage() {
             disabled={fetching}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${
               isDark
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20'
+                ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-900/30'
+                : 'bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-600/20'
             }`}
           >
             <svg className={`w-3.5 h-3.5 ${fetching ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,27 +285,10 @@ export default function WAApiPage() {
         </div>
       </div>
 
-      {/* ── Toast / Progress ──────────────────────────────────────────────── */}
+      {/* ── Toast ──────────────────────────────────────────────── */}
       {toast && (
-        <div className={`px-4 py-2.5 rounded-xl text-sm text-center font-medium ${isDark ? 'bg-emerald-900/40 border border-emerald-700 text-emerald-300' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'}`}>
+        <div className={`px-4 py-2.5 rounded-xl text-sm text-center font-medium ${isDark ? 'bg-brand-900/40 border border-brand-700 text-brand-300' : 'bg-brand-50 border border-brand-200 text-brand-700'}`}>
           {toast}
-        </div>
-      )}
-
-      {progress && progress.total > 0 && (
-        <div className={`rounded-xl p-4 ${isDark ? 'bg-slate-800/80 border border-slate-700' : 'bg-white border border-slate-200 shadow-sm'}`}>
-          <div className="flex justify-between text-xs mb-2">
-            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Fetching WhatsApp events...</span>
-            <span className={`font-mono font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-              {formatCount(progress.loaded)} / {formatCount(progress.total)} ({pct}%)
-            </span>
-          </div>
-          <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
         </div>
       )}
 
@@ -335,11 +301,6 @@ export default function WAApiPage() {
           theme={theme}
           onApply={recalibrateForDateRange}
         />
-        {!hasDates && (filters.startDate || filters.endDate) && (
-          <p className={`text-[11px] px-1 ${isDark ? 'text-amber-400/70' : 'text-amber-600/70'}`}>
-            Date filtering requires updated data. Go to Settings → Recalibrate to rebuild with date info.
-          </p>
-        )}
       </div>
 
       {/* ── Error ─────────────────────────────────────────────────────────── */}
@@ -352,15 +313,11 @@ export default function WAApiPage() {
       {/* ── Loading ───────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'bg-emerald-900/30' : 'bg-emerald-50'}`}>
-            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'bg-brand-900/30' : 'bg-brand-50'}`}>
+            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           </div>
           <div className="text-center">
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-              {progress && progress.total > 0
-                ? `Loading ${formatCount(progress.loaded)} of ${formatCount(progress.total)} events`
-                : 'Loading analytics'}
-            </p>
+            <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Loading analytics</p>
             <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>This may take a moment</p>
           </div>
         </div>
@@ -420,21 +377,11 @@ export default function WAApiPage() {
           </div>
 
           {/* ── Payment Conversion ────────────────────────────────────────── */}
-          {((snapshot?.buttonPhones && Object.keys(snapshot.buttonPhones).length > 0) || (snapshot?.templatePhones && Object.keys(snapshot.templatePhones).length > 0)) && (
+          {snapshot?.paymentConversion && (
             <div className="space-y-4">
               <SectionHeader title="Payment Conversion" description="Track how WhatsApp engagement converts to completed payments" isDark={isDark} />
               <LazySection height="280px">
-                <WAPaymentConversion
-                  buttonPhones={snapshot.buttonPhones || {}}
-                  templatePhones={snapshot.templatePhones || {}}
-                  cachedConversion={snapshot.paymentConversion || null}
-                  onConversionComputed={async (data) => {
-                    const updated = { ...snapshot, paymentConversion: data }
-                    setSnapshot(updated)
-                    try { await saveSnapshot('wa', updated) } catch {}
-                  }}
-                  theme={theme}
-                />
+                <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} />
               </LazySection>
             </div>
           )}
