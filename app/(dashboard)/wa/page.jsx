@@ -381,7 +381,7 @@ export default function WAApiPage() {
             <div className="space-y-4">
               <SectionHeader title="Payment Conversion" description="Track how WhatsApp engagement converts to completed payments" isDark={isDark} />
               <LazySection height="280px">
-                <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} />
+                <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} dataMasked={dataMasked} />
               </LazySection>
             </div>
           )}

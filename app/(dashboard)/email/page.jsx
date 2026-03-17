@@ -227,6 +227,7 @@ export default function EmailPage() {
               <EmailPaymentConversion
                 data={snapshot.emailPaymentConversion}
                 theme={theme}
+                dataMasked={dataMasked}
               />
             </LazySection>
           )}

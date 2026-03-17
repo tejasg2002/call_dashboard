@@ -8,6 +8,7 @@ import SourceTable from './SourceTable'
 import SourceCharts from './SourceCharts'
 import SourceCadenceHeatmap from './SourceCadenceHeatmap'
 import SourceDailyActivity from './SourceDailyActivity'
+import SourceCohortMatrix from './SourceCohortMatrix'
 
 const RANGE_OPTIONS = [
   { key: 'all', label: 'All time' },
@@ -232,15 +233,13 @@ const SourceStatsDashboard = () => {
           </div>
         )}
 
-        <SourceCadenceHeatmap rows={data?.sourceRows} loading={loading} />
-
-        <SourceCharts rows={data?.sourceRows} loading={loading} />
-
-        <SourceDailyActivity
+        <SourceCohortMatrix
           sourceRows={data?.sourceRows}
-          dailyActivity={data?.dailyActivity}
+          cohortMatrix={data?.cohortMatrix}
           loading={loading}
         />
+
+        <SourceCharts rows={data?.sourceRows} loading={loading} />
 
         <SourceTable rows={data?.sourceRows} loading={loading} dateLabel={dateLabel} />
       </div>

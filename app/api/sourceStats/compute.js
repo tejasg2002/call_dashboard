@@ -247,6 +247,59 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
       .sort((a, b) => b.date.localeCompare(a.date))
   }
 
+  const cohortDays = 7
+  const cohortCutoff = new Date()
+  cohortCutoff.setDate(cohortCutoff.getDate() - cohortDays)
+  const cohortCutoffStr = toDateStr(cohortCutoff)
+  const OLDER_KEY = '_older'
+
+  const cohortMatrix = {}
+  for (const srcKey of topSourceKeys) {
+    const display = sourceDisplayNames[srcKey]
+    const matrix = {}
+    const regDateLeads = {}
+    let olderLeadCount = 0
+
+    for (const [mobile, src] of leadMap) {
+      if (src !== srcKey) continue
+      const regDate = leadRegDates.get(mobile)
+      if (!regDate) continue
+      const regStr = toDateStr(regDate)
+      const isRecent = regStr >= cohortCutoffStr
+      const rowKey = isRecent ? regStr : OLDER_KEY
+
+      if (isRecent) {
+        regDateLeads[regStr] = (regDateLeads[regStr] || 0) + 1
+      } else {
+        olderLeadCount++
+      }
+
+      const callData = callMap.get(mobile)
+      if (!callData) continue
+      if (!matrix[rowKey]) matrix[rowKey] = {}
+      for (const { day, count } of callData.dailyCalls) {
+        if (day < cohortCutoffStr) continue
+        if (!matrix[rowKey][day]) matrix[rowKey][day] = { calls: 0, leads: new Set() }
+        matrix[rowKey][day].calls += count
+        matrix[rowKey][day].leads.add(mobile)
+      }
+    }
+
+    if (olderLeadCount > 0) {
+      regDateLeads[OLDER_KEY] = olderLeadCount
+    }
+
+    const cells = []
+    for (const [regDate, callDays] of Object.entries(matrix)) {
+      for (const [callDate, data] of Object.entries(callDays)) {
+        cells.push({ regDate, callDate, calls: data.calls, leadsContacted: data.leads.size })
+      }
+    }
+    if (cells.length > 0 || Object.keys(regDateLeads).length > 0) {
+      cohortMatrix[display] = { cells, regDateLeads }
+    }
+  }
+
   const totalLeads = leadMap.size
   const totalCalls = sourceRows.reduce((sum, r) => sum + r.totalCalls, 0)
   const totalSources = sourceRows.length
@@ -279,6 +332,7 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
     kpi,
     sourceRows,
     dailyActivity,
+    cohortMatrix,
     collectionCounts,
     dateRange: hasDateFilter ? { startDate, endDate } : null,
     computedAt: new Date().toISOString(),

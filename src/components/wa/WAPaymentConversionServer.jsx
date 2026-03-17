@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { maskPhone } from '../../lib/userManagement'
 
 function FunnelStep({ label, value, total, color, isLast, isDark }) {
   const pct = total > 0 ? (value / total) * 100 : 0
@@ -41,9 +42,10 @@ function TagList({ items, color, isDark }) {
   )
 }
 
-export default function WAPaymentConversionServer({ data, theme }) {
+export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
   const isDark = theme === 'dark'
   const [activeTab, setActiveTab] = useState('paid')
+  const mp = (phone) => dataMasked ? maskPhone(phone) : phone
 
   if (!data) return null
 
@@ -137,7 +139,7 @@ export default function WAPaymentConversionServer({ data, theme }) {
                       {paidDetails.map((u, idx) => (
                         <tr key={u.mobile}>
                           <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{u.mobile}</td>
+                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
                           <td className={`px-3 py-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{u.application_no || '—'}</td>
                           <td className={`px-3 py-2 text-right font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                             {u.payment_amount ? `₹${Number(u.payment_amount).toLocaleString('en-IN')}` : '—'}
@@ -168,7 +170,7 @@ export default function WAPaymentConversionServer({ data, theme }) {
                       {(formSubmittedDetails || []).map((u, idx) => (
                         <tr key={u.mobile}>
                           <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{u.mobile}</td>
+                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
                           <td className="px-3 py-2">
                             <TagList items={u.clickedTemplates} color={isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-700'} isDark={isDark} />
                           </td>

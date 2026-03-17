@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { maskEmail } from '../../lib/userManagement'
 
 function HeroMetric({ value, label, sub, accent, isDark }) {
   return (
@@ -34,9 +35,10 @@ function FunnelStep({ label, value, total, color, isLast, isDark }) {
   )
 }
 
-export default function EmailPaymentConversion({ data, theme }) {
+export default function EmailPaymentConversion({ data, theme, dataMasked }) {
   const isDark = theme === 'dark'
   const [expandedRow, setExpandedRow] = useState(null)
+  const me = (email) => dataMasked ? maskEmail(email) : email
 
   if (!data || data.totalClicked === 0) return null
 
@@ -195,7 +197,7 @@ export default function EmailPaymentConversion({ data, theme }) {
                             {(paidDetails || []).filter((d) => d.email).map((d, i) => (
                               <tr key={d.email}>
                                 <td className={`px-4 py-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{i + 1}</td>
-                                <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{d.email}</td>
+                                <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{me(d.email)}</td>
                                 <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{d.application_no || '—'}</td>
                                 <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{d.payment_amount || '—'}</td>
                                 <td className="px-4 py-2">
