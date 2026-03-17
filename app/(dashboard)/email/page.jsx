@@ -207,32 +207,25 @@ export default function EmailPage() {
         <div className="p-4 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700 rounded-xl text-rose-800 dark:text-rose-200 text-sm">{error}</div>
       )}
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'bg-violet-900/30' : 'bg-violet-50'}`}>
-            <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      <EmailKpiCards kpi={kpi} theme={theme} uniqueClicked={snapshot?.emailPaymentConversion?.totalClicked || 0} />
+
+      {loading && !snapshot ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isDark ? 'bg-violet-900/30' : 'bg-violet-50'}`}>
+            <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
-          <div className="text-center">
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Loading analytics</p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>This may take a moment</p>
-          </div>
+          <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Loading email data...</p>
         </div>
       ) : (
         <>
-          <EmailKpiCards kpi={kpi} theme={theme} />
-
           <LazySection height="300px">
             <EmailSubjectTable rows={filteredTemplateRows} theme={theme} dataMasked={dataMasked} />
           </LazySection>
 
-          {snapshot?.subjectEmails && Object.keys(snapshot.subjectEmails).length > 0 && (
+          {snapshot?.emailPaymentConversion && snapshot.emailPaymentConversion.totalClicked > 0 && (
             <LazySection height="280px">
               <EmailPaymentConversion
-                subjectEmails={snapshot.subjectEmails}
-                cachedConversion={null}
-                onConversionComputed={async (data) => {
-                  setSnapshot((prev) => ({ ...prev, emailPaymentConversion: data }))
-                }}
+                data={snapshot.emailPaymentConversion}
                 theme={theme}
               />
             </LazySection>

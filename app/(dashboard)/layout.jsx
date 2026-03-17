@@ -14,7 +14,7 @@ const NAV_SECTIONS = [
     items: [
       {
         href: '/',
-        match: (p) => p === '/' || p === '/call-review',
+        match: (p) => p === '/' || p === '/call-review' || p === '/sourceStats',
         label: 'Calls',
         perm: 'always',
         icon: (
@@ -69,22 +69,11 @@ const NAV_SECTIONS = [
 const HEADER_TITLES = {
   '/': 'Call Analytics',
   '/call-review': 'Call Review',
+  '/sourceStats': 'Source Stats',
   '/wa': 'WhatsApp Analytics',
   '/wa/campaigns': 'Campaign Analytics',
   '/email': 'Email Analytics',
   '/settings': 'Settings',
-}
-
-function getBreadcrumb(pathname) {
-  const map = {
-    '/': [{ label: 'Analytics' }, { label: 'Calls' }],
-    '/call-review': [{ label: 'Analytics' }, { label: 'Calls' }, { label: 'Review' }],
-    '/wa': [{ label: 'Analytics' }, { label: 'WhatsApp' }],
-    '/wa/campaigns': [{ label: 'Analytics' }, { label: 'WhatsApp' }, { label: 'Campaigns' }],
-    '/email': [{ label: 'Analytics' }, { label: 'Email' }],
-    '/settings': [{ label: 'System' }, { label: 'Settings' }],
-  }
-  return map[pathname] || [{ label: 'Dashboard' }]
 }
 
 export default function DashboardLayout({ children }) {
@@ -118,8 +107,6 @@ export default function DashboardLayout({ children }) {
 
   const permCheck = { always: true, isAdmin, canViewCallReview, canViewWhatsApp, canViewEmail }
   const headerTitle = HEADER_TITLES[pathname] || 'Dashboard'
-  const breadcrumb = getBreadcrumb(pathname)
-
   const sidebarContent = (
     <>
       {/* Logo */}
@@ -321,33 +308,13 @@ export default function DashboardLayout({ children }) {
               </svg>
             </button>
 
-            {/* Breadcrumb + title */}
-            <div>
-              <div className="flex items-center gap-1.5 text-[11px]">
-                {breadcrumb.map((crumb, i) => (
-                  <span key={i} className="flex items-center gap-1.5">
-                    {i > 0 && (
-                      <svg className={cn("w-3 h-3", isDark ? "text-slate-700" : "text-slate-300")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
-                    )}
-                    <span className={cn(
-                      i === breadcrumb.length - 1
-                        ? (isDark ? "text-slate-200 font-medium" : "text-slate-700 font-medium")
-                        : (isDark ? "text-slate-600" : "text-slate-400")
-                    )}>
-                      {crumb.label}
-                    </span>
-                  </span>
-                ))}
-              </div>
-              <h1 className={cn(
-                "text-base font-semibold -mt-0.5 leading-tight",
-                isDark ? "text-white" : "text-slate-900"
-              )}>
-                {headerTitle}
-              </h1>
-            </div>
+            {/* Page title */}
+            <h1 className={cn(
+              "text-sm font-semibold",
+              isDark ? "text-white" : "text-slate-900"
+            )}>
+              {headerTitle}
+            </h1>
           </div>
 
           {/* Right actions */}

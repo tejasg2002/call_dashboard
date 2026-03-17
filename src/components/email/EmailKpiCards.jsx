@@ -87,7 +87,7 @@ const VALUE_STYLES = {
   red: 'text-red-500 dark:text-red-400',
 }
 
-export default function EmailKpiCards({ kpi, theme }) {
+export default function EmailKpiCards({ kpi, theme, uniqueClicked }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
       {CARDS.map((c) => {
@@ -118,6 +118,11 @@ export default function EmailKpiCards({ kpi, theme }) {
               {val.toLocaleString('en-IN')}
             </p>
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">{c.label}</p>
+            {c.key === 'clicked' && uniqueClicked > 0 && (
+              <p className="text-[10px] text-amber-500/80 dark:text-amber-400/70 mt-0.5 font-medium">
+                {uniqueClicked.toLocaleString('en-IN')} unique users
+              </p>
+            )}
             {rate !== null && (
               <p className="text-[10px] text-slate-400/70 dark:text-slate-600 mt-0.5">{c.rateLabel}</p>
             )}

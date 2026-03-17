@@ -236,6 +236,28 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
   const paidMobiles = paidResult.map((r) => r._id)
 
+  const convertedMobiles = [...new Set([...formSubmittedMobiles, ...paidMobiles])]
+  const clickAttrResult = convertedMobiles.length > 0
+    ? await waCol.aggregate([
+        { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+        {
+          $group: {
+            _id: '$phone_number',
+            templates: { $addToSet: '$template_name' },
+            buttons: { $addToSet: '$button_text' },
+          },
+        },
+      ]).toArray()
+    : []
+
+  const clickAttrMap = new Map()
+  for (const r of clickAttrResult) {
+    clickAttrMap.set(normaliseMobile(r._id), {
+      templates: (r.templates || []).filter(Boolean),
+      buttons: (r.buttons || []).filter(Boolean),
+    })
+  }
+
   const paymentConversion = {
     totalClicked: clickedPhones.length,
     formSubmitted: formSubmittedCount,
@@ -245,11 +267,26 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
       : 0,
     formSubmittedMobiles,
     paidMobiles,
-    paidDetails: paidResult.map((r) => ({
-      mobile: r._id,
-      application_no: r.application_no,
-      payment_amount: r.payment_amount,
-    })),
+    paidDetails: paidResult.map((r) => {
+      const norm = normaliseMobile(r._id)
+      const attr = clickAttrMap.get(norm)
+      return {
+        mobile: r._id,
+        application_no: r.application_no,
+        payment_amount: r.payment_amount,
+        clickedTemplates: attr?.templates || [],
+        clickedButtons: attr?.buttons || [],
+      }
+    }),
+    formSubmittedDetails: formSubmittedMobiles.map((m) => {
+      const norm = normaliseMobile(m)
+      const attr = clickAttrMap.get(norm)
+      return {
+        mobile: m,
+        clickedTemplates: attr?.templates || [],
+        clickedButtons: attr?.buttons || [],
+      }
+    }),
   }
 
   const engagementSummary = {

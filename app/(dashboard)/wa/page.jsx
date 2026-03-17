@@ -33,9 +33,9 @@ function formatCount(n) {
 
 function SectionHeader({ title, description, isDark }) {
   return (
-    <div className="pt-2">
-      <h2 className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{title}</h2>
-      {description && <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{description}</p>}
+    <div className="pt-1">
+      <h2 className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{title}</h2>
+      {description && <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{description}</p>}
     </div>
   )
 }

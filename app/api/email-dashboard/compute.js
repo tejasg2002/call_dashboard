@@ -2,6 +2,7 @@ import clientPromise from '../../../src/lib/mongodb'
 
 const DB = 'itm'
 const EMAIL_COL = 'aws_ses_webhook_ibs'
+const APPS_COL = 'npfMbaApplications'
 const CACHE_COL = 'email_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
@@ -44,22 +45,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
 
   const validEventTypes = Object.keys(STAGE_MAP)
 
-  const [kpiResult, subjectResult, clickResult, totalDocs] = await Promise.all([
-    col.aggregate([
-      { $match: { ...matchFilter, 'detail.eventType': { $in: validEventTypes } } },
-      {
-        $group: {
-          _id: null,
-          sent: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Send'] }, 1, 0] } },
-          delivered: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Delivery'] }, 1, 0] } },
-          opened: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Open'] }, 1, 0] } },
-          clicked: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Click'] }, 1, 0] } },
-          bounced: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Bounce'] }, 1, 0] } },
-          complained: { $sum: { $cond: [{ $eq: ['$detail.eventType', 'Complaint'] }, 1, 0] } },
-        },
-      },
-    ]).toArray(),
-
+  const [subjectResult, clickedEmailsResult, totalDocs] = await Promise.all([
     col.aggregate([
       { $match: { ...matchFilter, 'detail.eventType': { $in: validEventTypes } } },
       {
@@ -75,7 +61,6 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
           sampleFrom: { $first: { $arrayElemAt: ['$detail.mail.commonHeaders.from', 0] } },
           sampleDate: { $first: '$detail.mail.commonHeaders.date' },
           templateId: { $first: { $arrayElemAt: ['$detail.mail.tags.templateId', 0] } },
-          emails: { $addToSet: { $arrayElemAt: ['$detail.mail.destination', 0] } },
         },
       },
     ]).toArray(),
@@ -88,8 +73,6 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
             subject: '$detail.mail.commonHeaders.subject',
             email: { $arrayElemAt: ['$detail.mail.destination', 0] },
           },
-          links: { $addToSet: '$detail.click.link' },
-          lastClick: { $max: '$time' },
         },
       },
     ]).toArray(),
@@ -99,19 +82,17 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
       : col.countDocuments(matchFilter),
   ])
 
-  const rawKpi = kpiResult[0] || { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 }
-  delete rawKpi._id
-  rawKpi.deliveryRate = pct(rawKpi.delivered, rawKpi.sent)
-  rawKpi.openRate = pct(rawKpi.opened, rawKpi.delivered)
-  rawKpi.clickRate = pct(rawKpi.clicked, rawKpi.delivered)
-  rawKpi.bounceRate = pct(rawKpi.bounced, rawKpi.sent)
-
+  const rawKpi = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 }
   const subjectMap = {}
+
   for (const r of subjectResult) {
     const subject = r._id.subject
+    const eventType = r._id.eventType
     if (!subject) continue
-    const stage = STAGE_MAP[r._id.eventType]
+    const stage = STAGE_MAP[eventType]
     if (!stage) continue
+
+    rawKpi[stage] += r.count
 
     if (!subjectMap[subject]) {
       subjectMap[subject] = {
@@ -121,18 +102,16 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
         firstSeen: null,
         lastSeen: null,
         sampleMail: null,
-        _allEmails: new Set(),
       }
     }
     const row = subjectMap[subject]
-    row[stage] = (row[stage] || 0) + r.count
+    row[stage] += r.count
 
     if (r.firstSeen && (!row.firstSeen || r.firstSeen < row.firstSeen)) row.firstSeen = r.firstSeen
     if (r.lastSeen && (!row.lastSeen || r.lastSeen > row.lastSeen)) row.lastSeen = r.lastSeen
     if (!row.templateId && r.templateId) row.templateId = r.templateId
-    if (r.emails) r.emails.forEach((e) => { if (e) row._allEmails.add(e.toLowerCase()) })
 
-    if (!row.sampleMail && r._id.eventType === 'Send') {
+    if (!row.sampleMail && eventType === 'Send') {
       row.sampleMail = {
         from: r.sampleSource || r.sampleFrom || '',
         subject,
@@ -142,34 +121,99 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     }
   }
 
-  const clicksBySubjectEmail = {}
-  for (const r of clickResult) {
+  rawKpi.deliveryRate = pct(rawKpi.delivered, rawKpi.sent)
+  rawKpi.openRate = pct(rawKpi.opened, rawKpi.delivered)
+  rawKpi.clickRate = pct(rawKpi.clicked, rawKpi.delivered)
+  rawKpi.bounceRate = pct(rawKpi.bounced, rawKpi.sent)
+
+  const clickedBySubject = {}
+  const allClickedEmails = new Set()
+  for (const r of clickedEmailsResult) {
     const subject = r._id.subject
     const email = r._id.email
     if (!subject || !email) continue
-    if (!clicksBySubjectEmail[subject]) clicksBySubjectEmail[subject] = {}
-    clicksBySubjectEmail[subject][email.toLowerCase()] = {
-      links: (r.links || []).filter(Boolean),
-      lastClick: r.lastClick,
+    const lower = email.toLowerCase()
+    allClickedEmails.add(lower)
+    if (!clickedBySubject[subject]) clickedBySubject[subject] = new Set()
+    clickedBySubject[subject].add(lower)
+  }
+  const clickedEmailList = [...allClickedEmails]
+
+  const templateRows = Object.values(subjectMap).map((row) => ({
+    ...row,
+    deliveryRate: pct(row.delivered, row.sent),
+    openRate: pct(row.opened, row.delivered),
+    clickRate: pct(row.clicked, row.delivered),
+    bounceRate: pct(row.bounced, row.sent),
+  })).sort((a, b) => b.sent - a.sent)
+
+  const appsCol = db.collection(APPS_COL)
+
+  const [formSubmittedResult, paidResult] = await Promise.all([
+    clickedEmailList.length > 0
+      ? appsCol.aggregate([
+          {
+            $match: {
+              'personal_details.email_id': { $in: clickedEmailList },
+              'application_detail.application_no': { $ne: '' },
+            },
+          },
+          { $group: { _id: { $toLower: '$personal_details.email_id' } } },
+        ]).toArray()
+      : Promise.resolve([]),
+
+    clickedEmailList.length > 0
+      ? appsCol.aggregate([
+          {
+            $match: {
+              'personal_details.email_id': { $in: clickedEmailList },
+              'payment_details.payment_receipt_no1': { $nin: [null, ''] },
+            },
+          },
+          {
+            $group: {
+              _id: { $toLower: '$personal_details.email_id' },
+              application_no: { $first: '$application_detail.application_no' },
+              payment_amount: { $first: '$payment_details.payment_amount1' },
+            },
+          },
+        ]).toArray()
+      : Promise.resolve([]),
+  ])
+
+  const formSubmittedEmails = new Set(formSubmittedResult.map((r) => r._id))
+  const paidEmails = new Set(paidResult.map((r) => r._id))
+
+  const perSubjectConversion = {}
+  for (const [subject, emailSet] of Object.entries(clickedBySubject)) {
+    const emails = [...emailSet]
+    let formCount = 0
+    let paidCount = 0
+    for (const e of emails) {
+      if (formSubmittedEmails.has(e)) formCount++
+      if (paidEmails.has(e)) paidCount++
+    }
+    perSubjectConversion[subject] = {
+      clicked: emails.length,
+      formSubmitted: formCount,
+      paid: paidCount,
+      rate: emails.length > 0 ? parseFloat(((paidCount / emails.length) * 100).toFixed(1)) : 0,
     }
   }
 
-  const templateRows = Object.values(subjectMap).map((row) => {
-    const { _allEmails, ...rest } = row
-    return {
-      ...rest,
-      deliveryRate: pct(row.delivered, row.sent),
-      openRate: pct(row.opened, row.delivered),
-      clickRate: pct(row.clicked, row.delivered),
-      bounceRate: pct(row.bounced, row.sent),
-    }
-  }).sort((a, b) => b.sent - a.sent)
-
-  const subjectEmails = {}
-  for (const [subject, row] of Object.entries(subjectMap)) {
-    if (row._allEmails.size > 0) {
-      subjectEmails[subject] = [...row._allEmails]
-    }
+  const emailPaymentConversion = {
+    totalClicked: clickedEmailList.length,
+    formSubmitted: formSubmittedResult.length,
+    paid: paidResult.length,
+    conversionRate: clickedEmailList.length > 0
+      ? parseFloat(((paidResult.length / clickedEmailList.length) * 100).toFixed(2))
+      : 0,
+    paidDetails: paidResult.map((r) => ({
+      email: r._id,
+      application_no: r.application_no,
+      payment_amount: r.payment_amount,
+    })),
+    perSubject: perSubjectConversion,
   }
 
   const funnel = [
@@ -188,8 +232,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     kpi: rawKpi,
     templateRows,
     funnel,
-    subjectEmails,
-    clicksBySubjectEmail,
+    emailPaymentConversion,
     rawDocCount: totalDocs,
     lastRawDocTime,
     computedAt: new Date().toISOString(),

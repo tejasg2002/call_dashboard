@@ -70,10 +70,10 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
 
   return (
       <div className={tableWrap}>
-        <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-          <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Template Performance</h3>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Click any column header to sort · click <span className="font-semibold">Preview</span> to see template content
+        <div className={`px-4 py-2.5 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+          <h3 className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Template Performance</h3>
+          <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Click any column header to sort · click <span className="font-medium">Preview</span> to see template content
           </p>
         </div>
         <div className="overflow-x-auto">

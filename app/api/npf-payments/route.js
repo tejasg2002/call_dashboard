@@ -20,10 +20,6 @@ export async function GET(request) {
         { $sort: { count: -1 } },
       ]).toArray()
 
-      const sample = await col.find({}).limit(5).toArray()
-
-      const collections = await db.listCollections().toArray()
-
       return Response.json({
         collection: COLLECTION,
         database: DB_NAME,
@@ -31,11 +27,6 @@ export async function GET(request) {
         statusDistribution: statusAgg.map((s) => ({
           status: s._id,
           count: s.count,
-        })),
-        allCollections: collections.map((c) => c.name),
-        sampleDocuments: sample.map((d) => ({
-          ...d,
-          _id: d._id.toString(),
         })),
       })
     }

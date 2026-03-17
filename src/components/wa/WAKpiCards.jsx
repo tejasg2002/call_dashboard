@@ -160,7 +160,7 @@ export default function WAKpiCards({ kpi, theme }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {volumeMetrics.map((m) => (
           <div
             key={m.key}
