@@ -6,8 +6,6 @@ import { cn } from '../../lib/utils'
 import SourceKpiCards from './SourceKpiCards'
 import SourceTable from './SourceTable'
 import SourceCharts from './SourceCharts'
-import SourceCadenceHeatmap from './SourceCadenceHeatmap'
-import SourceDailyActivity from './SourceDailyActivity'
 import SourceCohortMatrix from './SourceCohortMatrix'
 
 const RANGE_OPTIONS = [
@@ -17,6 +15,7 @@ const RANGE_OPTIONS = [
   { key: 'month', label: 'This month' },
   { key: 'custom', label: 'Custom' },
 ]
+
 
 const formatDateInput = (date) => {
   const y = date.getFullYear()

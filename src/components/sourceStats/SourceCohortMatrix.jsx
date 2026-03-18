@@ -42,30 +42,83 @@ function buildLast7Days() {
   return days
 }
 
+const SOURCE_TEAMS = {
+  'Team A': ['google', 'organic', 'bing', 'referral', 'website', 'direct', 'chat'],
+  'Team B': ['collegedunia', 'database'],
+  'Team C': ['shiksha', 'careers360', 'getmyuni', 'kollegeapply', 'twigznetwork'],
+  'Team D': ['btl', 'agents', 'facebook', 'inbound call', 'telephony'],
+}
+
+function getTeamForSource(sourceName) {
+  const lower = sourceName.toLowerCase()
+  for (const [team, sources] of Object.entries(SOURCE_TEAMS)) {
+    if (sources.some((s) => lower.includes(s))) return team
+  }
+  return 'Other'
+}
+
 const SourceCohortMatrix = ({ sourceRows, cohortMatrix, loading }) => {
-  const [selectedSource, setSelectedSource] = useState('')
+  const [selectedTeam, setSelectedTeam] = useState('all')
+  const [selectedSources, setSelectedSources] = useState(new Set())
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [hoveredCell, setHoveredCell] = useState(null)
 
-  const sourceOptions = useMemo(() => {
+  const allSourceOptions = useMemo(() => {
     if (!sourceRows || !cohortMatrix) return []
     return sourceRows.filter((r) => cohortMatrix[r.source]).map((r) => r.source)
   }, [sourceRows, cohortMatrix])
 
-  const activeSource = selectedSource || sourceOptions[0] || ''
+  const teamOptions = useMemo(() => {
+    const teams = new Set()
+    for (const s of allSourceOptions) teams.add(getTeamForSource(s))
+    return ['all', ...Object.keys(SOURCE_TEAMS).filter((t) => teams.has(t)), ...(teams.has('Other') ? ['Other'] : [])]
+  }, [allSourceOptions])
+
+  const filteredByTeam = useMemo(() => {
+    if (selectedTeam === 'all') return allSourceOptions
+    return allSourceOptions.filter((s) => getTeamForSource(s) === selectedTeam)
+  }, [allSourceOptions, selectedTeam])
+
+  const activeSources = useMemo(() => {
+    if (selectedSources.size === 0) return filteredByTeam
+    return filteredByTeam.filter((s) => selectedSources.has(s))
+  }, [filteredByTeam, selectedSources])
+
+  const toggleSource = (src) => {
+    setSelectedSources((prev) => {
+      const next = new Set(prev)
+      if (next.has(src)) next.delete(src)
+      else next.add(src)
+      return next
+    })
+  }
+
+  const selectAll = () => setSelectedSources(new Set())
+  const deselectAll = () => setSelectedSources(new Set(['__none__']))
 
   const last7 = useMemo(() => buildLast7Days(), [])
 
   const { cellMap, regLeadCounts } = useMemo(() => {
-    if (!cohortMatrix || !activeSource || !cohortMatrix[activeSource]) {
+    if (!cohortMatrix || activeSources.length === 0) {
       return { cellMap: {}, regLeadCounts: {} }
     }
-    const { cells, regDateLeads } = cohortMatrix[activeSource]
-    const map = {}
-    for (const { regDate, callDate, calls, leadsContacted } of cells) {
-      map[`${regDate}|${callDate}`] = { calls, leadsContacted }
+    const mergedMap = {}
+    const mergedLeads = {}
+    for (const src of activeSources) {
+      const data = cohortMatrix[src]
+      if (!data) continue
+      for (const [date, count] of Object.entries(data.regDateLeads || {})) {
+        mergedLeads[date] = (mergedLeads[date] || 0) + count
+      }
+      for (const { regDate, callDate, calls, leadsContacted } of data.cells) {
+        const key = `${regDate}|${callDate}`
+        if (!mergedMap[key]) mergedMap[key] = { calls: 0, leadsContacted: 0 }
+        mergedMap[key].calls += calls
+        mergedMap[key].leadsContacted += leadsContacted
+      }
     }
-    return { cellMap: map, regLeadCounts: regDateLeads || {} }
-  }, [cohortMatrix, activeSource])
+    return { cellMap: mergedMap, regLeadCounts: mergedLeads }
+  }, [cohortMatrix, activeSources])
 
   if (loading && (!sourceRows || sourceRows.length === 0)) {
     return (
@@ -79,7 +132,7 @@ const SourceCohortMatrix = ({ sourceRows, cohortMatrix, loading }) => {
     )
   }
 
-  if (!cohortMatrix || sourceOptions.length === 0) return null
+  if (!cohortMatrix || allSourceOptions.length === 0) return null
 
   return (
     <div className={cn(
@@ -87,30 +140,110 @@ const SourceCohortMatrix = ({ sourceRows, cohortMatrix, loading }) => {
       "bg-white dark:bg-slate-900/60",
       "border-slate-200/80 dark:border-slate-800"
     )}>
-      <div className="flex items-center justify-between px-5 pt-5 pb-3 gap-4 flex-wrap">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Lead Registration vs Call Date — Last 7 Days
-          </h3>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-            Cell = leads contacted / total calls — hover for % ratio
-          </p>
+      <div className="px-5 pt-5 pb-3 space-y-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Lead Registration vs Call Date — Last 7 Days
+            </h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Cell = total leads / total calls — hover for % ratio
+            </p>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className={cn(
+                "px-3 py-2 rounded-lg border text-xs font-medium min-w-[200px] flex items-center justify-between gap-2",
+                "bg-white dark:bg-slate-800",
+                "border-slate-200 dark:border-slate-700",
+                "text-slate-800 dark:text-slate-200",
+                dropdownOpen && "ring-2 ring-brand-400/40 border-brand-400"
+              )}
+            >
+              <span className="truncate">
+                {selectedSources.size === 0 || selectedSources.size === filteredByTeam.length
+                  ? `All sources (${filteredByTeam.length})`
+                  : `${activeSources.length} source${activeSources.length !== 1 ? 's' : ''} selected`}
+              </span>
+              <svg className={cn("w-3.5 h-3.5 shrink-0 transition-transform", dropdownOpen && "rotate-180")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            {dropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setDropdownOpen(false)} />
+                <div className={cn(
+                  "absolute right-0 top-full mt-1 z-30 w-56 rounded-lg border shadow-xl overflow-hidden",
+                  "bg-white dark:bg-slate-800",
+                  "border-slate-200 dark:border-slate-700"
+                )}>
+                  <div className={cn(
+                    "flex items-center justify-between px-3 py-2 border-b",
+                    "border-slate-100 dark:border-slate-700"
+                  )}>
+                    <button
+                      onClick={selectAll}
+                      className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAll}
+                      className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto py-1">
+                    {filteredByTeam.map((src) => {
+                      const isChecked = selectedSources.size === 0 || selectedSources.has(src)
+                      return (
+                        <label
+                          key={src}
+                          className={cn(
+                            "flex items-center gap-2.5 px-3 py-1.5 cursor-pointer text-xs transition-colors",
+                            "hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                            isChecked ? "text-slate-800 dark:text-slate-200" : "text-slate-400 dark:text-slate-500"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSource(src)}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500 focus:ring-1"
+                          />
+                          <span className="truncate">{src}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <select
-          value={activeSource}
-          onChange={(e) => setSelectedSource(e.target.value)}
-          className={cn(
-            "px-3 py-2 rounded-lg border text-xs font-medium min-w-[180px]",
-            "bg-white dark:bg-slate-800",
-            "border-slate-200 dark:border-slate-700",
-            "text-slate-800 dark:text-slate-200",
-            "focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-400"
-          )}
-        >
-          {sourceOptions.map((src) => (
-            <option key={src} value={src}>{src}</option>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {teamOptions.map((t) => (
+            <button
+              key={t}
+              onClick={() => { setSelectedTeam(t); setSelectedSources(new Set()) }}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
+                selectedTeam === t
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+                  : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              )}
+            >
+              {t === 'all' ? 'All' : t}
+            </button>
           ))}
-        </select>
+          {activeSources.length > 0 && activeSources.length < filteredByTeam.length && (
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1">
+              {activeSources.join(', ')}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="overflow-auto">
@@ -228,7 +361,7 @@ const SourceCohortMatrix = ({ sourceRows, cohortMatrix, loading }) => {
                             "border-slate-200 dark:border-slate-700"
                           )}>
                             <p className="text-[11px] font-semibold text-slate-900 dark:text-white mb-1.5">
-                              {activeSource}
+                              {activeSources.length === 1 ? activeSources[0] : `${activeSources.length} sources`}
                             </p>
                             <div className="space-y-1 text-[10px]">
                               <div className="flex justify-between">
