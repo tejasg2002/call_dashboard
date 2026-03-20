@@ -15,6 +15,7 @@ import WACampaignManager from '../../../src/components/wa/WACampaignManager'
 import WACampaignAnalytics from '../../../src/components/wa/WACampaignAnalytics'
 import WAEngagementSection from '../../../src/components/wa/WAEngagementSection'
 import WAPaymentConversionServer from '../../../src/components/wa/WAPaymentConversionServer'
+import WAClickBreakdown from '../../../src/components/wa/WAClickBreakdown'
 import LazySection from '../../../src/components/LazySection'
 
 function loadCampaigns() {
@@ -375,6 +376,16 @@ export default function WAApiPage() {
               </div>
             </LazySection>
           </div>
+
+          {/* ── Click Breakdown ───────────────────────────────────────────── */}
+          {snapshot?.clickBreakdown && snapshot.clickBreakdown.length > 0 && (
+            <div className="space-y-4">
+              <SectionHeader title="Click Breakdown" description="Every user who clicked — what template, button, and link" isDark={isDark} />
+              <LazySection height="400px">
+                <WAClickBreakdown data={snapshot.clickBreakdown} theme={theme} dataMasked={dataMasked} />
+              </LazySection>
+            </div>
+          )}
 
           {/* ── Payment Conversion ────────────────────────────────────────── */}
           {snapshot?.paymentConversion && (

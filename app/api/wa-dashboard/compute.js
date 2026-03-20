@@ -311,6 +311,34 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     if (r._id) templatePhones[r._id] = r.phones || []
   }
 
+  const clickBreakdownResult = await waCol.aggregate([
+    { $match: { ...matchFilter, stage: 'clicked' } },
+    { $sort: { event_timestamp: -1 } },
+    {
+      $group: {
+        _id: '$phone_number',
+        clicks: {
+          $push: {
+            template: '$template_name',
+            button: '$button_text',
+            link: '$button_link',
+            type: '$click_type',
+            time: '$click_timestamp',
+          },
+        },
+      },
+    },
+  ]).toArray()
+
+  const clickBreakdown = clickBreakdownResult
+    .filter((r) => r._id)
+    .map((r) => ({
+      phone: r._id,
+      totalClicks: r.clicks.length,
+      clicks: r.clicks.slice(0, 20),
+    }))
+    .sort((a, b) => b.totalClicks - a.totalClicks)
+
   const lastDoc = await waCol.find({}).sort({ event_timestamp: -1 }).limit(1).toArray()
   const lastRawDocTime = lastDoc[0]?.event_timestamp
     ? new Date(lastDoc[0].event_timestamp).toISOString()
@@ -327,6 +355,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     engagementSummary,
     buttonPhones,
     templatePhones,
+    clickBreakdown,
     rawDocCount: totalDocs,
     lastRawDocTime,
     formSubmittedCount,

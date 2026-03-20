@@ -45,7 +45,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
 
   const validEventTypes = Object.keys(STAGE_MAP)
 
-  const [subjectResult, clickedEmailsResult, totalDocs] = await Promise.all([
+  const [subjectResult, clickedEmailsResult, clickBreakdownResult, totalDocs] = await Promise.all([
     col.aggregate([
       { $match: { ...matchFilter, 'detail.eventType': { $in: validEventTypes } } },
       {
@@ -72,6 +72,81 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
           _id: {
             subject: '$detail.mail.commonHeaders.subject',
             email: { $arrayElemAt: ['$detail.mail.destination', 0] },
+          },
+        },
+      },
+    ]).toArray(),
+
+    col.aggregate([
+      { $match: { ...matchFilter, 'detail.eventType': 'Click' } },
+      { $sort: { time: -1 } },
+      {
+        $addFields: {
+          _emailLower: {
+            $toLower: {
+              $trim: {
+                input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
+              },
+            },
+          },
+          _buttonLabel: {
+            $cond: {
+              if: { $gt: [{ $size: { $ifNull: ['$detail.click.linkTags', []] } }, 0] },
+              then: {
+                $let: {
+                  vars: { ft: { $arrayElemAt: ['$detail.click.linkTags', 0] } },
+                  in: {
+                    $trim: {
+                      input: {
+                        $ifNull: [
+                          '$$ft.value',
+                          { $ifNull: ['$$ft.name', ''] },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              else: '',
+            },
+          },
+        },
+      },
+      { $match: { _emailLower: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: '$_emailLower',
+          clicks: {
+            $push: {
+              template: {
+                $cond: {
+                  if: {
+                    $gt: [
+                      { $strLenCP: { $ifNull: ['$detail.mail.commonHeaders.subject', ''] } },
+                      0,
+                    ],
+                  },
+                  then: '$detail.mail.commonHeaders.subject',
+                  else: {
+                    $ifNull: [
+                      { $arrayElemAt: ['$detail.mail.tags.templateId', 0] },
+                      '(no subject)',
+                    ],
+                  },
+                },
+              },
+              templateId: { $ifNull: [{ $arrayElemAt: ['$detail.mail.tags.templateId', 0] }, ''] },
+              button: {
+                $cond: {
+                  if: { $gt: [{ $strLenCP: { $ifNull: ['$_buttonLabel', ''] } }, 0] },
+                  then: '$_buttonLabel',
+                  else: 'Link',
+                },
+              },
+              link: { $ifNull: ['$detail.click.link', ''] },
+              type: 'click',
+              time: '$time',
+            },
           },
         },
       },
@@ -138,6 +213,15 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     clickedBySubject[subject].add(lower)
   }
   const clickedEmailList = [...allClickedEmails]
+
+  const clickBreakdown = clickBreakdownResult
+    .filter((r) => r._id)
+    .map((r) => ({
+      email: r._id,
+      totalClicks: r.clicks.length,
+      clicks: r.clicks.slice(0, 20),
+    }))
+    .sort((a, b) => b.totalClicks - a.totalClicks)
 
   const templateRows = Object.values(subjectMap).map((row) => ({
     ...row,
@@ -233,6 +317,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     templateRows,
     funnel,
     emailPaymentConversion,
+    clickBreakdown,
     rawDocCount: totalDocs,
     lastRawDocTime,
     computedAt: new Date().toISOString(),

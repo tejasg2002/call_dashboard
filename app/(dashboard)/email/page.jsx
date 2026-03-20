@@ -8,6 +8,7 @@ import EmailKpiCards from '../../../src/components/email/EmailKpiCards'
 import EmailFilters from '../../../src/components/email/EmailFilters'
 import EmailSubjectTable from '../../../src/components/email/EmailSubjectTable'
 import EmailPaymentConversion from '../../../src/components/email/EmailPaymentConversion'
+import EmailClickBreakdown from '../../../src/components/email/EmailClickBreakdown'
 import LazySection from '../../../src/components/LazySection'
 
 function formatCount(n) {
@@ -221,6 +222,16 @@ export default function EmailPage() {
           <LazySection height="300px">
             <EmailSubjectTable rows={filteredTemplateRows} theme={theme} dataMasked={dataMasked} />
           </LazySection>
+
+          {snapshot?.clickBreakdown && snapshot.clickBreakdown.length > 0 && (
+            <LazySection height="420px">
+              <EmailClickBreakdown
+                data={snapshot.clickBreakdown}
+                theme={theme}
+                dataMasked={dataMasked}
+              />
+            </LazySection>
+          )}
 
           {snapshot?.emailPaymentConversion && snapshot.emailPaymentConversion.totalClicked > 0 && (
             <LazySection height="280px">
