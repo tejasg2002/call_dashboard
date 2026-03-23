@@ -189,7 +189,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
       )}
 
       <div className={`px-6 py-3 border-t text-[10px] ${isDark ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-        Data sourced from MongoDB (npfMbaApplications + marketingwa). Auto-refreshed every hour via cron.
+        Form &amp; payment counts only include records with timestamps on or after the first sent/delivered WhatsApp for that number. Sourced from npfMbaApplications + marketingwa.
       </div>
     </div>
   )

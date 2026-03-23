@@ -1,4 +1,5 @@
 import clientPromise from '../../../src/lib/mongodb'
+import { isOnOrAfter } from '../../../src/lib/conversionAttribution'
 
 const DB = 'itm'
 const EMAIL_COL = 'aws_ses_webhook_ibs'
@@ -14,6 +15,10 @@ const STAGE_MAP = {
   Click: 'clicked',
   Bounce: 'bounced',
   Complaint: 'complained',
+}
+
+function emailSubjectKey(emailLower, subject) {
+  return `${emailLower}\u{1e}${subject}`
 }
 
 export async function computeEmailDashboard({ mode = 'cached', startDate, endDate } = {}) {
@@ -214,6 +219,60 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
   }
   const clickedEmailList = [...allClickedEmails]
 
+  const emailToSubjects = new Map()
+  for (const [subject, emailSet] of Object.entries(clickedBySubject)) {
+    for (const e of emailSet) {
+      if (!emailToSubjects.has(e)) emailToSubjects.set(e, new Set())
+      emailToSubjects.get(e).add(subject)
+    }
+  }
+
+  /** First SES Send time per (email, subject); not limited to dashboard date range */
+  const firstSendRows = clickedEmailList.length > 0
+    ? await col.aggregate([
+        { $match: { 'detail.eventType': 'Send' } },
+        {
+          $addFields: {
+            em: {
+              $toLower: {
+                $trim: {
+                  input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
+                },
+              },
+            },
+          },
+        },
+        { $match: { em: { $in: clickedEmailList } } },
+        {
+          $group: {
+            _id: {
+              email: '$em',
+              subject: '$detail.mail.commonHeaders.subject',
+            },
+            firstSent: { $min: '$time' },
+          },
+        },
+      ]).toArray()
+    : []
+
+  const firstSendMap = new Map()
+  for (const row of firstSendRows) {
+    const em = row._id?.email
+    const sub = row._id?.subject
+    if (!em || !sub) continue
+    firstSendMap.set(emailSubjectKey(em, sub), row.firstSent)
+  }
+
+  function emailQualifiesAfterSend(emailLower, eventTime) {
+    const subs = emailToSubjects.get(emailLower)
+    if (!subs || eventTime == null) return false
+    for (const sub of subs) {
+      const sent = firstSendMap.get(emailSubjectKey(emailLower, sub))
+      if (sent != null && isOnOrAfter(eventTime, sent)) return true
+    }
+    return false
+  }
+
   const clickBreakdown = clickBreakdownResult
     .filter((r) => r._id)
     .map((r) => ({
@@ -233,7 +292,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
 
   const appsCol = db.collection(APPS_COL)
 
-  const [formSubmittedResult, paidResult] = await Promise.all([
+  const [formSubmittedAgg, paidAgg] = await Promise.all([
     clickedEmailList.length > 0
       ? appsCol.aggregate([
           {
@@ -242,7 +301,12 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
               'application_detail.application_no': { $ne: '' },
             },
           },
-          { $group: { _id: { $toLower: '$personal_details.email_id' } } },
+          {
+            $group: {
+              _id: { $toLower: '$personal_details.email_id' },
+              formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
+            },
+          },
         ]).toArray()
       : Promise.resolve([]),
 
@@ -257,6 +321,15 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
           {
             $group: {
               _id: { $toLower: '$personal_details.email_id' },
+              paidAt: {
+                $max: {
+                  $ifNull: [
+                    '$payment_details.payment_date',
+                    '$application_detail.payment_date',
+                  ],
+                },
+              },
+              docCreated: { $max: '$createdAt' },
               application_no: { $first: '$application_detail.application_no' },
               payment_amount: { $first: '$payment_details.payment_amount1' },
             },
@@ -265,8 +338,16 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
       : Promise.resolve([]),
   ])
 
-  const formSubmittedEmails = new Set(formSubmittedResult.map((r) => r._id))
-  const paidEmails = new Set(paidResult.map((r) => r._id))
+  const formByEmail = new Map(formSubmittedAgg.map((r) => [r._id, r.formSubmittedAt]))
+  const paidByEmail = new Map(paidAgg.map((r) => [r._id, r]))
+
+  const formSubmittedResult = formSubmittedAgg.filter((r) =>
+    emailQualifiesAfterSend(r._id, r.formSubmittedAt),
+  )
+  const paidResult = paidAgg.filter((r) => {
+    const paidTs = r.paidAt != null ? r.paidAt : r.docCreated
+    return emailQualifiesAfterSend(r._id, paidTs)
+  })
 
   const perSubjectConversion = {}
   for (const [subject, emailSet] of Object.entries(clickedBySubject)) {
@@ -274,8 +355,12 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     let formCount = 0
     let paidCount = 0
     for (const e of emails) {
-      if (formSubmittedEmails.has(e)) formCount++
-      if (paidEmails.has(e)) paidCount++
+      const sendT = firstSendMap.get(emailSubjectKey(e, subject))
+      const formAt = formByEmail.get(e)
+      if (formAt && sendT && isOnOrAfter(formAt, sendT)) formCount++
+      const paidRow = paidByEmail.get(e)
+      const payTs = paidRow ? (paidRow.paidAt != null ? paidRow.paidAt : paidRow.docCreated) : null
+      if (payTs && sendT && isOnOrAfter(payTs, sendT)) paidCount++
     }
     perSubjectConversion[subject] = {
       clicked: emails.length,

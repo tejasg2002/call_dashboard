@@ -72,7 +72,9 @@ export default function EmailPaymentConversion({ data, theme, dataMasked }) {
           </div>
           <div>
             <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Payment Conversion</h3>
-            <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Clicked users to form &amp; payment (server-computed)</p>
+            <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Clicked users → form &amp; payment. Forms/payments count only if dated on or after the SES send for a subject they clicked.
+            </p>
           </div>
         </div>
 

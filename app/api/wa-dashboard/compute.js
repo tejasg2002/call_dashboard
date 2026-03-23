@@ -1,4 +1,5 @@
 import clientPromise from '../../../src/lib/mongodb'
+import { isOnOrAfter, parseOptDate } from '../../../src/lib/conversionAttribution'
 
 const DB = 'itm'
 const WA_COL = 'marketingwa'
@@ -196,10 +197,39 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
 
   const clickedPhones = clickedPhonesResult.map((r) => String(r._id)).filter(Boolean)
   const normalisedClickedMobiles = [...new Set(clickedPhones.map(normaliseMobile).filter(Boolean))]
+  const clickedPhoneDedup = [...new Set(clickedPhones.filter(Boolean))]
+
+  /** Earliest outbound (sent/delivered) per normalised mobile — full history, not date-filtered */
+  const firstOutboundResult = clickedPhoneDedup.length > 0
+    ? await waCol.aggregate([
+        {
+          $match: {
+            phone_number: { $in: clickedPhoneDedup },
+            stage: { $in: ['sent', 'delivered'] },
+          },
+        },
+        {
+          $group: {
+            _id: '$phone_number',
+            firstOutbound: { $min: '$event_timestamp' },
+          },
+        },
+      ]).toArray()
+    : []
+
+  const firstOutboundByNorm = new Map()
+  for (const row of firstOutboundResult) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const anchor = parseOptDate(row.firstOutbound)
+    if (!anchor) continue
+    const prev = firstOutboundByNorm.get(norm)
+    if (!prev || anchor.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, anchor)
+  }
 
   const appsCol = db.collection(APPS_COL)
 
-  const [formSubmittedResult, paidResult] = await Promise.all([
+  const [formSubmittedAgg, paidAgg] = await Promise.all([
     normalisedClickedMobiles.length > 0
       ? appsCol.aggregate([
           {
@@ -208,7 +238,12 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
               'application_detail.application_no': { $ne: '' },
             },
           },
-          { $group: { _id: '$personal_details.mobile_number' } },
+          {
+            $group: {
+              _id: '$personal_details.mobile_number',
+              formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
+            },
+          },
         ]).toArray()
       : Promise.resolve([]),
 
@@ -223,6 +258,15 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
           {
             $group: {
               _id: '$personal_details.mobile_number',
+              paidAt: {
+                $max: {
+                  $ifNull: [
+                    '$payment_details.payment_date',
+                    '$application_detail.payment_date',
+                  ],
+                },
+              },
+              docCreated: { $max: '$createdAt' },
               application_no: { $first: '$application_detail.application_no' },
               payment_amount: { $first: '$payment_details.payment_amount1' },
             },
@@ -230,6 +274,22 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
         ]).toArray()
       : Promise.resolve([]),
   ])
+
+  const formSubmittedResult = formSubmittedAgg.filter((r) => {
+    const norm = normaliseMobile(r._id)
+    const anchor = firstOutboundByNorm.get(norm)
+    if (!anchor || r.formSubmittedAt == null) return false
+    return isOnOrAfter(r.formSubmittedAt, anchor)
+  })
+
+  const paidResult = paidAgg.filter((r) => {
+    const norm = normaliseMobile(r._id)
+    const anchor = firstOutboundByNorm.get(norm)
+    if (!anchor) return false
+    const paidTs = r.paidAt != null ? r.paidAt : r.docCreated
+    if (paidTs == null) return false
+    return isOnOrAfter(paidTs, anchor)
+  })
 
   const formSubmittedCount = formSubmittedResult.length
   const paidCount = paidResult.length
