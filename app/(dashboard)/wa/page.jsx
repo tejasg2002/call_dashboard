@@ -390,7 +390,7 @@ export default function WAApiPage() {
           {/* ── Payment Conversion ────────────────────────────────────────── */}
           {snapshot?.paymentConversion && (
             <div className="space-y-4">
-              <SectionHeader title="Payment Conversion" description="Track how WhatsApp engagement converts to completed payments" isDark={isDark} />
+              <SectionHeader title="Form conversion" description="Clicked users who submitted an MBA application after template send" isDark={isDark} />
               <LazySection height="280px">
                 <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} dataMasked={dataMasked} />
               </LazySection>

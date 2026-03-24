@@ -83,6 +83,7 @@ const HEADER_TITLES = {
   '/sourceStats': 'Source Stats',
   '/wa': 'WhatsApp Analytics',
   '/wa/campaigns': 'Campaign Analytics',
+  '/wa/chat': 'WhatsApp Chat',
   '/email': 'Email Analytics',
   '/sms': 'SMS Analytics',
   '/settings': 'Settings',

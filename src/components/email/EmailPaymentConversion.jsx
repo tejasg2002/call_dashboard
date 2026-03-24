@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { maskEmail } from '../../lib/userManagement'
+import { useMemo } from 'react'
 
 function HeroMetric({ value, label, sub, accent, isDark }) {
   return (
@@ -35,31 +34,21 @@ function FunnelStep({ label, value, total, color, isLast, isDark }) {
   )
 }
 
-export default function EmailPaymentConversion({ data, theme, dataMasked }) {
+export default function EmailPaymentConversion({ data, theme }) {
   const isDark = theme === 'dark'
-  const [expandedRow, setExpandedRow] = useState(null)
-  const me = (email) => dataMasked ? maskEmail(email) : email
 
   if (!data || data.totalClicked === 0) return null
 
-  const { totalClicked, formSubmitted, paid, conversionRate, perSubject, paidDetails } = data
+  const { totalClicked, formSubmitted, conversionRate, perSubject } = data
 
   const sortedSubjects = useMemo(() => {
     if (!perSubject) return []
     return Object.entries(perSubject)
       .map(([subject, stats]) => ({ subject, ...stats }))
-      .sort((a, b) => b.paid - a.paid || b.formSubmitted - a.formSubmitted || b.clicked - a.clicked)
+      .sort((a, b) => b.formSubmitted - a.formSubmitted || b.clicked - a.clicked)
   }, [perSubject])
 
   const maxClicked = sortedSubjects.length > 0 ? Math.max(...sortedSubjects.map((s) => s.clicked)) : 1
-
-  const paidDetailMap = useMemo(() => {
-    const m = new Map()
-    if (paidDetails) {
-      for (const d of paidDetails) m.set(d.email, d)
-    }
-    return m
-  }, [paidDetails])
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -71,14 +60,14 @@ export default function EmailPaymentConversion({ data, theme, dataMasked }) {
             </svg>
           </div>
           <div>
-            <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Payment Conversion</h3>
+            <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Form conversion</h3>
             <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              Clicked users → form &amp; payment. Forms/payments count only if dated on or after the SES send for a subject they clicked.
+              Clicked users with an MBA application (application no.) after the SES send for that subject.
             </p>
           </div>
         </div>
 
-        <div className={`mt-5 grid grid-cols-4 gap-3 py-4 px-2 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-white/80 shadow-inner'}`}>
+        <div className={`mt-5 grid grid-cols-3 gap-3 py-4 px-2 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-white/80 shadow-inner'}`}>
           <HeroMetric
             value={totalClicked.toLocaleString('en-IN')}
             label="Clicked Users"
@@ -93,25 +82,17 @@ export default function EmailPaymentConversion({ data, theme, dataMasked }) {
             isDark={isDark}
           />
           <HeroMetric
-            value={paid.toLocaleString('en-IN')}
-            label="Payments Done"
-            sub={formSubmitted > 0 ? `${((paid / formSubmitted) * 100).toFixed(1)}% of forms` : ''}
-            accent={isDark ? 'text-brand-400' : 'text-brand-600'}
-            isDark={isDark}
-          />
-          <HeroMetric
             value={`${conversionRate}%`}
-            label="Conversion Rate"
-            sub="clicked → paid"
-            accent={paid > 0 ? (isDark ? 'text-brand-400' : 'text-brand-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}
+            label="Click → Form rate"
+            sub="of clicked users"
+            accent={formSubmitted > 0 ? (isDark ? 'text-brand-400' : 'text-brand-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}
             isDark={isDark}
           />
         </div>
 
         <div className="flex items-center gap-2 mt-4">
           <FunnelStep label="Clicked" value={totalClicked} total={totalClicked} color="text-blue-500" isDark={isDark} />
-          <FunnelStep label="Form" value={formSubmitted} total={totalClicked} color="text-amber-500" isDark={isDark} />
-          <FunnelStep label="Paid" value={paid} total={totalClicked} color="text-brand-500" isLast isDark={isDark} />
+          <FunnelStep label="Form" value={formSubmitted} total={totalClicked} color="text-amber-500" isLast isDark={isDark} />
         </div>
       </div>
 
@@ -123,102 +104,43 @@ export default function EmailPaymentConversion({ data, theme, dataMasked }) {
         {sortedSubjects.length > 0 ? (
           <div className="space-y-1">
             {sortedSubjects.map((row) => {
-              const isExpanded = expandedRow === row.subject
               const barWidth = maxClicked > 0 ? (row.clicked / maxClicked) * 100 : 0
 
-              const subjectPaidDetails = paidDetails?.filter((d) => {
-                const subjectEmails = perSubject?.[row.subject]
-                if (!subjectEmails) return false
-                return true
-              }) || []
-
               return (
-                <div key={row.subject} className={`rounded-xl overflow-hidden transition-all ${isExpanded ? (isDark ? 'bg-slate-900/60 ring-1 ring-slate-700' : 'bg-slate-50 ring-1 ring-slate-200') : ''}`}>
-                  <div
-                    onClick={() => setExpandedRow(isExpanded ? null : row.subject)}
-                    className={`flex items-center gap-4 px-4 py-3 cursor-pointer rounded-xl transition-colors ${
-                      isExpanded ? '' : isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <svg className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''} ${isDark ? 'text-slate-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={row.subject}>{row.subject}</span>
-                        {row.paid > 0 && (
-                          <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
-                            {row.paid} paid
-                          </span>
-                        )}
-                        {row.formSubmitted > 0 && (
-                          <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
-                            {row.formSubmitted} forms
-                          </span>
-                        )}
-                      </div>
-                      <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-brand-500 to-brand-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
-                      </div>
+                <div
+                  key={row.subject}
+                  className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-colors ${
+                    isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={row.subject}>{row.subject}</span>
+                      {row.formSubmitted > 0 && (
+                        <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+                          {row.formSubmitted} forms
+                        </span>
+                      )}
                     </div>
-
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <div className="text-center w-14">
-                        <p className={`text-sm font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{row.clicked.toLocaleString('en-IN')}</p>
-                        <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Clicked</p>
-                      </div>
-                      <div className="text-center w-14">
-                        <p className={`text-sm font-bold ${row.formSubmitted > 0 ? (isDark ? 'text-amber-400' : 'text-amber-600') : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{row.formSubmitted.toLocaleString('en-IN')}</p>
-                        <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Forms</p>
-                      </div>
-                      <div className="text-center w-14">
-                        <p className={`text-sm font-bold ${row.paid > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{row.paid.toLocaleString('en-IN')}</p>
-                        <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Paid</p>
-                      </div>
-                      <div className={`text-center w-14 px-2 py-1 rounded-lg ${row.rate > 0 ? (isDark ? 'bg-brand-900/30' : 'bg-brand-50') : ''}`}>
-                        <p className={`text-sm font-bold ${row.rate > 0 ? 'text-brand-500' : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{row.rate}%</p>
-                        <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Rate</p>
-                      </div>
+                    <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                      <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-amber-500 transition-all duration-700" style={{ width: `${barWidth}%` }} />
                     </div>
                   </div>
 
-                  {isExpanded && row.paid > 0 && (
-                    <div className={`mx-4 mb-3 rounded-lg overflow-hidden border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                      <div className="max-h-[280px] overflow-y-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className={isDark ? 'bg-slate-800' : 'bg-slate-50'}>
-                              <th className={`text-left px-4 py-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>#</th>
-                              <th className={`text-left px-4 py-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Email</th>
-                              <th className={`text-left px-4 py-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Application</th>
-                              <th className={`text-left px-4 py-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Amount</th>
-                              <th className={`text-left px-4 py-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                            {(paidDetails || []).filter((d) => d.email).map((d, i) => (
-                              <tr key={d.email}>
-                                <td className={`px-4 py-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{i + 1}</td>
-                                <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{me(d.email)}</td>
-                                <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{d.application_no || '—'}</td>
-                                <td className={`px-4 py-2 font-mono text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{d.payment_amount || '—'}</td>
-                                <td className="px-4 py-2">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-brand-900/40 text-brand-400' : 'bg-brand-100 text-brand-700'}`}>
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                    Paid
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="text-center w-14">
+                      <p className={`text-sm font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{row.clicked.toLocaleString('en-IN')}</p>
+                      <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Clicked</p>
                     </div>
-                  )}
-
-                  {isExpanded && row.paid === 0 && (
-                    <p className={`text-xs text-center py-5 mx-4 mb-3 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>No completed payments for this subject</p>
-                  )}
+                    <div className="text-center w-14">
+                      <p className={`text-sm font-bold ${row.formSubmitted > 0 ? (isDark ? 'text-amber-400' : 'text-amber-600') : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{row.formSubmitted.toLocaleString('en-IN')}</p>
+                      <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Forms</p>
+                    </div>
+                    <div className={`text-center w-14 px-2 py-1 rounded-lg ${row.formRate > 0 ? (isDark ? 'bg-amber-900/30' : 'bg-amber-50') : ''}`}>
+                      <p className={`text-sm font-bold ${row.formRate > 0 ? (isDark ? 'text-amber-400' : 'text-amber-600') : isDark ? 'text-slate-600' : 'text-slate-300'}`}>{row.formRate}%</p>
+                      <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Form %</p>
+                    </div>
+                  </div>
                 </div>
               )
             })}

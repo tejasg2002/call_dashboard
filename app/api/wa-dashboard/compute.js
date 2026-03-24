@@ -4,6 +4,7 @@ import { isOnOrAfter, parseOptDate } from '../../../src/lib/conversionAttributio
 const DB = 'itm'
 const WA_COL = 'marketingwa'
 const APPS_COL = 'npfMbaApplications'
+const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
 const CACHE_COL = 'wa_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
@@ -229,51 +230,22 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
 
   const appsCol = db.collection(APPS_COL)
 
-  const [formSubmittedAgg, paidAgg] = await Promise.all([
-    normalisedClickedMobiles.length > 0
-      ? appsCol.aggregate([
-          {
-            $match: {
-              'personal_details.mobile_number': { $in: normalisedClickedMobiles },
-              'application_detail.application_no': { $ne: '' },
-            },
+  const formSubmittedAgg = normalisedClickedMobiles.length > 0
+    ? await appsCol.aggregate([
+        {
+          $match: {
+            'personal_details.mobile_number': { $in: normalisedClickedMobiles },
+            'application_detail.application_no': { $ne: '' },
           },
-          {
-            $group: {
-              _id: '$personal_details.mobile_number',
-              formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
-            },
+        },
+        {
+          $group: {
+            _id: '$personal_details.mobile_number',
+            formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
           },
-        ]).toArray()
-      : Promise.resolve([]),
-
-    normalisedClickedMobiles.length > 0
-      ? appsCol.aggregate([
-          {
-            $match: {
-              'personal_details.mobile_number': { $in: normalisedClickedMobiles },
-              'payment_details.payment_receipt_no1': { $nin: [null, ''] },
-            },
-          },
-          {
-            $group: {
-              _id: '$personal_details.mobile_number',
-              paidAt: {
-                $max: {
-                  $ifNull: [
-                    '$payment_details.payment_date',
-                    '$application_detail.payment_date',
-                  ],
-                },
-              },
-              docCreated: { $max: '$createdAt' },
-              application_no: { $first: '$application_detail.application_no' },
-              payment_amount: { $first: '$payment_details.payment_amount1' },
-            },
-          },
-        ]).toArray()
-      : Promise.resolve([]),
-  ])
+        },
+      ]).toArray()
+    : []
 
   const formSubmittedResult = formSubmittedAgg.filter((r) => {
     const norm = normaliseMobile(r._id)
@@ -282,21 +254,10 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     return isOnOrAfter(r.formSubmittedAt, anchor)
   })
 
-  const paidResult = paidAgg.filter((r) => {
-    const norm = normaliseMobile(r._id)
-    const anchor = firstOutboundByNorm.get(norm)
-    if (!anchor) return false
-    const paidTs = r.paidAt != null ? r.paidAt : r.docCreated
-    if (paidTs == null) return false
-    return isOnOrAfter(paidTs, anchor)
-  })
-
   const formSubmittedCount = formSubmittedResult.length
-  const paidCount = paidResult.length
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
-  const paidMobiles = paidResult.map((r) => r._id)
 
-  const convertedMobiles = [...new Set([...formSubmittedMobiles, ...paidMobiles])]
+  const convertedMobiles = [...new Set(formSubmittedMobiles)]
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol.aggregate([
         { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
@@ -318,26 +279,15 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     })
   }
 
+  const formConversionRate = clickedPhones.length > 0
+    ? parseFloat(((formSubmittedCount / clickedPhones.length) * 100).toFixed(2))
+    : 0
+
   const paymentConversion = {
     totalClicked: clickedPhones.length,
     formSubmitted: formSubmittedCount,
-    paid: paidCount,
-    conversionRate: clickedPhones.length > 0
-      ? parseFloat(((paidCount / clickedPhones.length) * 100).toFixed(2))
-      : 0,
+    conversionRate: formConversionRate,
     formSubmittedMobiles,
-    paidMobiles,
-    paidDetails: paidResult.map((r) => {
-      const norm = normaliseMobile(r._id)
-      const attr = clickAttrMap.get(norm)
-      return {
-        mobile: r._id,
-        application_no: r.application_no,
-        payment_amount: r.payment_amount,
-        clickedTemplates: attr?.templates || [],
-        clickedButtons: attr?.buttons || [],
-      }
-    }),
     formSubmittedDetails: formSubmittedMobiles.map((m) => {
       const norm = normaliseMobile(m)
       const attr = clickAttrMap.get(norm)
@@ -390,10 +340,49 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     },
   ]).toArray()
 
+  const phoneVariantsForLead = [
+    ...new Set(
+      clickBreakdownResult
+        .map((r) => r._id)
+        .filter(Boolean)
+        .flatMap((p) => {
+          const n = normaliseMobile(p)
+          if (!n) return []
+          const v = [n]
+          if (n.length === 10) v.push(`91${n}`)
+          return v
+        }),
+    ),
+  ]
+
+  const crmSnapshotCol = db.collection(CRM_SNAPSHOT_COL)
+  const leadByNormMobile = new Map()
+  if (phoneVariantsForLead.length > 0) {
+    const leadDocs = await crmSnapshotCol
+      .find({
+        $or: [
+          { mobile: { $in: phoneVariantsForLead } },
+          { alternate_mobile: { $in: phoneVariantsForLead } },
+        ],
+      })
+      .sort({ _id: -1 })
+      .project({ mobile: 1, alternate_mobile: 1, lead_id: 1 })
+      .toArray()
+    for (const doc of leadDocs) {
+      const lid = doc.lead_id != null && String(doc.lead_id).trim() !== '' ? String(doc.lead_id) : ''
+      if (!lid) continue
+      for (const raw of [doc.mobile, doc.alternate_mobile]) {
+        const key = normaliseMobile(raw)
+        if (key && !leadByNormMobile.has(key)) leadByNormMobile.set(key, lid)
+      }
+    }
+  }
+
   const clickBreakdown = clickBreakdownResult
     .filter((r) => r._id)
     .map((r) => ({
       phone: r._id,
+      leadId: leadByNormMobile.get(normaliseMobile(r._id)) || null,
       totalClicks: r.clicks.length,
       clicks: r.clicks.slice(0, 20),
     }))

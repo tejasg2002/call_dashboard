@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { maskPhone } from '../../lib/userManagement'
 
 function FunnelStep({ label, value, total, color, isLast, isDark }) {
@@ -44,7 +43,6 @@ function TagList({ items, color, isDark }) {
 
 export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
   const isDark = theme === 'dark'
-  const [activeTab, setActiveTab] = useState('paid')
   const mp = (phone) => dataMasked ? maskPhone(phone) : phone
 
   if (!data) return null
@@ -52,27 +50,24 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
   const {
     totalClicked = 0,
     formSubmitted = 0,
-    paid = 0,
     conversionRate = 0,
-    paidDetails = [],
     formSubmittedDetails = [],
   } = data
 
   const funnelSteps = [
     { label: 'Clicked', value: totalClicked, color: 'text-amber-500' },
     { label: 'Form Submitted', value: formSubmitted, color: 'text-blue-500' },
-    { label: 'Paid', value: paid, color: 'text-emerald-500' },
-  ]
-
-  const tabs = [
-    { key: 'paid', label: 'Paid Users', count: paidDetails.length },
-    { key: 'forms', label: 'Form Submitted', count: formSubmittedDetails?.length || 0 },
   ]
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white border-slate-200'}`}>
       <div className="px-6 py-5">
-        <div className="grid grid-cols-3 gap-8 mb-6">
+        <h3 className={`text-sm font-semibold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Form conversion</h3>
+        <p className={`text-[11px] mb-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Clicked users with an MBA application (application no.) after first template send/deliver.
+        </p>
+
+        <div className="grid grid-cols-2 gap-8 mb-6">
           {funnelSteps.map((s) => (
             <div key={s.label} className="text-center">
               <p className={`text-2xl font-bold tracking-tight ${s.color}`}>{s.value.toLocaleString('en-IN')}</p>
@@ -97,91 +92,45 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
 
         {conversionRate > 0 && (
           <p className={`text-center text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Click → Payment conversion rate: <span className="font-bold text-emerald-500">{conversionRate}%</span>
+            Click → Form rate: <span className="font-bold text-blue-500">{conversionRate}%</span>
           </p>
         )}
       </div>
 
-      {(paidDetails.length > 0 || (formSubmittedDetails?.length || 0) > 0) && (
+      {(formSubmittedDetails?.length || 0) > 0 && (
         <div className={`border-t ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
-          <div className="px-6 pt-4 pb-2 flex items-center gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                  activeTab === tab.key
-                    ? isDark ? 'bg-slate-700 text-white' : 'bg-slate-900 text-white'
-                    : isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                {tab.label} ({tab.count})
-              </button>
-            ))}
+          <div className="px-6 pt-4 pb-2">
+            <p className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+              Form submitted ({formSubmittedDetails.length})
+            </p>
           </div>
-
           <div className="px-6 pb-4">
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
               <div className="max-h-80 overflow-y-auto">
-                {activeTab === 'paid' && (
-                  <table className="w-full text-[11px]">
-                    <thead className={isDark ? 'bg-slate-800 sticky top-0' : 'bg-white sticky top-0'}>
-                      <tr>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Mobile</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Application</th>
-                        <th className={`px-3 py-2 text-right font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Amount</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Template Clicked</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button Clicked</th>
+                <table className="w-full text-[11px]">
+                  <thead className={isDark ? 'bg-slate-800 sticky top-0' : 'bg-white sticky top-0'}>
+                    <tr>
+                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
+                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Mobile</th>
+                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Template Clicked</th>
+                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button Clicked</th>
+                    </tr>
+                  </thead>
+                  <tbody className={isDark ? 'divide-y divide-slate-800' : 'divide-y divide-slate-200'}>
+                    {(formSubmittedDetails || []).map((u, idx) => (
+                      <tr key={u.mobile}>
+                        <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
+                        <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
+                        <td className="px-3 py-2">
+                          <TagList items={u.clickedTemplates} color={isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-700'} isDark={isDark} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <TagList items={u.clickedButtons} color={isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-50 text-amber-700'} isDark={isDark} />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className={isDark ? 'divide-y divide-slate-800' : 'divide-y divide-slate-200'}>
-                      {paidDetails.map((u, idx) => (
-                        <tr key={u.mobile}>
-                          <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
-                          <td className={`px-3 py-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{u.application_no || '—'}</td>
-                          <td className={`px-3 py-2 text-right font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                            {u.payment_amount ? `₹${Number(u.payment_amount).toLocaleString('en-IN')}` : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <TagList items={u.clickedTemplates} color={isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-700'} isDark={isDark} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <TagList items={u.clickedButtons} color={isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-50 text-amber-700'} isDark={isDark} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-
-                {activeTab === 'forms' && (
-                  <table className="w-full text-[11px]">
-                    <thead className={isDark ? 'bg-slate-800 sticky top-0' : 'bg-white sticky top-0'}>
-                      <tr>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Mobile</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Template Clicked</th>
-                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button Clicked</th>
-                      </tr>
-                    </thead>
-                    <tbody className={isDark ? 'divide-y divide-slate-800' : 'divide-y divide-slate-200'}>
-                      {(formSubmittedDetails || []).map((u, idx) => (
-                        <tr key={u.mobile}>
-                          <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                          <td className={`px-3 py-2 font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
-                          <td className="px-3 py-2">
-                            <TagList items={u.clickedTemplates} color={isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-700'} isDark={isDark} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <TagList items={u.clickedButtons} color={isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-50 text-amber-700'} isDark={isDark} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -189,7 +138,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
       )}
 
       <div className={`px-6 py-3 border-t text-[10px] ${isDark ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-        Form &amp; payment counts only include records with timestamps on or after the first sent/delivered WhatsApp for that number. Sourced from npfMbaApplications + marketingwa.
+        Form counts only include applications with timestamps on or after the first sent/delivered WhatsApp for that number. npfMbaApplications + marketingwa.
       </div>
     </div>
   )

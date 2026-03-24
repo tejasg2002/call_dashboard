@@ -35,12 +35,12 @@ export async function GET(request) {
         rawDocCount: waResult.rawDocCount,
         templateRows: waResult.templateRows?.length,
         formSubmitted: waResult.formSubmittedCount,
-        paid: waResult.paymentConversion?.paid,
         computeTime: waResult.elapsed,
       },
       email: {
         rawDocCount: emailResult.rawDocCount,
         templateRows: emailResult.templateRows?.length,
+        formSubmitted: emailResult.emailPaymentConversion?.formSubmitted,
         computeTime: emailResult.elapsed,
       },
       sourceStats: {

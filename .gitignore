@@ -16,6 +16,7 @@ build/
 # Service account key - NEVER commit
 serviceAccountKey.json
 *-service-account*.json
+itm-recordss*.json
 
 # Editor directories
 .idea/

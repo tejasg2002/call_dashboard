@@ -4,6 +4,7 @@ import { isOnOrAfter } from '../../../src/lib/conversionAttribution'
 const DB = 'itm'
 const EMAIL_COL = 'aws_ses_webhook_ibs'
 const APPS_COL = 'npfMbaApplications'
+const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
 const CACHE_COL = 'email_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
@@ -273,10 +274,54 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     return false
   }
 
+  const crmSnapshotCol = db.collection(CRM_SNAPSHOT_COL)
+  const clickEmailsForLead = [...new Set(clickBreakdownResult.map((r) => r._id).filter(Boolean))]
+  const leadByEmail = new Map()
+  if (clickEmailsForLead.length > 0) {
+    const leadRows = await crmSnapshotCol
+      .aggregate([
+        {
+          $match: {
+            $expr: {
+              $in: [
+                {
+                  $toLower: {
+                    $trim: {
+                      input: { $ifNull: ['$email', ''] },
+                    },
+                  },
+                },
+                clickEmailsForLead,
+              ],
+            },
+          },
+        },
+        { $sort: { _id: -1 } },
+        {
+          $group: {
+            _id: {
+              $toLower: {
+                $trim: {
+                  input: { $ifNull: ['$email', ''] },
+                },
+              },
+            },
+            leadId: { $first: { $ifNull: ['$lead_id', ''] } },
+          },
+        },
+      ])
+      .toArray()
+    for (const row of leadRows) {
+      const lid = row.leadId != null && String(row.leadId).trim() !== '' ? String(row.leadId) : ''
+      if (row._id && lid) leadByEmail.set(row._id, lid)
+    }
+  }
+
   const clickBreakdown = clickBreakdownResult
     .filter((r) => r._id)
     .map((r) => ({
       email: r._id,
+      leadId: leadByEmail.get(r._id) || null,
       totalClicks: r.clicks.length,
       clicks: r.clicks.slice(0, 20),
     }))

@@ -20,8 +20,10 @@ function getClickLink(raw) {
   return getDetail(raw).click?.link || ''
 }
 function getTimestamp(raw) {
-  const d = getInner(raw)
-  return d.time || d.createdAt || raw.timestamp || ''
+  const inner = getInner(raw)
+  const clickTs = getDetail(raw).click?.timestamp
+  if (clickTs) return clickTs
+  return inner.time || inner.createdAt || raw.timestamp || ''
 }
 
 // Extract a rich mail-header object for the preview card (captured once per subject)
