@@ -134,6 +134,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
 
   // Fetch lead IDs for the current page only
   useEffect(() => {
+    if (dataMasked) return
     if (!shown.length) return
     const toFetch = shown.map((u) => u.phone).filter((p) => !(p in leadMap))
     if (!toFetch.length) return
@@ -147,7 +148,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
         setLeadMap((prev) => ({ ...prev, [phone]: result?.lead_id || null }))
       })
     })
-  }, [page, stage])
+  }, [page, stage, dataMasked])
 
   const copyText = (text) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -192,7 +193,9 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                 <span className={`text-[12px] font-mono font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                   {displayPhone}
                 </span>
-                {leadId === 'loading' ? (
+                {dataMasked ? (
+                  <span className={`text-[10px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</span>
+                ) : leadId === 'loading' ? (
                   <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                     <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   </span>

@@ -35,11 +35,12 @@ function formatTime(ts) {
 }
 
 // ── CRM Lead badge ─────────────────────────────────────────────────────────────
-function LeadInfo({ emailAddress, isDark }) {
+function LeadInfo({ emailAddress, isDark, dataMasked }) {
   const [lead, setLead]     = useState(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    if (dataMasked) return
     if (!emailAddress || emailAddress.includes('*')) { setLead(false); return }
     setLead(null)
     let cancelled = false
@@ -47,11 +48,13 @@ function LeadInfo({ emailAddress, isDark }) {
       if (!cancelled) setLead(result || false)
     })
     return () => { cancelled = true }
-  }, [emailAddress])
+  }, [emailAddress, dataMasked])
 
   const copy = (text) => {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
+
+  if (dataMasked) return null
 
   if (lead === null) {
     return (
@@ -179,7 +182,7 @@ function SubjectStageLine({ subjectName, stageMap, isDark, rowIndex }) {
 }
 
 // ── Email card ─────────────────────────────────────────────────────────────────
-function EmailCard({ email, rawEmail, events, isDark }) {
+function EmailCard({ email, rawEmail, events, isDark, dataMasked }) {
   const [expanded, setExpanded] = useState(false)
   const lastEvent = events[0]
   const lastTs    = formatTime(lastEvent?.timestamp)
@@ -261,7 +264,7 @@ function EmailCard({ email, rawEmail, events, isDark }) {
           <div style={{ animation: 'emailBodyIn 0.2s ease both' }}>
             {/* CRM Lead lookup */}
             <div className="px-4 pt-3 pb-2">
-              <LeadInfo emailAddress={rawEmail || email} isDark={isDark} />
+              <LeadInfo emailAddress={rawEmail || email} isDark={isDark} dataMasked={dataMasked} />
             </div>
 
             {/* Horizontal per-subject stage rows */}
@@ -364,6 +367,7 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
                 rawEmail={rawEmail}
                 events={events}
                 isDark={isDark}
+                dataMasked={dataMasked}
               />
             ))}
             {!search.trim() && byEmail.length > 8 && (

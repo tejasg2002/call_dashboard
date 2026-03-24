@@ -46,6 +46,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
   useEffect(() => { setPage(0); setLeadMap({}) }, [stage])
 
   useEffect(() => {
+    if (dataMasked) return
     if (!shown.length) return
     const toFetch = shown.map((u) => u.email).filter((e) => !(e in leadMap))
     if (!toFetch.length) return
@@ -59,7 +60,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
         setLeadMap((prev) => ({ ...prev, [email]: result?.lead_id || null }))
       })
     })
-  }, [page, stage])
+  }, [page, stage, dataMasked])
 
   const copyText = (text) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -104,7 +105,9 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                   {displayEmail}
                 </span>
                 {/* Lead ID */}
-                {leadId === 'loading' ? (
+                {dataMasked ? (
+                  <span className={`text-[10px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</span>
+                ) : leadId === 'loading' ? (
                   <span className="inline-block w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
                 ) : leadId ? (
                   <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-700/40 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>

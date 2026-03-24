@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { maskEmail } from '../../lib/userManagement'
+import { maskEmail, redactLeadIdForViewer } from '../../lib/userManagement'
 import { cn } from '../../lib/utils'
 
 export default function EmailClickBreakdown({ data, theme, dataMasked }) {
@@ -13,13 +13,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
 
   const me = (email) => (dataMasked ? maskEmail(email) : email)
 
-  const ml = (leadId) => {
-    if (leadId == null || leadId === '') return '—'
-    const s = String(leadId)
-    if (!dataMasked) return s
-    if (s.length <= 3) return '***'
-    return '*'.repeat(s.length - 3) + s.slice(-3)
-  }
+  const ml = (leadId) => redactLeadIdForViewer(leadId, dataMasked)
 
   const allTemplates = useMemo(() => {
     if (!data) return []
@@ -48,11 +42,11 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
     let result = data
     if (search) {
       const q = search.toLowerCase().trim()
-      result = result.filter(
-        (u) =>
-          u.email?.toLowerCase().includes(q)
-          || String(u.leadId ?? '').toLowerCase().includes(q),
-      )
+      result = result.filter((u) => {
+        if (u.email?.toLowerCase().includes(q)) return true
+        if (!dataMasked && String(u.leadId ?? '').toLowerCase().includes(q)) return true
+        return false
+      })
     }
     if (filterTemplate || filterButton) {
       result = result
@@ -68,7 +62,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
         .filter(Boolean)
     }
     return result
-  }, [data, search, filterTemplate, filterButton])
+  }, [data, search, filterTemplate, filterButton, dataMasked])
 
   if (!data || data.length === 0) return null
 
@@ -186,7 +180,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
                       <div className="w-[132px] shrink-0 min-w-0 overflow-hidden pr-1">
                         <span
                           className={cn('block w-full font-mono text-[10px] truncate', isDark ? 'text-slate-300' : 'text-slate-700')}
-                          title={u.leadId ? String(u.leadId) : undefined}
+                          title={!dataMasked && u.leadId ? String(u.leadId) : undefined}
                         >
                           {ml(u.leadId)}
                         </span>

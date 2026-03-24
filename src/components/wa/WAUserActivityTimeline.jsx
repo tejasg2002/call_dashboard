@@ -23,11 +23,12 @@ function formatTime(ts) {
 }
 
 /* ─── CRM Lead badge ────────────────────────────────────────────────── */
-function LeadInfo({ phoneNumber, isDark }) {
+function LeadInfo({ phoneNumber, isDark, dataMasked }) {
   const [lead, setLead] = useState(null)   // null = loading, false = not found, object = found
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    if (dataMasked) return
     if (!phoneNumber || phoneNumber.includes('*')) {
       setLead(false)
       return
@@ -38,7 +39,7 @@ function LeadInfo({ phoneNumber, isDark }) {
       if (!cancelled) setLead(result || false)
     })
     return () => { cancelled = true }
-  }, [phoneNumber])
+  }, [phoneNumber, dataMasked])
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -46,6 +47,8 @@ function LeadInfo({ phoneNumber, isDark }) {
       setTimeout(() => setCopied(false), 2000)
     })
   }
+
+  if (dataMasked) return null
 
   if (lead === null) {
     return (
@@ -203,7 +206,7 @@ const LEAD_TAG = {
 }
 
 /* ─── Phone card ────────────────────────────────────────────────────── */
-function PhoneCard({ phone_number, rawPhone, events, isDark }) {
+function PhoneCard({ phone_number, rawPhone, events, isDark, dataMasked }) {
   const [expanded, setExpanded] = useState(false)
   const lastEvent = events[0]
   const lastTs = formatTime(lastEvent?._resolvedTs || lastEvent?.event_timestamp || lastEvent?.timestamp)
@@ -305,7 +308,7 @@ function PhoneCard({ phone_number, rawPhone, events, isDark }) {
           <div style={{ animation: 'waBodyIn 0.2s ease both' }}>
             {/* CRM Lead lookup */}
             <div className="px-4 pt-3 pb-2">
-              <LeadInfo phoneNumber={rawPhone || phone_number} isDark={isDark} />
+              <LeadInfo phoneNumber={rawPhone || phone_number} isDark={isDark} dataMasked={dataMasked} />
             </div>
 
             {/* Horizontal per-template stage rows */}
@@ -459,6 +462,7 @@ export default function WAUserActivityTimeline({ byPhone, theme, isAdmin, dataMa
                 rawPhone={rawPhone}
                 events={events}
                 isDark={isDark}
+                dataMasked={dataMasked}
               />
             ))}
             {!searchPhone.trim() && leadFilter === 'all' && byPhone.length > 50 && (

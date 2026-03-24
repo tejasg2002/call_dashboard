@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { maskPhone } from '../../lib/userManagement'
+import { maskPhone, redactLeadIdForViewer } from '../../lib/userManagement'
 import { cn } from '../../lib/utils'
 
 export default function WAClickBreakdown({ data, theme, dataMasked }) {
@@ -48,11 +48,11 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
     let result = data
     if (search) {
       const q = search.trim()
-      result = result.filter(
-        (u) =>
-          u.phone?.includes(q)
-          || String(u.leadId ?? '').includes(q),
-      )
+      result = result.filter((u) => {
+        if (u.phone?.includes(q)) return true
+        if (!dataMasked && String(u.leadId ?? '').includes(q)) return true
+        return false
+      })
     }
     if (filterTemplate || filterButton) {
       result = result
@@ -68,7 +68,7 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
         .filter(Boolean)
     }
     return result
-  }, [data, search, filterTemplate, filterButton])
+  }, [data, search, filterTemplate, filterButton, dataMasked])
 
   if (!data || data.length === 0) return null
 
@@ -173,7 +173,7 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
                       <div className="w-[132px] shrink-0 min-w-0 overflow-hidden pr-1">
                         <span
                           className={cn("block w-full font-mono text-[10px] truncate", isDark ? "text-slate-300" : "text-slate-700")}
-                          title={u.leadId ? String(u.leadId) : undefined}
+                          title={!dataMasked && u.leadId ? String(u.leadId) : undefined}
                         >
                           {ml(u.leadId)}
                         </span>

@@ -138,3 +138,12 @@ export function maskEmail(email) {
   const [local, domain] = email.split('@')
   return (local[0] || '') + '***@' + domain
 }
+
+/**
+ * Lead IDs are hidden for restricted viewers (same audience as masked phone/email)—no partial fingerprint.
+ */
+export function redactLeadIdForViewer(leadId, dataMasked) {
+  if (leadId == null || leadId === '') return '—'
+  if (dataMasked) return '—'
+  return String(leadId)
+}
