@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { maskEmail, redactLeadIdForViewer } from '../../lib/userManagement'
+import { maskEmail, maskLeadId } from '../../lib/userManagement'
 import { cn } from '../../lib/utils'
 
 export default function EmailClickBreakdown({ data, theme, dataMasked }) {
@@ -12,8 +12,6 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
   const [filterButton, setFilterButton] = useState('')
 
   const me = (email) => (dataMasked ? maskEmail(email) : email)
-
-  const ml = (leadId) => redactLeadIdForViewer(leadId, dataMasked)
 
   const allTemplates = useMemo(() => {
     if (!data) return []
@@ -42,11 +40,11 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
     let result = data
     if (search) {
       const q = search.toLowerCase().trim()
-      result = result.filter((u) => {
-        if (u.email?.toLowerCase().includes(q)) return true
-        if (!dataMasked && String(u.leadId ?? '').toLowerCase().includes(q)) return true
-        return false
-      })
+      result = result.filter(
+        (u) =>
+          u.email?.toLowerCase().includes(q)
+          || String(u.leadId ?? '').toLowerCase().includes(q),
+      )
     }
     if (filterTemplate || filterButton) {
       result = result
@@ -62,7 +60,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
         .filter(Boolean)
     }
     return result
-  }, [data, search, filterTemplate, filterButton, dataMasked])
+  }, [data, search, filterTemplate, filterButton])
 
   if (!data || data.length === 0) return null
 
@@ -182,7 +180,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
                           className={cn('block w-full font-mono text-[10px] truncate', isDark ? 'text-slate-300' : 'text-slate-700')}
                           title={!dataMasked && u.leadId ? String(u.leadId) : undefined}
                         >
-                          {ml(u.leadId)}
+                          {maskLeadId(u.leadId, dataMasked)}
                         </span>
                       </div>
                       <div className="w-14 shrink-0 text-center">

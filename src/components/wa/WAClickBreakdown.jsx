@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { maskPhone, redactLeadIdForViewer } from '../../lib/userManagement'
+import { maskPhone, maskLeadId } from '../../lib/userManagement'
 import { cn } from '../../lib/utils'
 
 export default function WAClickBreakdown({ data, theme, dataMasked }) {
@@ -12,14 +12,6 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
   const [filterButton, setFilterButton] = useState('')
 
   const mp = (phone) => dataMasked ? maskPhone(phone) : phone
-
-  const ml = (leadId) => {
-    if (leadId == null || leadId === '') return '—'
-    const s = String(leadId)
-    if (!dataMasked) return s
-    if (s.length <= 3) return '***'
-    return '*'.repeat(s.length - 3) + s.slice(-3)
-  }
 
   const allTemplates = useMemo(() => {
     if (!data) return []
@@ -48,11 +40,11 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
     let result = data
     if (search) {
       const q = search.trim()
-      result = result.filter((u) => {
-        if (u.phone?.includes(q)) return true
-        if (!dataMasked && String(u.leadId ?? '').includes(q)) return true
-        return false
-      })
+      result = result.filter(
+        (u) =>
+          u.phone?.includes(q)
+          || String(u.leadId ?? '').includes(q),
+      )
     }
     if (filterTemplate || filterButton) {
       result = result
@@ -68,7 +60,7 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
         .filter(Boolean)
     }
     return result
-  }, [data, search, filterTemplate, filterButton, dataMasked])
+  }, [data, search, filterTemplate, filterButton])
 
   if (!data || data.length === 0) return null
 
@@ -175,7 +167,7 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
                           className={cn("block w-full font-mono text-[10px] truncate", isDark ? "text-slate-300" : "text-slate-700")}
                           title={!dataMasked && u.leadId ? String(u.leadId) : undefined}
                         >
-                          {ml(u.leadId)}
+                          {maskLeadId(u.leadId, dataMasked)}
                         </span>
                       </div>
                       <div className="w-14 shrink-0 text-center">

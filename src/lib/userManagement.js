@@ -140,10 +140,13 @@ export function maskEmail(email) {
 }
 
 /**
- * Lead IDs are hidden for restricted viewers (same audience as masked phone/email)—no partial fingerprint.
+ * Mask CRM lead id when dataMasked is true (non-admin / restricted users).
+ * Short ids: first 2 + … ; longer: first 4 + … + last 4
  */
-export function redactLeadIdForViewer(leadId, dataMasked) {
-  if (leadId == null || leadId === '') return '—'
-  if (dataMasked) return '—'
-  return String(leadId)
+export function maskLeadId(id, dataMasked) {
+  if (id == null || id === '') return '—'
+  const s = String(id)
+  if (!dataMasked) return s
+  if (s.length <= 8) return `${s.slice(0, 2)}…`
+  return `${s.slice(0, 4)}…${s.slice(-4)}`
 }

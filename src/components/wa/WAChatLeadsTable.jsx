@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { cn } from '../../lib/utils'
-import { redactLeadIdForViewer } from '../../lib/userManagement'
+import { maskLeadId } from '../../lib/userManagement'
 
 function maskPersonName(name, masked) {
   if (!name) return '—'
@@ -33,13 +33,14 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
     if (q.trim()) {
       const n = q.trim().toLowerCase()
       list = list.filter((r) => {
-        const parts = [r.slNo, r.registeredName, r.previousLeadStage, r.leadStage]
-        if (!dataMasked && r.leadId) parts.push(r.leadId)
-        return parts.join(' ').toLowerCase().includes(n)
+        const blob = [r.slNo, r.leadId, r.registeredName, r.previousLeadStage, r.leadStage]
+          .join(' ')
+          .toLowerCase()
+        return blob.includes(n)
       })
     }
     return list
-  }, [rows, q, stageFilter, dataMasked])
+  }, [rows, q, stageFilter])
 
   if (loading) {
     return (
@@ -128,7 +129,7 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
             {filtered.map((r, i) => (
               <tr key={`${r.leadId}-${i}`} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80'}>
                 <td className={cn('px-4 py-2 tabular-nums', isDark ? 'text-slate-500' : 'text-slate-400')}>{r.slNo || i + 1}</td>
-                <td className={cn('px-4 py-2 font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>{redactLeadIdForViewer(r.leadId, dataMasked)}</td>
+                <td className={cn('px-4 py-2 font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskLeadId(r.leadId, dataMasked)}</td>
                 <td className={cn('px-4 py-2 font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskPersonName(r.registeredName, dataMasked)}</td>
                 <td className={cn('px-4 py-2', isDark ? 'text-slate-400' : 'text-slate-600')}>{r.previousLeadStage || '—'}</td>
                 <td className="px-4 py-2">

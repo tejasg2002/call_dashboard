@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchLeadByMobile } from '../../lib/firebase'
 import { fetchWATemplateUsers } from '../../lib/waApi'
-import { maskPhone } from '../../lib/userManagement'
+import { maskPhone, maskLeadId } from '../../lib/userManagement'
 
 // ── WhatsApp text formatter ──────────────────────────────────────────────────
 function WAText({ text }) {
@@ -134,7 +134,6 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
 
   // Fetch lead IDs for the current page only
   useEffect(() => {
-    if (dataMasked) return
     if (!shown.length) return
     const toFetch = shown.map((u) => u.phone).filter((p) => !(p in leadMap))
     if (!toFetch.length) return
@@ -148,7 +147,7 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
         setLeadMap((prev) => ({ ...prev, [phone]: result?.lead_id || null }))
       })
     })
-  }, [page, stage, dataMasked])
+  }, [page, stage])
 
   const copyText = (text) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -193,34 +192,37 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                 <span className={`text-[12px] font-mono font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                   {displayPhone}
                 </span>
-                {dataMasked ? (
-                  <span className={`text-[10px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</span>
-                ) : leadId === 'loading' ? (
+                {leadId === 'loading' ? (
                   <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                     <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   </span>
                 ) : leadId ? (
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-700/40 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-lg border max-w-[200px] ${isDark ? 'bg-indigo-900/20 border-indigo-700/40 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}
+                    title={!dataMasked ? String(leadId) : undefined}
+                  >
                     <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    {leadId}
-                    <button
-                      type="button"
-                      onClick={() => copyText(leadId)}
-                      title="Copy lead ID"
-                      className={`ml-0.5 p-0.5 rounded transition-colors ${isDark ? 'hover:bg-indigo-700/50' : 'hover:bg-indigo-100'}`}
-                    >
-                      {copiedId === leadId ? (
-                        <svg className="w-2.5 h-2.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </button>
+                    <span className="truncate">{maskLeadId(leadId, dataMasked)}</span>
+                    {!dataMasked && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(leadId)}
+                        title="Copy lead ID"
+                        className={`ml-0.5 p-0.5 rounded transition-colors flex-shrink-0 ${isDark ? 'hover:bg-indigo-700/50' : 'hover:bg-indigo-100'}`}
+                      >
+                        {copiedId === leadId ? (
+                          <svg className="w-2.5 h-2.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </span>
                 ) : (
                   <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>No lead</span>

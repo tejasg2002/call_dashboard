@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { maskEmail } from '../../lib/userManagement'
+import { maskEmail, maskLeadId } from '../../lib/userManagement'
 import { fetchLeadByEmail } from '../../lib/firebase'
 
 const STAGES = {
@@ -40,7 +40,6 @@ function LeadInfo({ emailAddress, isDark, dataMasked }) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (dataMasked) return
     if (!emailAddress || emailAddress.includes('*')) { setLead(false); return }
     setLead(null)
     let cancelled = false
@@ -48,13 +47,11 @@ function LeadInfo({ emailAddress, isDark, dataMasked }) {
       if (!cancelled) setLead(result || false)
     })
     return () => { cancelled = true }
-  }, [emailAddress, dataMasked])
+  }, [emailAddress])
 
   const copy = (text) => {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
-
-  if (dataMasked) return null
 
   if (lead === null) {
     return (
@@ -78,15 +75,22 @@ function LeadInfo({ emailAddress, isDark, dataMasked }) {
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
         <span className="text-xs font-medium">CRM Lead ID</span>
       </div>
-      <span className={`font-mono text-xs flex-1 truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{lead.lead_id}</span>
-      <button onClick={() => copy(lead.lead_id)} title="Copy Lead ID"
-        className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-indigo-800/50 text-indigo-400' : 'hover:bg-indigo-100 text-indigo-500'}`}
+      <span
+        className={`font-mono text-xs flex-1 truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`}
+        title={!dataMasked ? String(lead.lead_id) : undefined}
       >
-        {copied
-          ? <svg className="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-          : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-        }
-      </button>
+        {maskLeadId(lead.lead_id, dataMasked)}
+      </span>
+      {!dataMasked && (
+        <button onClick={() => copy(lead.lead_id)} title="Copy Lead ID"
+          className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-indigo-800/50 text-indigo-400' : 'hover:bg-indigo-100 text-indigo-500'}`}
+        >
+          {copied
+            ? <svg className="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          }
+        </button>
+      )}
     </div>
   )
 }
