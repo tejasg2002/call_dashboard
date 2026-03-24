@@ -42,6 +42,25 @@ function normalizeRows(rawRows) {
   }))
 }
 
+function envWantsServiceAccount() {
+  return Boolean(
+    process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PATH?.trim()
+    || process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_B64?.trim()
+    || process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON?.trim(),
+  )
+}
+
+function isServiceAccountShape(obj) {
+  return (
+    obj != null
+    && typeof obj === 'object'
+    && typeof obj.client_email === 'string'
+    && obj.client_email.length > 0
+    && typeof obj.private_key === 'string'
+    && /BEGIN [A-Z ]*PRIVATE KEY/.test(obj.private_key)
+  )
+}
+
 /** @returns {object | null} */
 function parseServiceAccountCredentials() {
   const filePath = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PATH?.trim()
@@ -50,13 +69,17 @@ function parseServiceAccountCredentials() {
   try {
     if (filePath) {
       const abs = resolve(process.cwd(), filePath)
-      return JSON.parse(readFileSync(abs, 'utf8'))
+      const obj = JSON.parse(readFileSync(abs, 'utf8'))
+      return isServiceAccountShape(obj) ? obj : null
     }
     if (b64?.trim()) {
-      return JSON.parse(Buffer.from(b64.trim(), 'base64').toString('utf8'))
+      const cleaned = b64.replace(/\s+/g, '')
+      const obj = JSON.parse(Buffer.from(cleaned, 'base64').toString('utf8'))
+      return isServiceAccountShape(obj) ? obj : null
     }
     if (raw?.trim()) {
-      return JSON.parse(raw.trim())
+      const obj = JSON.parse(raw.trim())
+      return isServiceAccountShape(obj) ? obj : null
     }
   } catch (e) {
     console.error('[api/wa-chat-sheet] Invalid service account credentials', e)
@@ -257,6 +280,19 @@ export async function GET() {
 
   try {
     const credentials = parseServiceAccountCredentials()
+    if (!credentials && envWantsServiceAccount()) {
+      return Response.json(
+        {
+          error:
+            'Google Sheets service account env is set but credentials are invalid or incomplete. '
+            + 'For GOOGLE_SHEETS_SERVICE_ACCOUNT_B64: base64-encode the full JSON key file (entire file, no wrapping quotes). '
+            + 'On macOS: base64 -i your-key.json | tr -d \'\\n\' then paste the single line into the env var.',
+          rows: [],
+        },
+        { status: 502 },
+      )
+    }
+
     if (credentials) {
       const { headers, rawRows } = await fetchViaSheetsApi(credentials)
       const rows = normalizeRows(rawRows)
