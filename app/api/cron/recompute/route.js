@@ -47,6 +47,7 @@ export async function GET(request) {
         totalSources: sourceStatsResult.kpi?.totalSources,
         totalLeads: sourceStatsResult.kpi?.totalLeads,
         totalCalls: sourceStatsResult.kpi?.totalCalls,
+        ownerAttemptRows: sourceStatsResult.ownerAttemptRows?.length,
         computeTime: sourceStatsResult.elapsed,
       },
       sms: {

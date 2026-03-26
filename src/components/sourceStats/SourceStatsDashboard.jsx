@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTheme } from '../../../app/providers'
 import { fetchSourceStats } from '../../lib/sourceStatsApi'
 import { cn } from '../../lib/utils'
 import SourceKpiCards from './SourceKpiCards'
+import SourceOwnerAttemptTable from './SourceOwnerAttemptTable'
 import SourceTable from './SourceTable'
 import SourceCharts from './SourceCharts'
 import SourceCohortMatrix from './SourceCohortMatrix'
@@ -25,6 +27,7 @@ const formatDateInput = (date) => {
 }
 
 const SourceStatsDashboard = () => {
+  const { theme } = useTheme()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -208,6 +211,17 @@ const SourceStatsDashboard = () => {
         )}
 
         <SourceKpiCards kpi={data?.kpi} loading={loading} dateLabel={dateLabel} />
+
+        <SourceOwnerAttemptTable
+          rows={data?.ownerAttemptRows}
+          theme={theme}
+          loading={loading}
+          dateNote={
+            data?.ownerAttemptMeta
+              ? `IST · Today ${data.ownerAttemptMeta.todayIst} · Yesterday ${data.ownerAttemptMeta.yesterdayIst} · Day before ${data.ownerAttemptMeta.dayBeforeYesterdayIst} · Target = today leads × 3 · I&E Attempted = CRM phones with ≥1 call in last 7 IST days`
+              : undefined
+          }
+        />
 
         {data?.collectionCounts && (
           <div className={cn(
