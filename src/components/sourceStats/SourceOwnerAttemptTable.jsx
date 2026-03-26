@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { cn } from '../../lib/utils'
 
 function stripEmail(name) {
@@ -9,22 +10,42 @@ function stripEmail(name) {
 
 const COLS = [
   { key: 'ownerDisplay', label: 'Owner', align: 'left' },
-  { key: 'todayLeads', label: 'Today Leads', align: 'right' },
+  { key: 'todayLeads', label: 'Today Leads', align: 'right', heat: 'scale' },
   { key: 'targetAttempts', label: 'Target Attempts', align: 'right' },
-  { key: 'achievedAttempts', label: 'Achieved Attempts', align: 'right' },
-  { key: 'yesterdayLeads', label: 'Yesterday Leads', align: 'right' },
+  { key: 'achievedAttempts', label: 'Achieved Attempts', align: 'right', heat: 'pct', targetKey: 'targetAttempts' },
+  { key: 'yesterdayLeads', label: 'Yesterday Leads', align: 'right', heat: 'scale' },
   { key: 'yesterdayTargetAttempts', label: 'Yest Target Attempts', align: 'right' },
-  { key: 'yesterdayAttempts', label: 'Yesterday Attempts', align: 'right' },
-  { key: 'dayBeforeYesterdayLeads', label: 'Day B4 Yest Leads', align: 'right' },
+  { key: 'yesterdayAttempts', label: 'Yesterday Attempts', align: 'right', heat: 'pct', targetKey: 'yesterdayTargetAttempts' },
+  { key: 'dayBeforeYesterdayLeads', label: 'Day B4 Yest Leads', align: 'right', heat: 'scale' },
   { key: 'dayBeforeYesterdayTargetAttempts', label: 'Day B4 Yest Target', align: 'right' },
-  { key: 'dayBeforeYesterdayAttempts', label: 'Day B4 Yest Attempts', align: 'right' },
-  { key: 'totalIe', label: 'Total I&E', align: 'right' },
-  { key: 'ieAttempted', label: 'I&E Attempted', align: 'right' },
+  { key: 'dayBeforeYesterdayAttempts', label: 'Day B4 Yest Attempts', align: 'right', heat: 'pct', targetKey: 'dayBeforeYesterdayTargetAttempts' },
+  { key: 'totalIe', label: 'Total I&E', align: 'right', heat: 'scale' },
+  { key: 'ieAttempted', label: 'I&E Attempted', align: 'right', heat: 'scale' },
 ]
 
 function fmt(n) {
   if (n == null || n === '') return '—'
   return typeof n === 'number' ? n.toLocaleString('en-IN') : String(n)
+}
+
+/** % achieved vs target → red/yellow/green */
+function pctHeatBg(achieved, target) {
+  if (!target || target <= 0) return ''
+  const pct = achieved / target
+  if (pct >= 1) return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300'
+  if (pct >= 0.6) return 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+  if (pct > 0) return 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+  return ''
+}
+
+/** Intensity scale: higher value = stronger blue tint */
+function scaleHeatBg(value, maxVal) {
+  if (!value || value <= 0 || !maxVal) return ''
+  const ratio = Math.min(value / maxVal, 1)
+  if (ratio >= 0.75) return 'bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-200'
+  if (ratio >= 0.4) return 'bg-blue-50 dark:bg-blue-900/25 text-blue-800 dark:text-blue-300'
+  if (ratio > 0) return 'bg-blue-50/50 dark:bg-blue-900/15'
+  return ''
 }
 
 export default function SourceOwnerAttemptTable({
@@ -35,9 +56,25 @@ export default function SourceOwnerAttemptTable({
 }) {
   const list = Array.isArray(rows) ? rows : []
   const hasRows = list.length > 0
+
+  const colMaxes = useMemo(() => {
+    if (!hasRows) return {}
+    const m = {}
+    for (const c of COLS) {
+      if (c.heat !== 'scale') continue
+      let mx = 0
+      for (const row of list) {
+        const v = Number(row[c.key]) || 0
+        if (v > mx) mx = v
+      }
+      m[c.key] = mx
+    }
+    return m
+  }, [list, hasRows])
+
   const totalRow = hasRows
     ? list.reduce(
-      (acc, row) =>       ({
+      (acc, row) => ({
         owner: '__total__',
         ownerDisplay: 'Total',
         todayLeads: acc.todayLeads + (Number(row.todayLeads) || 0),
@@ -70,6 +107,16 @@ export default function SourceOwnerAttemptTable({
     )
     : null
 
+  function cellHeat(col, row) {
+    if (!col.heat) return ''
+    const val = Number(row[col.key]) || 0
+    if (col.heat === 'pct') {
+      const target = Number(row[col.targetKey]) || 0
+      return pctHeatBg(val, target)
+    }
+    return scaleHeatBg(val, colMaxes[col.key])
+  }
+
   return (
     <div
       className={cn(
@@ -89,11 +136,29 @@ export default function SourceOwnerAttemptTable({
               {dateNote}
             </p>
           )}
+          <div className="flex items-center gap-4 mt-2">
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+              <span className="inline-block w-3 h-3 rounded bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800" />
+              ≥100% target
+            </span>
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+              <span className="inline-block w-3 h-3 rounded bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800" />
+              60–99%
+            </span>
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+              <span className="inline-block w-3 h-3 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800" />
+              &lt;60%
+            </span>
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+              <span className="inline-block w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800" />
+              High value
+            </span>
+          </div>
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs min-w-[1040px]">
+        <table className="w-full text-xs min-w-[1200px]">
           <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-[1]">
             <tr>
               {COLS.map((c) => (
@@ -140,10 +205,11 @@ export default function SourceOwnerAttemptTable({
                     <td
                       key={c.key}
                       className={cn(
-                        'px-3 py-2 text-slate-800 dark:text-slate-200',
+                        'px-3 py-2',
                         c.align === 'right'
                           ? 'text-right font-mono tabular-nums'
                           : 'font-medium',
+                        cellHeat(c, row) || 'text-slate-800 dark:text-slate-200',
                       )}
                     >
                       {c.key === 'ownerDisplay' ? (
@@ -163,8 +229,9 @@ export default function SourceOwnerAttemptTable({
                   <td
                     key={c.key}
                     className={cn(
-                      'px-3 py-2.5 text-slate-900 dark:text-slate-100 font-semibold',
+                      'px-3 py-2.5 font-semibold',
                       c.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left',
+                      cellHeat(c, totalRow) || 'text-slate-900 dark:text-slate-100',
                     )}
                   >
                     {c.key === 'ownerDisplay' ? totalRow.ownerDisplay : fmt(totalRow[c.key])}
