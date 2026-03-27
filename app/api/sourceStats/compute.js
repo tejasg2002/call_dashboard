@@ -263,37 +263,7 @@ const CRM_LEAD_REGISTRATION_PROJECT = {
               {
                 $ifNull: [
                   '$createdAt',
-                  {
-                    $ifNull: [
-                      '$assignment.assignedAt',
-                      {
-                        $ifNull: [
-                          '$first_owner_assigned_date',
-                          {
-                            $ifNull: [
-                              '$firstOwnerAssignedDate',
-                              {
-                                $ifNull: [
-                                  '$npfData.firstOwnerAssignedDate',
-                                  {
-                                    $ifNull: [
-                                      '$_source.First Lead Owner Assigned Date',
-                                      {
-                                        $ifNull: [
-                                          '$_source.Re-assigned On',
-                                          { $ifNull: ['$createdDate', '$_source.Latest Registration Date'] },
-                                        ],
-                                      },
-                                    ],
-                                  },
-                                ],
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    ],
-                  },
+                  { $ifNull: ['$createdDate', '$_source.Latest Registration Date'] },
                 ],
               },
             ],
@@ -797,8 +767,7 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
   }
 
   for (const [mobile, regDate] of leadRegDates) {
-    const normOwner = phoneToOwnerNorm.get(mobile)
-    if (!normOwner) continue
+    const normOwner = phoneToOwnerNorm.get(mobile) || 'unassigned'
     const ymd = toDateStrIst(regDate)
     if (!ymd) continue
     const c = ensureLeadCounts(normOwner)
@@ -814,8 +783,7 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
    */
   const ownerCohortPhones = new Map() // normOwner -> { today: Set, yesterday: Set, dbYest: Set }
   for (const [phone, regDate] of leadRegDates) {
-    const normOwner = phoneToOwnerNorm.get(phone)
-    if (!normOwner) continue
+    const normOwner = phoneToOwnerNorm.get(phone) || 'unassigned'
     const ymd = toDateStrIst(regDate)
     if (!ymd) continue
     if (ymd !== todayIst && ymd !== yesterdayIst && ymd !== dayBeforeYesterdayIst) continue
@@ -954,11 +922,20 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
     ...ownerLeadDayCounts.keys(),
   ])
 
+  if (ownerLeadDayCounts.has('unassigned')) {
+    ownerNorms.add('unassigned')
+    if (!ownerDisplayNames.has('unassigned')) ownerDisplayNames.set('unassigned', 'Unassigned')
+  }
+
   const rows = [...ownerNorms]
-    .filter((norm) => norm != null && norm !== 'unassigned' || ownerLeadDayCounts.has('unassigned'))
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    .filter((norm) => norm != null)
+    .sort((a, b) => {
+      if (a === 'unassigned') return 1
+      if (b === 'unassigned') return -1
+      return a.localeCompare(b, undefined, { sensitivity: 'base' })
+    })
     .map((norm) => {
-      const displayLabel = ownerDisplayNames.get(norm) || norm
+      const displayLabel = ownerDisplayNames.get(norm) || (norm === 'unassigned' ? 'Unassigned' : norm)
       const lc = ownerLeadDayCounts.get(norm) || { today: 0, yesterday: 0, dbYest: 0 }
       const cohorts = ownerCohortPhones.get(norm) || { today: new Set(), yesterday: new Set(), dbYest: new Set() }
 
