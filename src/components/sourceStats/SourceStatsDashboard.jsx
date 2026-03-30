@@ -5,6 +5,7 @@ import { useTheme } from '../../../app/providers'
 import { fetchSourceStats } from '../../lib/sourceStatsApi'
 import { cn } from '../../lib/utils'
 import SourceKpiCards from './SourceKpiCards'
+import SmartPingCallStats from './SmartPingCallStats'
 import SourceOwnerAttemptTable from './SourceOwnerAttemptTable'
 import SourceTable from './SourceTable'
 import SourceCharts from './SourceCharts'
@@ -212,10 +213,16 @@ const SourceStatsDashboard = () => {
 
         <SourceKpiCards kpi={data?.kpi} loading={loading} dateLabel={dateLabel} />
 
+        <SmartPingCallStats
+          rows={data?.smartpingCallStats}
+          loading={loading}
+        />
+
         <SourceOwnerAttemptTable
           rows={data?.ownerAttemptRows}
           theme={theme}
           loading={loading}
+          onRefresh={() => loadData({ mode: 'fresh' })}
           dateNote={
             data?.ownerAttemptMeta
               ? `IST · Today ${data.ownerAttemptMeta.todayIst} · Yesterday ${data.ownerAttemptMeta.yesterdayIst} · Day before ${data.ownerAttemptMeta.dayBeforeYesterdayIst} · Target = today leads × 3 · I&E Attempted = CRM phones with ≥1 call in last 7 IST days`

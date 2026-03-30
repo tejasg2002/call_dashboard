@@ -12,9 +12,9 @@ This document explains how each column in the **Owner Activity** table is fetche
 - **Leads source (CRM DB)**
   - Database: `itm-crm`
   - Collection: `leads`
-- **Call attempts source (ITM DB)**
-  - Database: `itm`
-  - Collection: `callrecordings`
+- **Call attempts source (SmartPing)**
+  - Database: `analytics`
+  - Collection: `smartping_database`
 
 ---
 
@@ -65,7 +65,7 @@ Phone is read in this order:
 
 Lead cohort date is read in this order:
 
-1. `npfData.latestRegDate` — primary; aligns with Compass filters on this field (string range or regex on the `DD/MM/YYYY, …` value for “today” in IST)
+1. `npfData.latestRegDate` — primary; aligns with Compass filters on this field (string range or regex on the `DD/MM/YYYY, …` value for "today" in IST)
 2. `_source["User Registration Date"]` (example: `23/03/2026, 11:32:24 PM`)
 3. `npfData.registrationAttemptDate`
 4. `createdAt`
@@ -93,49 +93,26 @@ These phone sets are later used to compute today attempts by cohort.
 
 ---
 
-## Call Recordings Fetch (this is where “attempts” come from)
+## SmartPing Call Fetch (this is where "attempts" come from)
 
-All attempt-style metrics (**Achieved Attempts**, **Yesterday Attempts**, **Day before Yesterday Attempts**, and the **I&E** flags on those touches) are computed **only** from MongoDB:
+All attempt-style metrics (**Achieved Attempts**, **Yesterday Attempts**, **Day before Yesterday Attempts**, and **I&E Attempted**) are computed from the SmartPing call log:
 
-- **Database:** `itm`
-- **Collection:** `callrecordings` (see `RECORDINGS_COL` in `app/api/sourceStats/compute.js`)
+- **Database:** `analytics`
+- **Collection:** `smartping_database`
 
-There is **no** attempt count taken from CRM `stats`, NPF counters, or other collections for Owner Activity. One row in the pipeline after `$unwind` of `body.data` (or the synthetic single-item path) counts as **one attempt** if it has a valid phone and `eventAtDate`.
+Each SmartPing document represents a call event with fields:
+- `call_id` — unique identifier for the call
+- `agent_name` — e.g. `Yukta_Kamble` (not used for owner matching; phones are matched instead)
+- `customer_number` — 10-digit phone number
+- `call_start_time` — IST timestamp string `"YYYY-MM-DD HH:mm:ss"`
+- `event_name` — `Hangup`, `Answered`, `Ringing`, etc.
 
-The callrecordings pipeline:
+A single call can produce multiple events (Ringing → Answered → Hangup), so we **deduplicate by `{call_id, customer_number}`** — one `call_id` = one attempt.
 
-1. handles `body.data` as:
-   - array,
-   - single object,
-   - or fallback from root `phone_number`
-2. extracts phone from fallback chain:
-   - `body.data.call.phone_number`
-   - `body.data.phone_number`
-   - `body.data.call.customer_number`
-   - `body.data.mobile`
-   - `body.data.phone`
-   - `phone_number`
-   - `customer_phone`
-3. extracts event timestamp from fallback chain:
-   - `createdAt`
-   - `created_at`
-   - `updatedAt`
-   - `body.data.call.start_time`
-   - `body.data.call.created_at`
-   - `body.data.timestamp`
-   - `body.data.call.timestamp`
-   - `timestamp`
-4. converts event timestamp to `eventAtDate`
-5. keeps rows with non-empty phone and `eventAtDate >= lookbackStart` (30 days)
-6. computes:
-   - `ownerKey` from recording owner fields
-   - `isIe` via disposition regex:
-     - `i&e`, `i/e`, `information`, `enquiry`, `i.e.`, `inquiry`
+### Queries
 
-Finally it uses `$facet`:
-
-- `todayTouches`: calls only in today IST window, output `{ ownerKey, _phoneRaw, isIe }`
-- `totalIeByOwner`: 30-day I&E count grouped by owner
+1. **Today's calls by phone**: match `call_start_time` starting with today's IST date (`$regex: "^YYYY-MM-DD"`), group by `{call_id, phone}`, then count per phone.
+2. **Last 7 days calls**: match `call_start_time >= istSevenStart` (string comparison works for YYYY-MM-DD format), group by `{call_id, phone}`, then distinct phones (used for `ieAttempted`).
 
 ---
 
@@ -153,8 +130,7 @@ Finally it uses `$facet`:
 
 ### `Achieved Attempts`
 
-- Count of **today's calls (IST)** where:
-  - normalized call owner == row owner
+- Count of **today's SmartPing calls** where:
   - normalized call phone exists in owner's **today-assigned lead phone set**
 
 ### `Yesterday Leads`
@@ -164,8 +140,7 @@ Finally it uses `$facet`:
 
 ### `Yesterday Attempts`
 
-- Count of **today's calls (IST)** where:
-  - normalized call owner == row owner
+- Count of **today's SmartPing calls** where:
   - normalized call phone exists in owner's **yesterday-assigned lead phone set**
 
 ### `Day B4 Yest Leads`
@@ -175,33 +150,32 @@ Finally it uses `$facet`:
 
 ### `Day before Yesterday Attempts`
 
-- Count of **today's calls (IST)** where:
-  - normalized call owner == row owner
+- Count of **today's SmartPing calls** where:
   - normalized call phone exists in owner's **day-before-yesterday-assigned lead phone set**
 
 ### `Total I&E`
 
-- Source: `totalIeByOwner` facet
-- Meaning: 30-day I&E-like attempts count for the owner
+- Source: CRM leads where `stage.current` matches "Interested & Eligible"
+- Meaning: total I&E leads for this owner
 
 ### `I&E Attempted`
 
-- Count of **today's calls into today's cohort** where `isIe = true`
-- This is a subset of today's cohort attempts (`Achieved Attempts`)
+- Count of owner's I&E lead phones that had any SmartPing call in the last 7 IST days
 
 ---
 
 ## Important Notes
 
 - Phone matching uses normalized 10-digit mobile (`normaliseMobile(...)`) from CRM lead fields.
-- `normaliseMobile` strips non-digits and handles `+91` / `91` prefixes so values like `+91-7021315785` still match call recordings.
+- `normaliseMobile` strips non-digits and handles `+91` / `91` prefixes so values like `+91-7021315785` still match SmartPing `customer_number`.
+- SmartPing `customer_number` is typically already 10 digits; `normaliseMobile` handles edge cases.
 - Attempt columns are **not** pulled by call day buckets (today/yesterday/day-before); they are all based on **today calls into assignment cohorts**.
 - Owner display text is a formatted label; matching is done on normalized owner keys.
 
 ### Compass vs dashboard counts
 
 - In MongoDB Compass, use the field **`_source.User Registration Date`** (single underscore `_source`). A filter like **`__source.User Registration Date`** is a different field and can give wrong counts.
-- If **Owner attempts (CRM pool)** “Today Leads” was lower than Compass (e.g. 179 vs 420), typical causes were:
+- If **Owner attempts (CRM pool)** "Today Leads" was lower than Compass (e.g. 179 vs 420), typical causes were:
   - registration dates were taken only from **CallQ** `createdDate`, not `itm-crm.leads` **User Registration Date** (now merged into `leadRegDates`);
   - phones with formatting (`+91-…`, hyphens) were dropped before `normaliseMobile` was digit-based (fixed);
   - phones not present in the **CRM snapshot** sheet (`crmSnapshotMarch23`) had no owner until we **overlay** `itm-crm.leads` owner + phone on top of the snapshot.

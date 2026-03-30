@@ -3,11 +3,13 @@ import clientPromise from '../../../src/lib/mongodb'
 const ITM_DB = 'itm'
 const ITM_CRM_DB = 'itm-crm'
 const CALLQ_DB = 'callQ'
+const ANALYTICS_DB = 'analytics'
 const LEADS_COL = 'leads'
 const WEBHOOK_COL = 'callerDtWebhookLogs'
 const RECORDINGS_COL = 'callrecordings'
+const SMARTPING_COL = 'smartping_database'
 const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
-const CACHE_COL = 'source_stats_cache'
+const CACHE_COL = 'call_dashboard_cache'
 
 const DAY_BUCKET_COUNT = 8
 const DAY_LABELS = ['Day 0', 'Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7+']
@@ -693,9 +695,9 @@ function crmProjectOwnerFromDoc(doc) {
 }
 
 /**
- * Owner / attempt grid from CRM snapshot phones (+ itm-crm lead overlay) + leadRegDates + callrecordings (IST days).
+ * Owner / attempt grid from CRM snapshot phones (+ itm-crm lead overlay) + leadRegDates + SmartPing calls (IST days).
  */
-async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ieCountByNormOwner = new Map()) {
+async function computeOwnerAttemptRows(client, itmDb, leadRegDates, crmLeadDocs = [], ieCountByNormOwner = new Map()) {
   const todayIst = istYmdToday()
   const yesterdayIst = shiftIstYmd(todayIst, -1)
   const dayBeforeYesterdayIst = shiftIstYmd(todayIst, -2)
@@ -767,7 +769,8 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
   }
 
   for (const [mobile, regDate] of leadRegDates) {
-    const normOwner = phoneToOwnerNorm.get(mobile) || 'unassigned'
+    const normOwner = phoneToOwnerNorm.get(mobile)
+    if (!normOwner) continue
     const ymd = toDateStrIst(regDate)
     if (!ymd) continue
     const c = ensureLeadCounts(normOwner)
@@ -783,7 +786,8 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
    */
   const ownerCohortPhones = new Map() // normOwner -> { today: Set, yesterday: Set, dbYest: Set }
   for (const [phone, regDate] of leadRegDates) {
-    const normOwner = phoneToOwnerNorm.get(phone) || 'unassigned'
+    const normOwner = phoneToOwnerNorm.get(phone)
+    if (!normOwner) continue
     const ymd = toDateStrIst(regDate)
     if (!ymd) continue
     if (ymd !== todayIst && ymd !== yesterdayIst && ymd !== dayBeforeYesterdayIst) continue
@@ -797,111 +801,115 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
   }
 
   /**
-   * Resilient phone extraction pipeline stage reused for both today + last-7 queries.
-   * Handles body.data as array or single object, plus root phone_number fallback.
+   * Fetch attempts from SmartPing (`analytics.smartping_database`).
+   * Each doc = one call event with `customer_number`, `call_start_time` (IST string "YYYY-MM-DD HH:mm:ss").
+   * Group by call_id to deduplicate (multiple events per call).
    */
-  const phoneExtractionStages = [
-    {
-      $addFields: {
-        _dataItems: {
-          $cond: [
-            { $isArray: '$body.data' },
-            '$body.data',
-            {
-              $cond: [
-                { $eq: [{ $type: '$body.data' }, 'object'] },
-                ['$body.data'],
-                {
-                  $cond: [
-                    { $gt: [{ $strLenCP: { $trim: { input: { $toString: { $ifNull: ['$phone_number', ''] } } } } }, 0] },
-                    [{ call: { phone_number: '$phone_number' } }],
-                    [],
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      },
-    },
-    { $unwind: '$_dataItems' },
-    {
-      $addFields: {
-        _phoneRaw: {
-          $trim: {
-            input: {
-              $toString: {
-                $ifNull: [
-                  '$_dataItems.call.phone_number',
-                  {
-                    $ifNull: [
-                      '$_dataItems.phone_number',
-                      {
-                        $ifNull: [
-                          '$_dataItems.call.customer_number',
-                          {
-                            $ifNull: [
-                              '$_dataItems.mobile',
-                              {
-                                $ifNull: [
-                                  '$_dataItems.phone',
-                                  { $ifNull: ['$phone_number', { $ifNull: ['$customer_phone', ''] }] },
-                                ],
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
-    },
-    { $match: { _phoneRaw: { $nin: [null, '', 'null', 'undefined'] } } },
-  ]
+  const smartpingCol = client.db(ANALYTICS_DB).collection(SMARTPING_COL)
 
-  /**
-   * Fetch today's calls only from callrecordings, grouped by phone.
-   * Also fetch last-7-day calls for ieAttempted.
-   */
-  const { start: todayCallStart, end: todayCallEnd } = istIntervalForYmd(todayIst)
-  const last7Start = new Date(Date.parse(`${istSevenStart}T00:00:00+05:30`))
-  const recordingsCol = itmDb.collection(RECORDINGS_COL)
-  const [todayCallsByPhone, last7CallsByPhone] = await Promise.all([
-    recordingsCol
+  const [todayCallsByPhone, last7CallsByPhone, todayAgentPhonePairs] = await Promise.all([
+    smartpingCol
       .aggregate([
-        {
-          $match: {
-            $or: [{ body: { $exists: true, $ne: null } }, { phone_number: { $exists: true, $nin: [null, ''] } }],
-            createdAt: { $gte: todayCallStart, $lte: todayCallEnd },
-          },
-        },
-        ...phoneExtractionStages,
-        // Deduplicate: one recording doc (_id) counts as one attempt per phone, even if body.data is an array
-        { $group: { _id: { recordingId: '$_id', phone: '$_phoneRaw' } } },
+        { $match: { customer_number: { $exists: true, $nin: [null, ''] }, call_start_time: { $regex: `^${todayIst}` } } },
+        { $group: { _id: { callId: '$call_id', phone: '$customer_number' } } },
         { $group: { _id: '$_id.phone', count: { $sum: 1 } } },
       ])
       .toArray(),
 
-    recordingsCol
+    smartpingCol
       .aggregate([
-        {
-          $match: {
-            $or: [{ body: { $exists: true, $ne: null } }, { phone_number: { $exists: true, $nin: [null, ''] } }],
-            createdAt: { $gte: last7Start },
-          },
-        },
-        ...phoneExtractionStages,
-        // Deduplicate per recording doc before checking last-7-days presence
-        { $group: { _id: { recordingId: '$_id', phone: '$_phoneRaw' } } },
+        { $match: { customer_number: { $exists: true, $nin: [null, ''] }, call_start_time: { $gte: istSevenStart } } },
+        { $group: { _id: { callId: '$call_id', phone: '$customer_number' } } },
         { $group: { _id: '$_id.phone' } },
       ])
       .toArray(),
+
+    smartpingCol
+      .aggregate([
+        { $match: { customer_number: { $exists: true, $nin: [null, ''] }, agent_name: { $exists: true, $nin: [null, '', '{agent_name}'] }, call_start_time: { $regex: `^${todayIst}` } } },
+        { $group: { _id: { phone: '$customer_number', agent: '$agent_name' } } },
+      ])
+      .toArray(),
   ])
+
+  /**
+   * Build mappings to merge SmartPing agent names into existing CRM owner rows.
+   * Strategy: match via CRM email prefix (e.g. "Iqra_k" → "iqrak" → matches "iqrak@itm.edu"
+   * from "Iqra (iqrak@itm.edu)"), then fallback to unique first-name match.
+   */
+  const emailPrefixToNorm = new Map()
+  const firstNameToNorms = new Map()
+  for (const [norm, display] of ownerDisplayNames) {
+    const emailMatch = String(display).match(/\(([^@]+)@/)
+    if (emailMatch) emailPrefixToNorm.set(emailMatch[1].toLowerCase(), norm)
+    const firstName = norm.split(' ')[0]
+    if (firstName) {
+      if (!firstNameToNorms.has(firstName)) firstNameToNorms.set(firstName, [])
+      firstNameToNorms.get(firstName).push(norm)
+    }
+  }
+
+  function resolveSmartpingAgent(rawAgent) {
+    const spaced = String(rawAgent).replace(/_/g, ' ').trim()
+    const directNorm = normOwnerKeyLabel(spaced)
+    if (ownerDisplayNames.has(directNorm)) return directNorm
+
+    const joined = spaced.replace(/\s+/g, '').toLowerCase()
+    if (emailPrefixToNorm.has(joined)) return emailPrefixToNorm.get(joined)
+
+    const parts = spaced.toLowerCase().split(/\s+/)
+    if (parts.length >= 2) {
+      const firstPlusInitials = parts[0] + parts.slice(1).map(p => p[0]).join('')
+      if (emailPrefixToNorm.has(firstPlusInitials)) return emailPrefixToNorm.get(firstPlusInitials)
+      const firstPlusLastInitial = parts[0] + parts[parts.length - 1][0]
+      if (emailPrefixToNorm.has(firstPlusLastInitial)) return emailPrefixToNorm.get(firstPlusLastInitial)
+    }
+
+    const firstName = parts[0]
+    const candidates = firstNameToNorms.get(firstName)
+    if (candidates && candidates.length === 1) return candidates[0]
+
+    return directNorm
+  }
+
+  const smartpingAttributedPhones = new Set()
+  for (const pair of todayAgentPhonePairs) {
+    const normPhone = normaliseMobile(pair._id.phone)
+    if (!normPhone) continue
+    if (phoneToOwnerNorm.has(normPhone)) continue
+    const agentRaw = pair._id.agent
+    if (!agentRaw || agentRaw === '{agent_name}') continue
+    const normAgent = resolveSmartpingAgent(agentRaw)
+    if (!normAgent || normAgent === 'unassigned') continue
+    phoneToOwnerNorm.set(normPhone, normAgent)
+    smartpingAttributedPhones.add(normPhone)
+    if (!ownerCrmPhones.has(normAgent)) ownerCrmPhones.set(normAgent, new Set())
+    ownerCrmPhones.get(normAgent).add(normPhone)
+    const agentDisplay = String(agentRaw).replace(/_/g, ' ').trim()
+    if (!ownerDisplayNames.has(normAgent)) ownerDisplayNames.set(normAgent, agentDisplay)
+  }
+
+  for (const [mobile, regDate] of leadRegDates) {
+    if (!smartpingAttributedPhones.has(mobile)) continue
+    const normOwner = phoneToOwnerNorm.get(mobile)
+    if (!normOwner) continue
+    const ymd = toDateStrIst(regDate)
+    if (!ymd) continue
+
+    const lc = ensureLeadCounts(normOwner)
+    if (ymd === todayIst) lc.today += 1
+    if (ymd === yesterdayIst) lc.yesterday += 1
+    if (ymd === dayBeforeYesterdayIst) lc.dbYest += 1
+
+    if (ymd !== todayIst && ymd !== yesterdayIst && ymd !== dayBeforeYesterdayIst) continue
+    if (!ownerCohortPhones.has(normOwner)) {
+      ownerCohortPhones.set(normOwner, { today: new Set(), yesterday: new Set(), dbYest: new Set() })
+    }
+    const cohort = ownerCohortPhones.get(normOwner)
+    if (ymd === todayIst) cohort.today.add(mobile)
+    if (ymd === yesterdayIst) cohort.yesterday.add(mobile)
+    if (ymd === dayBeforeYesterdayIst) cohort.dbYest.add(mobile)
+  }
 
   /** normPhone -> today's call count */
   const todayCallCount = new Map()
@@ -922,20 +930,11 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
     ...ownerLeadDayCounts.keys(),
   ])
 
-  if (ownerLeadDayCounts.has('unassigned')) {
-    ownerNorms.add('unassigned')
-    if (!ownerDisplayNames.has('unassigned')) ownerDisplayNames.set('unassigned', 'Unassigned')
-  }
-
   const rows = [...ownerNorms]
-    .filter((norm) => norm != null)
-    .sort((a, b) => {
-      if (a === 'unassigned') return 1
-      if (b === 'unassigned') return -1
-      return a.localeCompare(b, undefined, { sensitivity: 'base' })
-    })
+    .filter((norm) => norm != null && norm !== 'unassigned' || ownerLeadDayCounts.has('unassigned'))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
     .map((norm) => {
-      const displayLabel = ownerDisplayNames.get(norm) || (norm === 'unassigned' ? 'Unassigned' : norm)
+      const displayLabel = ownerDisplayNames.get(norm) || norm
       const lc = ownerLeadDayCounts.get(norm) || { today: 0, yesterday: 0, dbYest: 0 }
       const cohorts = ownerCohortPhones.get(norm) || { today: new Set(), yesterday: new Set(), dbYest: new Set() }
 
@@ -985,6 +984,10 @@ async function computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs = [], ie
         ieAttempted,
       }
     })
+    .filter((r) =>
+      r.todayLeads || r.achievedAttempts || r.yesterdayLeads || r.yesterdayAttempts ||
+      r.dayBeforeYesterdayLeads || r.dayBeforeYesterdayAttempts || r.totalIe || r.ieAttempted
+    )
 
   return {
     rows,
@@ -1003,7 +1006,8 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
   const itmDb = client.db(ITM_DB)
   const itmCrmDb = client.db(ITM_CRM_DB)
   const callQDb = client.db(CALLQ_DB)
-  const cacheCol = itmDb.collection(CACHE_COL)
+  const analyticsDb = client.db(ANALYTICS_DB)
+  const cacheCol = analyticsDb.collection(CACHE_COL)
 
   const hasDateFilter = Boolean(startDate || endDate)
 
@@ -1122,7 +1126,7 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
     }
   }
 
-  const ownerAttemptBundle = await computeOwnerAttemptRows(itmDb, leadRegDates, crmLeadDocs, ieCountByNormOwner)
+  const ownerAttemptBundle = await computeOwnerAttemptRows(client, itmDb, leadRegDates, crmLeadDocs, ieCountByNormOwner)
 
   const sourceAgg = {}
   const sourceDisplayNames = {}
@@ -1304,6 +1308,41 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
     callRecordingPhones: callsByPhone.length,
   }
 
+  /**
+   * SmartPing per-agent call event breakdown (today, deduped by call_id).
+   */
+  const smartpingCol = client.db(ANALYTICS_DB).collection(SMARTPING_COL)
+  const todayIstForSp = istYmdToday()
+  const smartpingAgentStats = await smartpingCol
+    .aggregate([
+      {
+        $match: {
+          call_start_time: { $regex: `^${todayIstForSp}` },
+          agent_name: { $exists: true, $nin: [null, '', '{agent_name}'] },
+        },
+      },
+      { $group: { _id: { callId: '$call_id', agent: '$agent_name', event: '$event_name' } } },
+      {
+        $group: {
+          _id: { agent: '$_id.agent', event: '$_id.event' },
+          count: { $sum: 1 },
+        },
+      },
+    ])
+    .toArray()
+
+  const spAgentMap = {}
+  for (const r of smartpingAgentStats) {
+    const agent = String(r._id.agent).replace(/_/g, ' ').trim()
+    const event = r._id.event
+    if (!spAgentMap[agent]) spAgentMap[agent] = { agent, totalCalls: 0, Ringing: 0, Answered: 0, Hangup: 0, 'User Call Hangup': 0, abandoned: 0, 'Abandoned on IVR': 0 }
+    spAgentMap[agent][event] = (spAgentMap[agent][event] || 0) + r.count
+  }
+  for (const a of Object.values(spAgentMap)) {
+    a.totalCalls = a.Ringing + a.Answered + a.Hangup + a['User Call Hangup'] + a.abandoned + a['Abandoned on IVR']
+  }
+  const smartpingCallStats = Object.values(spAgentMap).sort((a, b) => b.totalCalls - a.totalCalls)
+
   const dashboard = {
     channel: 'sourceStats',
     kpi,
@@ -1313,6 +1352,7 @@ export async function computeSourceStats({ mode = 'cached', startDate, endDate }
     ownerActivity,
     ownerAttemptRows: ownerAttemptBundle.rows,
     ownerAttemptMeta: ownerAttemptBundle.meta,
+    smartpingCallStats,
     collectionCounts,
     dateRange: hasDateFilter ? { startDate, endDate } : null,
     computedAt: new Date().toISOString(),

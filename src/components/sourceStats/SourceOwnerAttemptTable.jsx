@@ -5,22 +5,26 @@ import { cn } from '../../lib/utils'
 
 function stripEmail(name) {
   if (!name) return name
-  return String(name).replace(/\s*\([^)]*@[^)]*\)/g, '').trim()
+  const stripped = String(name).replace(/\s*\([^)]*@[^)]*\)/g, '').trim()
+  return stripped
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 }
 
 const COLS = [
   { key: 'ownerDisplay', label: 'Owner', align: 'left' },
-  { key: 'todayLeads', label: 'Today Leads', align: 'right', heat: 'scale' },
-  { key: 'targetAttempts', label: 'Target Attempts', align: 'right' },
-  { key: 'achievedAttempts', label: 'Achieved Attempts', align: 'right', heat: 'pct', targetKey: 'targetAttempts' },
-  { key: 'yesterdayLeads', label: 'Yesterday Leads', align: 'right', heat: 'scale' },
-  { key: 'yesterdayTargetAttempts', label: 'Yest Target Attempts', align: 'right' },
-  { key: 'yesterdayAttempts', label: 'Yesterday Attempts', align: 'right', heat: 'pct', targetKey: 'yesterdayTargetAttempts' },
-  { key: 'dayBeforeYesterdayLeads', label: 'Day B4 Yest Leads', align: 'right', heat: 'scale' },
-  { key: 'dayBeforeYesterdayTargetAttempts', label: 'Day B4 Yest Target', align: 'right' },
-  { key: 'dayBeforeYesterdayAttempts', label: 'Day B4 Yest Attempts', align: 'right', heat: 'pct', targetKey: 'dayBeforeYesterdayTargetAttempts' },
-  { key: 'totalIe', label: 'Total I&E', align: 'right', heat: 'scale' },
-  { key: 'ieAttempted', label: 'I&E Attempted', align: 'right', heat: 'scale' },
+  { key: 'todayLeads', label: 'T Leads', align: 'right', heat: 'scale', title: 'Today Leads' },
+  { key: 'targetAttempts', label: 'T Tgt', align: 'right', title: 'Today Target Attempts' },
+  { key: 'achievedAttempts', label: 'T Att', align: 'right', heat: 'pct', targetKey: 'targetAttempts', title: 'Today Achieved Attempts' },
+  { key: 'yesterdayLeads', label: 'Y Leads', align: 'right', heat: 'scale', title: 'Yesterday Leads' },
+  { key: 'yesterdayTargetAttempts', label: 'Y Tgt', align: 'right', title: 'Yesterday Target Attempts' },
+  { key: 'yesterdayAttempts', label: 'Y Att', align: 'right', heat: 'pct', targetKey: 'yesterdayTargetAttempts', title: 'Yesterday Attempts' },
+  { key: 'dayBeforeYesterdayLeads', label: 'DB Leads', align: 'right', heat: 'scale', title: 'Day Before Yesterday Leads' },
+  { key: 'dayBeforeYesterdayTargetAttempts', label: 'DB Tgt', align: 'right', title: 'Day Before Yesterday Target' },
+  { key: 'dayBeforeYesterdayAttempts', label: 'DB Att', align: 'right', heat: 'pct', targetKey: 'dayBeforeYesterdayTargetAttempts', title: 'Day Before Yesterday Attempts' },
+  { key: 'totalIe', label: 'I&E', align: 'right', heat: 'scale', title: 'Total I&E' },
+  { key: 'ieAttempted', label: 'I&E Att', align: 'right', heat: 'scale', title: 'I&E Attempted' },
 ]
 
 function fmt(n) {
@@ -53,6 +57,7 @@ export default function SourceOwnerAttemptTable({
   theme,
   dateNote,
   loading,
+  onRefresh,
 }) {
   const list = Array.isArray(rows) ? rows : []
   const hasRows = list.length > 0
@@ -128,9 +133,27 @@ export default function SourceOwnerAttemptTable({
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-4 border-b border-slate-200/80 dark:border-slate-800">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Owner attempts (CRM pool)
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Owner attempts (CRM pool)
+            </h3>
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all disabled:opacity-50',
+                  'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 border border-brand-200 dark:border-brand-800',
+                )}
+                title="Refresh data (fresh compute)"
+              >
+                <svg className={cn('w-3 h-3', loading && 'animate-spin')} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                </svg>
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            )}
+          </div>
           {dateNote && (
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
               {dateNote}
@@ -158,18 +181,23 @@ export default function SourceOwnerAttemptTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs min-w-[1200px]">
+        <table className="w-full text-xs">
           <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-[1]">
             <tr>
               {COLS.map((c) => (
                 <th
                   key={c.key}
                   className={cn(
-                    'px-3 py-2.5 font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap',
+                    'px-2 py-2.5 font-semibold uppercase tracking-wider text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap cursor-default relative group',
                     c.align === 'right' ? 'text-right' : 'text-left',
                   )}
                 >
                   {c.label}
+                  {c.title && (
+                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 hidden group-hover:block px-2 py-1 rounded-md text-[11px] font-medium normal-case tracking-normal whitespace-nowrap shadow-lg bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900">
+                      {c.title}
+                    </span>
+                  )}
                 </th>
               ))}
             </tr>
@@ -205,7 +233,7 @@ export default function SourceOwnerAttemptTable({
                     <td
                       key={c.key}
                       className={cn(
-                        'px-3 py-2',
+                        'px-2 py-1.5',
                         c.align === 'right'
                           ? 'text-right font-mono tabular-nums'
                           : 'font-medium',
@@ -229,7 +257,7 @@ export default function SourceOwnerAttemptTable({
                   <td
                     key={c.key}
                     className={cn(
-                      'px-3 py-2.5 font-semibold',
+                      'px-2 py-2 font-semibold',
                       c.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left',
                       cellHeat(c, totalRow) || 'text-slate-900 dark:text-slate-100',
                     )}

@@ -10,7 +10,7 @@ import { computeSmsDashboard } from '../../smsDashboard/compute'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(request) {
   if (CRON_SECRET) {

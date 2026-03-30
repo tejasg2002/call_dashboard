@@ -106,10 +106,21 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
       : waCol.countDocuments(matchFilter),
 
     waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked', button_text: { $nin: [null, ''] } } },
+      { $match: { ...matchFilter, stage: 'clicked' } },
+      {
+        $addFields: {
+          _btn: {
+            $cond: [
+              { $and: [{ $ne: ['$button_text', null] }, { $ne: ['$button_text', ''] }] },
+              '$button_text',
+              '(Other clicks)',
+            ],
+          },
+        },
+      },
       {
         $group: {
-          _id: { template_name: '$template_name', button_text: '$button_text' },
+          _id: { template_name: '$template_name', button_text: '$_btn' },
           total_clicks: { $sum: 1 },
           unique_users: { $addToSet: '$phone_number' },
         },

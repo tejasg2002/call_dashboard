@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import WATemplatePreview from './WATemplatePreview'
 
 const COLUMNS = [
   { key: 'template_name', label: 'Template name',  sortable: true },
@@ -42,7 +42,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
   const isDark = theme === 'dark'
   const [sortKey, setSortKey] = useState('ctr')
   const [sortDir, setSortDir] = useState('desc')
-  const router = useRouter()
+  const [previewRow, setPreviewRow] = useState(null)
 
   function handleSort(key) {
     if (sortKey === key) {
@@ -172,9 +172,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                     <td className={tdClass}>₹{(r.total_cost ?? 0).toFixed(2)}</td>
                     <td className={tdClass}>
                       <button
-                        onClick={() => {
-                          router.push(`/wa/templates/${encodeURIComponent(r.template_name)}`)
-                        }}
+                        onClick={() => setPreviewRow(r)}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                           isDark ? 'border-brand-600 bg-brand-700/30 text-brand-300 hover:bg-brand-700/60' : 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
                         }`}
@@ -193,6 +191,18 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
             </tbody>
           </table>
         </div>
+
+        {previewRow && (
+          <WATemplatePreview
+            row={previewRow}
+            buttonStats={ctaRows.filter((c) =>
+              c.template_used && c.template_used.split(', ').includes(previewRow.template_name)
+            )}
+            theme={theme}
+            dataMasked={dataMasked}
+            onClose={() => setPreviewRow(null)}
+          />
+        )}
       </div>
   )
 }
