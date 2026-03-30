@@ -36,6 +36,8 @@ const SourceStatsDashboard = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [toast, setToast] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const loadData = useCallback(async ({ mode = 'cached', sd, ed } = {}) => {
     try {
@@ -100,6 +102,23 @@ const SourceStatsDashboard = () => {
     }
   }
 
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true)
+      setToast(null)
+      setError(null)
+      const result = await fetchSourceStats({ mode: 'full' })
+      setData(result)
+      setLastUpdated(new Date())
+      setToast(`Refreshed in ${(result.elapsed / 1000).toFixed(1)}s · ${result.ownerAttemptRows?.length || 0} owners`)
+      setTimeout(() => setToast(null), 4000)
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const handleCustomDateChange = (field, value) => {
     const newSd = field === 'start' ? value : startDate
     const newEd = field === 'end' ? value : endDate
@@ -151,17 +170,30 @@ const SourceStatsDashboard = () => {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleRecompute}
-              disabled={loading}
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
               className={cn(
                 "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50",
                 "bg-brand-700 hover:bg-brand-800 text-white shadow-sm shadow-brand-700/20"
               )}
             >
-              <svg className={cn("w-3.5 h-3.5", loading && "animate-spin")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              onClick={handleRecompute}
+              disabled={loading || refreshing}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold border transition-all disabled:opacity-50",
+                "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              )}
+            >
+              <svg className={cn("w-3.5 h-3.5", loading && !refreshing && "animate-spin")} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
               </svg>
-              {loading ? 'Computing...' : 'Recompute'}
+              {loading && !refreshing ? 'Computing...' : 'Recompute'}
             </button>
           </div>
         </div>
@@ -263,6 +295,12 @@ const SourceStatsDashboard = () => {
 
         <SourceTable rows={data?.sourceRows} loading={loading} dateLabel={dateLabel} />
       </div>
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium animate-[fadeInUp_0.3s_ease-out]">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
