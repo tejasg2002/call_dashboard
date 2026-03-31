@@ -37,6 +37,7 @@ function normalizeRows(rawRows) {
     slNo: pick(r, 'Sl.No', 'Sl No', 'S.No', 'Serial No', 'Sr.No'),
     leadId: pick(r, 'Lead Id', 'Lead ID', 'lead_id'),
     registeredName: pick(r, 'Registered Name', 'Name'),
+    source: pick(r, 'Source', 'Lead Source', 'UTM Source'),
     previousLeadStage: pick(r, 'Previous Lead Stage', 'Previous Stage'),
     leadStage: pick(r, 'Lead Stage', 'Stage'),
   }))

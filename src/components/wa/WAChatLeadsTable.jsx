@@ -33,7 +33,7 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
     if (q.trim()) {
       const n = q.trim().toLowerCase()
       list = list.filter((r) => {
-        const blob = [r.slNo, r.leadId, r.registeredName, r.previousLeadStage, r.leadStage]
+        const blob = [r.slNo, r.leadId, r.registeredName, r.source, r.previousLeadStage, r.leadStage]
           .join(' ')
           .toLowerCase()
         return blob.includes(n)
@@ -112,7 +112,7 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
         <table className="w-full text-[11px]">
           <thead className={cn('sticky top-0 z-10', isDark ? 'bg-slate-800' : 'bg-slate-50')}>
             <tr>
-              {['Sl.No', 'Lead Id', 'Registered Name', 'Previous Lead Stage', 'Lead Stage'].map((h) => (
+              {['Sl.No', 'Lead Id', 'Registered Name', 'Source', 'Previous Lead Stage', 'Lead Stage'].map((h) => (
                 <th
                   key={h}
                   className={cn(
@@ -131,6 +131,7 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
                 <td className={cn('px-4 py-2 tabular-nums', isDark ? 'text-slate-500' : 'text-slate-400')}>{r.slNo || i + 1}</td>
                 <td className={cn('px-4 py-2 font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskLeadId(r.leadId, dataMasked)}</td>
                 <td className={cn('px-4 py-2 font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskPersonName(r.registeredName, dataMasked)}</td>
+                <td className={cn('px-4 py-2', isDark ? 'text-slate-400' : 'text-slate-600')}>{r.source || '—'}</td>
                 <td className={cn('px-4 py-2', isDark ? 'text-slate-400' : 'text-slate-600')}>{r.previousLeadStage || '—'}</td>
                 <td className="px-4 py-2">
                   <span
