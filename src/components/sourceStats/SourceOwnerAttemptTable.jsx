@@ -145,7 +145,7 @@ export default function SourceOwnerAttemptTable({
                   'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all disabled:opacity-50',
                   'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 border border-brand-200 dark:border-brand-800',
                 )}
-                title="Refresh data (fresh compute)"
+                title="Reload from saved dashboard cache (fast — same as WhatsApp)"
               >
                 <svg className={cn('w-3 h-3', loading && 'animate-spin')} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />

@@ -254,7 +254,7 @@ const SourceStatsDashboard = () => {
           rows={data?.ownerAttemptRows}
           theme={theme}
           loading={loading}
-          onRefresh={() => loadData({ mode: 'fresh' })}
+          onRefresh={() => loadData({ mode: 'cached' })}
           dateNote={
             data?.ownerAttemptMeta
               ? `IST · Today ${data.ownerAttemptMeta.todayIst} · Yesterday ${data.ownerAttemptMeta.yesterdayIst} · Day before ${data.ownerAttemptMeta.dayBeforeYesterdayIst} · Target = today leads × 3 · I&E Attempted = CRM phones with ≥1 call in last 7 IST days`

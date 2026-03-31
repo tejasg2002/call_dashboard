@@ -79,15 +79,18 @@ export default function EmailPage() {
     }
   }, [])
 
-  const recalibrateForDateRange = useCallback(async () => {
-    const hasRange = filters.startDate || filters.endDate
-    if (!hasRange) return
+  const recalibrateForDateRange = useCallback(async (nextFilters = filters) => {
+    const hasRange = nextFilters.startDate || nextFilters.endDate
+    if (!hasRange) {
+      await loadData()
+      return
+    }
     try {
       setSyncing(true)
       const data = await fetchEmailDashboard({
         mode: 'range',
-        startDate: filters.startDate || '',
-        endDate: filters.endDate || '',
+        startDate: nextFilters.startDate || '',
+        endDate: nextFilters.endDate || '',
       })
       setSnapshot(data)
       setElapsed(data.elapsed)
@@ -95,10 +98,11 @@ export default function EmailPage() {
       setTimeout(() => setToast(null), 4000)
     } catch (err) {
       console.error('[EmailPage] range error:', err)
+      setError(err.message)
     } finally {
       setSyncing(false)
     }
-  }, [filters.startDate, filters.endDate])
+  }, [filters, loadData])
 
   useEffect(() => { loadData() }, [loadData])
 

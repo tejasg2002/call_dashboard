@@ -1,6 +1,6 @@
 'use client'
 
-export default function EmailFilters({ filters, setFilters, options, theme }) {
+export default function EmailFilters({ filters, setFilters, options, theme, onApply }) {
   const isDark = theme === 'dark'
 
   const inputCls = `w-full rounded-lg border px-3 py-2 text-sm ${
@@ -11,7 +11,9 @@ export default function EmailFilters({ filters, setFilters, options, theme }) {
   const labelCls = `block text-[11px] font-medium uppercase tracking-wide mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
 
   function reset() {
-    setFilters({ subject: '', eventType: '', email: '', startDate: '', endDate: '' })
+    const cleared = { subject: '', eventType: '', email: '', startDate: '', endDate: '' }
+    setFilters(cleared)
+    onApply?.(cleared)
   }
 
   const hasActive = Object.values(filters).some((v) => v !== '')
@@ -22,14 +24,26 @@ export default function EmailFilters({ filters, setFilters, options, theme }) {
         <h3 className={`text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Filters
         </h3>
-        {hasActive && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={reset}
-            className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${isDark ? 'text-rose-400 hover:bg-slate-700' : 'text-rose-500 hover:bg-rose-50'}`}
+            onClick={() => onApply?.(filters)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+              isDark
+                ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30'
+                : 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/20'
+            }`}
           >
-            Clear all
+            Apply
           </button>
-        )}
+          {hasActive && (
+            <button
+              onClick={reset}
+              className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${isDark ? 'text-rose-400 hover:bg-slate-700' : 'text-rose-500 hover:bg-rose-50'}`}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
