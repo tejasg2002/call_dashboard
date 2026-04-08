@@ -7,6 +7,7 @@ import { computeWADashboard } from '../../wa-dashboard/compute'
 import { computeEmailDashboard } from '../../email-dashboard/compute'
 import { computeSourceStats } from '../../sourceStats/compute'
 import { computeSmsDashboard } from '../../smsDashboard/compute'
+import { computeCallDashboard } from '../../call-dashboard/compute'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -22,11 +23,12 @@ export async function GET(request) {
 
   const start = Date.now()
   try {
-    const [waResult, emailResult, sourceStatsResult, smsResult] = await Promise.all([
+    const [waResult, emailResult, sourceStatsResult, smsResult, callResult] = await Promise.all([
       computeWADashboard({ mode: 'full' }),
       computeEmailDashboard({ mode: 'full' }),
       computeSourceStats({ mode: 'full' }),
       computeSmsDashboard({ mode: 'full' }),
+      computeCallDashboard({ mode: 'full' }),
     ])
 
     return Response.json({
@@ -53,6 +55,12 @@ export async function GET(request) {
       sms: {
         rawDocCount: smsResult.rawDocCount,
         computeTime: smsResult.elapsed,
+      },
+      callOverview: {
+        rawDocCount: callResult.rawDocCount,
+        filteredDocCount: callResult.filteredDocCount,
+        totalCalls: callResult.kpi?.totalCalls,
+        computeTime: callResult.elapsed,
       },
       totalElapsed: Date.now() - start,
       completedAt: new Date().toISOString(),

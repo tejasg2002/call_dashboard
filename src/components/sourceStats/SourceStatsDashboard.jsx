@@ -4,12 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '../../../app/providers'
 import { fetchSourceStats } from '../../lib/sourceStatsApi'
 import { cn } from '../../lib/utils'
-import SourceKpiCards from './SourceKpiCards'
 import SmartPingCallStats from './SmartPingCallStats'
 import SourceOwnerAttemptTable from './SourceOwnerAttemptTable'
-import SourceTable from './SourceTable'
-import SourceCharts from './SourceCharts'
-import SourceCohortMatrix from './SourceCohortMatrix'
 
 const RANGE_OPTIONS = [
   { key: 'all', label: 'All time' },
@@ -129,14 +125,6 @@ const SourceStatsDashboard = () => {
     }
   }
 
-  const dateLabel = rangePreset === 'all'
-    ? 'All time'
-    : rangePreset === 'today'
-      ? 'Today'
-      : rangePreset === 'custom'
-        ? `${startDate} — ${endDate}`
-        : `This ${rangePreset}`
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="max-w-[1600px] mx-auto px-4 lg:px-8 py-6 lg:py-8 space-y-6">
@@ -243,8 +231,6 @@ const SourceStatsDashboard = () => {
           </div>
         )}
 
-        <SourceKpiCards kpi={data?.kpi} loading={loading} dateLabel={dateLabel} />
-
         <SmartPingCallStats
           rows={data?.smartpingCallStats}
           loading={loading}
@@ -261,39 +247,6 @@ const SourceStatsDashboard = () => {
               : undefined
           }
         />
-
-        {data?.collectionCounts && (
-          <div className={cn(
-            "rounded-xl border px-5 py-3 flex flex-wrap gap-x-6 gap-y-1",
-            "bg-white dark:bg-slate-900/60",
-            "border-slate-200/80 dark:border-slate-800"
-          )}>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider mr-2">
-              Collection stats:
-            </span>
-            {[
-              { label: 'CallQ Leads', value: data.collectionCounts.callQLeads },
-              { label: 'Webhook Leads', value: data.collectionCounts.webhookLeads },
-              { label: 'Webhook-Only Leads', value: data.collectionCounts.webhookOnlyLeads },
-              { label: 'Unique Leads', value: data.collectionCounts.uniqueLeads },
-              { label: 'Call Rec. Phones', value: data.collectionCounts.callRecordingPhones },
-            ].map((item) => (
-              <span key={item.label} className="text-[11px] text-slate-500 dark:text-slate-400">
-                {item.label}: <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{item.value?.toLocaleString('en-IN')}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <SourceCohortMatrix
-          sourceRows={data?.sourceRows}
-          cohortMatrix={data?.cohortMatrix}
-          loading={loading}
-        />
-
-        <SourceCharts rows={data?.sourceRows} loading={loading} />
-
-        <SourceTable rows={data?.sourceRows} loading={loading} dateLabel={dateLabel} />
       </div>
 
       {toast && (

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 function LinkBadge({ url, count, isDark }) {
   const short = url.length > 45 ? url.slice(0, 45) + '…' : url
@@ -63,6 +65,7 @@ function CTARow({ r, isDark, thClass, tdClass }) {
 
 export default function WACTAPerformanceTable({ rows, theme }) {
   const isDark = theme === 'dark'
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(rows, 25)
   const thClass = `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-50'}`
   const tdClass = `px-4 py-3 text-sm ${isDark ? 'text-slate-200' : 'text-slate-700'}`
   const tableWrap = `rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`
@@ -90,13 +93,23 @@ export default function WACTAPerformanceTable({ rows, theme }) {
                 <td colSpan={5} className={`${tdClass} py-8 text-center`}>No CTA clicks yet</td>
               </tr>
             ) : (
-              rows.map((r) => (
+              paginated.map((r) => (
                 <CTARow key={r.button_text} r={r} isDark={isDark} thClass={thClass} tdClass={tdClass} />
               ))
             )}
           </tbody>
         </table>
       </div>
+      {total > 0 && (
+        <PaginationBar
+          page={page}
+          setPage={setPage}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          className={isDark ? 'border-slate-700' : ''}
+        />
+      )}
     </div>
   )
 }

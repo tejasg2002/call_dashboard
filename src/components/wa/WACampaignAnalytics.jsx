@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 const COLORS = [
   '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b',
@@ -21,6 +23,9 @@ function MetricRow({ label, value, sub, isDark }) {
 function CampaignCard({ data, isDark, color }) {
   const [expanded, setExpanded] = useState(false)
   const { kpi } = data
+  const tplPag = useClientPagination(data.templateRows || [], 15)
+  const ctaPag = useClientPagination(data.ctaRows || [], 24)
+
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
       {/* Color bar + name */}
@@ -74,7 +79,7 @@ function CampaignCard({ data, isDark, color }) {
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                      {data.templateRows.map((r) => (
+                      {tplPag.paginated.map((r) => (
                         <tr key={r.template_name}>
                           <td className={`py-1.5 pr-4 font-mono ${isDark ? 'text-brand-300' : 'text-brand-700'}`}>{r.template_name}</td>
                           <td className={`text-right py-1.5 pr-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.sent}</td>
@@ -86,19 +91,37 @@ function CampaignCard({ data, isDark, color }) {
                     </tbody>
                   </table>
                 </div>
+                {(data.templateRows?.length || 0) > 0 && (
+                  <PaginationBar
+                    page={tplPag.page}
+                    setPage={tplPag.setPage}
+                    totalPages={tplPag.totalPages}
+                    total={tplPag.total}
+                    pageSize={tplPag.pageSize}
+                    className={isDark ? 'border-slate-700' : ''}
+                  />
+                )}
               </div>
               {/* CTA breakdown */}
               {data.ctaRows.length > 0 && (
                 <div>
                   <p className={`text-xs font-semibold mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Buttons clicked</p>
                   <div className="flex flex-wrap gap-2">
-                    {data.ctaRows.map((r) => (
+                    {ctaPag.paginated.map((r) => (
                       <span key={r.button_text} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${isDark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
                         {r.button_text}
                         <span className={`font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{r.total_clicks}</span>
                       </span>
                     ))}
                   </div>
+                  <PaginationBar
+                    page={ctaPag.page}
+                    setPage={ctaPag.setPage}
+                    totalPages={ctaPag.totalPages}
+                    total={ctaPag.total}
+                    pageSize={ctaPag.pageSize}
+                    className={isDark ? 'border-slate-700' : ''}
+                  />
                 </div>
               )}
             </div>

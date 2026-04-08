@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 import { fetchLeadByEmail } from '../../lib/firebase'
 import { maskEmail, maskLeadId } from '../../lib/userManagement'
 
@@ -446,6 +448,8 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
     })
   }, [rows, sortKey, sortDir])
 
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(sorted, 25)
+
   function toggleSort(key) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(key); setSortDir('desc') }
@@ -495,7 +499,7 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-50'}`}>
-                {sorted.map((row) => (
+                {paginated.map((row) => (
                   <tr key={row.subject} className={`${isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'} transition-colors`}>
                     {/* Template ID */}
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -548,6 +552,16 @@ export default function EmailSubjectTable({ rows, theme, dataMasked }) {
             </table>
           )}
         </div>
+        {rows.length > 0 && (
+          <PaginationBar
+            page={page}
+            setPage={setPage}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            className={isDark ? 'border-slate-700' : ''}
+          />
+        )}
       </div>
     </>
   )

@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 function HeroMetric({ value, label, sub, accent, isDark }) {
   return (
@@ -36,10 +38,8 @@ function FunnelStep({ label, value, total, color, isLast, isDark }) {
 
 export default function EmailPaymentConversion({ data, theme }) {
   const isDark = theme === 'dark'
-
-  if (!data || data.totalClicked === 0) return null
-
-  const { totalClicked, formSubmitted, conversionRate, perSubject } = data
+  const perSubject = data?.perSubject
+  const formSubmittedDetails = data?.formSubmittedDetails ?? []
 
   const sortedSubjects = useMemo(() => {
     if (!perSubject) return []
@@ -47,6 +47,13 @@ export default function EmailPaymentConversion({ data, theme }) {
       .map(([subject, stats]) => ({ subject, ...stats }))
       .sort((a, b) => b.formSubmitted - a.formSubmitted || b.clicked - a.clicked)
   }, [perSubject])
+
+  const formPag = useClientPagination(formSubmittedDetails, 25)
+  const subjPag = useClientPagination(sortedSubjects, 15)
+
+  if (!data || data.totalClicked === 0) return null
+
+  const { totalClicked, formSubmitted, conversionRate } = data
 
   const maxClicked = sortedSubjects.length > 0 ? Math.max(...sortedSubjects.map((s) => s.clicked)) : 1
 
@@ -96,6 +103,60 @@ export default function EmailPaymentConversion({ data, theme }) {
         </div>
       </div>
 
+      {formSubmittedDetails.length > 0 && (
+        <div className={`border-t px-6 py-4 ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-wider mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Form submitted ({formSubmittedDetails.length})
+          </p>
+          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="max-h-80 overflow-x-auto overflow-y-auto">
+              <table className="w-full text-[11px] min-w-[640px]">
+                <thead className={isDark ? 'bg-slate-800 sticky top-0 z-[1]' : 'bg-white sticky top-0 z-[1]'}>
+                  <tr>
+                    <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
+                    <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Email</th>
+                    <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Lead ID</th>
+                    <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Form submitted (IST)</th>
+                    <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Subjects clicked</th>
+                  </tr>
+                </thead>
+                <tbody className={isDark ? 'divide-y divide-slate-800' : 'divide-y divide-slate-200'}>
+                  {formPag.paginated.map((row, idx) => (
+                    <tr key={row.email}>
+                      <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {(formPag.page - 1) * formPag.pageSize + idx + 1}
+                      </td>
+                      <td className={`px-3 py-2 font-mono text-xs ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{row.email}</td>
+                      <td className={`px-3 py-2 font-mono text-xs font-semibold ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
+                        {row.leadId || '—'}
+                      </td>
+                      <td className={`px-3 py-2 font-mono tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {row.formSubmittedAtDisplay || '—'}
+                      </td>
+                      <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {(row.subjectsClicked || []).length > 0
+                          ? (row.subjectsClicked || []).join(' · ')
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {formSubmittedDetails.length > 0 && (
+              <PaginationBar
+                page={formPag.page}
+                setPage={formPag.setPage}
+                totalPages={formPag.totalPages}
+                total={formPag.total}
+                pageSize={formPag.pageSize}
+                className={isDark ? 'border-slate-700/50' : ''}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="px-6 py-4">
         <p className={`text-[11px] font-semibold uppercase tracking-wider mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           By Email Subject ({sortedSubjects.length})
@@ -103,7 +164,7 @@ export default function EmailPaymentConversion({ data, theme }) {
 
         {sortedSubjects.length > 0 ? (
           <div className="space-y-1">
-            {sortedSubjects.map((row) => {
+            {subjPag.paginated.map((row) => {
               const barWidth = maxClicked > 0 ? (row.clicked / maxClicked) * 100 : 0
 
               return (
@@ -144,6 +205,14 @@ export default function EmailPaymentConversion({ data, theme }) {
                 </div>
               )
             })}
+            <PaginationBar
+              page={subjPag.page}
+              setPage={subjPag.setPage}
+              totalPages={subjPag.totalPages}
+              total={subjPag.total}
+              pageSize={subjPag.pageSize}
+              className={isDark ? 'border-slate-700/50' : ''}
+            />
           </div>
         ) : (
           <p className={`text-xs text-center py-6 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>No clicked users found</p>

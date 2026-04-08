@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { fetchCalls } from '../firebase'
+import { fetchCallDashboard } from '../lib/callDashboardApi'
 import { cn } from '../lib/utils'
 import MetricsCards from './MetricsCards'
 import PerformanceCards from './PerformanceCards'
@@ -9,23 +10,6 @@ import PerformanceCharts from './PerformanceCharts'
 import LazySection from './LazySection'
 
 const POLLING_INTERVAL = 30000
-
-const initialFilters = {
-  search: '',
-  leadOwner: '',
-  city: '',
-  state: '',
-  course: '',
-  callType: '',
-  leadStage: '',
-  disposition: '',
-  minScore: '',
-  maxScore: '',
-  minDuration: '',
-  maxDuration: '',
-  startDate: '',
-  endDate: '',
-}
 
 const RANGE_OPTIONS = [
   { key: 'all', label: 'All time' },
@@ -36,106 +20,136 @@ const RANGE_OPTIONS = [
 ]
 
 const Dashboard = () => {
-  const [calls, setCalls] = useState([])
+  const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedCall, setSelectedCall] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [filters, setFilters] = useState(initialFilters)
   const [rangePreset, setRangePreset] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
-  const loadCalls = async () => {
+  const loadDashboard = useCallback(async ({ mode = 'cached', sd, ed } = {}) => {
     try {
       setLoading(true)
-      const data = await fetchCalls()
-      setCalls(data)
+      const data = await fetchCallDashboard({
+        mode,
+        startDate: sd || undefined,
+        endDate: ed || undefined,
+      })
+      setSnapshot(data)
       setLastUpdated(new Date())
       setError(null)
-    } catch (err) {
-      setError({
-        message: err?.message || String(err),
-        code: err?.code,
-        rawMessage: err?.rawMessage,
-      })
-      console.error('Failed to fetch calls:', err)
+      return
+    } catch (serverErr) {
+      console.error('Failed to fetch call dashboard snapshot:', serverErr)
+
+      // Keep a safe fallback for environments where Firebase Admin credentials
+      // are not configured yet. This preserves the old behavior if needed.
+      if (!sd && !ed) {
+        try {
+          const calls = await fetchCalls()
+          const totalCalls = calls.length
+          const totalScore = calls.reduce((sum, call) => sum + (call.scores?.overall || 0), 0)
+          const averageScore = totalCalls > 0 ? Math.round(totalScore / totalCalls) : 0
+          const interestedCount = calls.filter(
+            (call) => call.Disposition?.counselor === 'interested' || call.lead_stage === 'Interested'
+          ).length
+          const notInterestedCount = calls.filter(
+            (call) => call.Disposition?.counselor === 'not_interested' || call.lead_stage === 'Not Interested'
+          ).length
+
+          const buildOwnerStats = (sourceCalls) => {
+            const ownerMap = {}
+            sourceCalls.forEach((call) => {
+              const owner = call.Lead_owner || 'Unassigned'
+              if (!ownerMap[owner]) ownerMap[owner] = { owner, totalCalls: 0, totalScore: 0, maxScore: 0 }
+              const score = call.scores?.overall || 0
+              ownerMap[owner].totalCalls += 1
+              ownerMap[owner].totalScore += score
+              ownerMap[owner].maxScore = Math.max(ownerMap[owner].maxScore, score)
+            })
+
+            return Object.values(ownerMap)
+              .map((item) => ({
+                owner: item.owner,
+                totalCalls: item.totalCalls,
+                avgScore: item.totalCalls > 0 ? Math.round(item.totalScore / item.totalCalls) : 0,
+                maxScore: item.maxScore,
+              }))
+              .sort((a, b) => b.totalCalls - a.totalCalls)
+          }
+
+          const startOfToday = new Date()
+          startOfToday.setHours(0, 0, 0, 0)
+
+          const monthStart = new Date()
+          monthStart.setDate(1)
+          monthStart.setHours(0, 0, 0, 0)
+
+          const getCallDate = (call) => {
+            const raw = call.Date || call.call_timestamp || call.created_at || call.createdAt || call.call_date || call.callDate || null
+            if (!raw) return null
+            if (typeof raw.toDate === 'function') return raw.toDate()
+            const parsed = new Date(raw)
+            return Number.isNaN(parsed.getTime()) ? null : parsed
+          }
+
+          setSnapshot({
+            kpi: {
+              totalCalls,
+              averageScore,
+              interestedCount,
+              notInterestedCount,
+              interestedPct: totalCalls > 0 ? Math.round((interestedCount / totalCalls) * 100) : 0,
+              notInterestedPct: totalCalls > 0 ? Math.round((notInterestedCount / totalCalls) * 100) : 0,
+            },
+            ownerStatsToday: buildOwnerStats(calls.filter((call) => {
+              const callDate = getCallDate(call)
+              return callDate && callDate >= startOfToday
+            })),
+            ownerStatsMonth: buildOwnerStats(calls.filter((call) => {
+              const callDate = getCallDate(call)
+              return callDate && callDate >= monthStart
+            })),
+            ownerStatsOverall: buildOwnerStats(calls),
+            rawDocCount: totalCalls,
+            filteredDocCount: totalCalls,
+            fromCache: false,
+            fallback: true,
+          })
+          setLastUpdated(new Date())
+          setError(null)
+          return
+        } catch (fallbackErr) {
+          setError({
+            message: fallbackErr?.message || String(fallbackErr),
+            code: fallbackErr?.code,
+            rawMessage: fallbackErr?.rawMessage,
+          })
+        }
+      } else {
+        setError({ message: serverErr?.message || String(serverErr) })
+      }
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadCalls()
-    const intervalId = setInterval(() => { loadCalls() }, POLLING_INTERVAL)
-    return () => { clearInterval(intervalId) }
   }, [])
 
-  const getCallDate = (call) => {
-    const raw = call.Date || call.call_timestamp || call.created_at || call.createdAt || call.call_date || call.callDate || null
-    if (!raw) return null
-    if (typeof raw.toDate === 'function') return raw.toDate()
-    return new Date(raw)
-  }
-
-  const filteredCalls = useMemo(() => {
-    return calls.filter((call) => {
-      if (filters.search) {
-        const s = filters.search.toLowerCase()
-        if (!call.Name?.toLowerCase().includes(s) && !call.Lead_id?.toLowerCase().includes(s)) return false
-      }
-      if (filters.leadOwner && call.Lead_owner !== filters.leadOwner) return false
-      if (filters.city && call.City !== filters.city) return false
-      if (filters.state && call.State !== filters.state) return false
-      if (filters.course && call.course !== filters.course) return false
-      if (filters.callType && call.Call_type !== filters.callType) return false
-      if (filters.leadStage && call.lead_stage !== filters.leadStage) return false
-      if (filters.disposition && call.Disposition?.counselor !== filters.disposition) return false
-      const score = call.scores?.overall || 0
-      if (filters.minScore !== '' && score < Number(filters.minScore)) return false
-      if (filters.maxScore !== '' && score > Number(filters.maxScore)) return false
-      const duration = call.Duration?.seconds || 0
-      if (filters.minDuration !== '' && duration < Number(filters.minDuration)) return false
-      if (filters.maxDuration !== '' && duration > Number(filters.maxDuration)) return false
-      const callDate = getCallDate(call)
-      if (filters.startDate) {
-        const [sy, sm, sd] = filters.startDate.split('-').map(Number)
-        if (callDate && callDate < new Date(sy, sm - 1, sd)) return false
-      }
-      if (filters.endDate) {
-        const [ey, em, ed] = filters.endDate.split('-').map(Number)
-        if (callDate && callDate >= new Date(ey, em - 1, ed + 1)) return false
-      }
-      return true
+  useEffect(() => {
+    loadDashboard({
+      mode: startDate || endDate ? 'range' : 'cached',
+      sd: startDate || undefined,
+      ed: endDate || undefined,
     })
-  }, [calls, filters])
-
-  const buildOwnerStats = (sourceCalls) => {
-    const map = {}
-    sourceCalls.forEach((call) => {
-      const owner = call.Lead_owner || 'Unassigned'
-      if (!map[owner]) map[owner] = { owner, totalCalls: 0, totalScore: 0, maxScore: 0 }
-      const score = call.scores?.overall || 0
-      map[owner].totalCalls += 1
-      map[owner].totalScore += score
-      if (score > map[owner].maxScore) map[owner].maxScore = score
-    })
-    return Object.values(map)
-      .map((item) => ({ ...item, avgScore: item.totalCalls > 0 ? Math.round(item.totalScore / item.totalCalls) : 0 }))
-      .sort((a, b) => b.totalCalls - a.totalCalls)
-  }
-
-  const ownerStatsToday = useMemo(() => {
-    if (filters.startDate || filters.endDate) return buildOwnerStats(filteredCalls)
-    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
-    return buildOwnerStats(filteredCalls.filter((c) => { const d = getCallDate(c); return d && d >= startOfToday }))
-  }, [filteredCalls, filters.startDate, filters.endDate])
-
-  const ownerStatsMonth = useMemo(() => {
-    if (filters.startDate || filters.endDate) return buildOwnerStats(filteredCalls)
-    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-    return buildOwnerStats(filteredCalls.filter((c) => { const d = getCallDate(c); return d && d >= monthStart }))
-  }, [filteredCalls, filters.startDate, filters.endDate])
-
-  const ownerStatsOverall = useMemo(() => buildOwnerStats(filteredCalls), [filteredCalls])
+    const intervalId = setInterval(() => {
+      loadDashboard({
+        mode: startDate || endDate ? 'range' : 'cached',
+        sd: startDate || undefined,
+        ed: endDate || undefined,
+      })
+    }, POLLING_INTERVAL)
+    return () => { clearInterval(intervalId) }
+  }, [loadDashboard, startDate, endDate])
 
   const formatDateInput = (date) => {
     const y = date.getFullYear()
@@ -151,22 +165,44 @@ const Dashboard = () => {
 
     if (range === 'today') {
       const v = formatDateInput(startOfToday)
-      setFilters((p) => ({ ...p, startDate: v, endDate: v }))
+      setStartDate(v)
+      setEndDate(v)
+      loadDashboard({ mode: 'range', sd: v, ed: v })
     } else if (range === 'week') {
       const day = today.getDay()
       const diff = day === 0 ? 6 : day - 1
       const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - diff)
-      setFilters((p) => ({ ...p, startDate: formatDateInput(weekStart), endDate: formatDateInput(startOfToday) }))
+      const sd = formatDateInput(weekStart)
+      const ed = formatDateInput(startOfToday)
+      setStartDate(sd)
+      setEndDate(ed)
+      loadDashboard({ mode: 'range', sd, ed })
     } else if (range === 'month') {
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-      setFilters((p) => ({ ...p, startDate: formatDateInput(monthStart), endDate: formatDateInput(startOfToday) }))
+      const sd = formatDateInput(monthStart)
+      const ed = formatDateInput(startOfToday)
+      setStartDate(sd)
+      setEndDate(ed)
+      loadDashboard({ mode: 'range', sd, ed })
     } else if (range === 'all') {
-      setFilters((p) => ({ ...p, startDate: '', endDate: '' }))
+      setStartDate('')
+      setEndDate('')
+      loadDashboard({ mode: 'cached' })
     }
   }
 
-  const dateLabel = filters.startDate || filters.endDate
-    ? (filters.startDate === filters.endDate ? 'Today' : 'Selected range')
+  const handleCustomDateChange = (field, value) => {
+    const nextStartDate = field === 'start' ? value : startDate
+    const nextEndDate = field === 'end' ? value : endDate
+    if (field === 'start') setStartDate(value)
+    else setEndDate(value)
+    if (nextStartDate && nextEndDate) {
+      loadDashboard({ mode: 'range', sd: nextStartDate, ed: nextEndDate })
+    }
+  }
+
+  const dateLabel = startDate || endDate
+    ? (startDate === endDate ? 'Today' : 'Selected range')
     : 'All time'
 
   return (
@@ -188,15 +224,25 @@ const Dashboard = () => {
                   Updated {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
+              {snapshot?.fromCache && (
+                <span className="text-[10px] text-slate-400 dark:text-slate-600 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                  cached
+                </span>
+              )}
+              {snapshot?.elapsed != null && (
+                <span className="text-[10px] text-slate-400 dark:text-slate-600">
+                  {(snapshot.elapsed / 1000).toFixed(1)}s
+                </span>
+              )}
               <span className="text-xs text-slate-400 dark:text-slate-600">
-                {calls.length > 0 && `${calls.length.toLocaleString('en-IN')} records`}
+                {snapshot?.filteredDocCount > 0 && `${snapshot.filteredDocCount.toLocaleString('en-IN')} records`}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={loadCalls}
+              onClick={() => loadDashboard({ mode: 'full', sd: startDate || undefined, ed: endDate || undefined })}
               disabled={loading}
               className={cn(
                 "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50",
@@ -231,15 +277,15 @@ const Dashboard = () => {
             <div className="flex items-center gap-2 ml-1">
               <input
                 type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters((p) => ({ ...p, startDate: e.target.value }))}
+                value={startDate}
+                onChange={(e) => handleCustomDateChange('start', e.target.value)}
                 className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-400"
               />
               <span className="text-slate-300 dark:text-slate-600 text-xs">to</span>
               <input
                 type="date"
-                value={filters.endDate}
-                onChange={(e) => setFilters((p) => ({ ...p, endDate: e.target.value }))}
+                value={endDate}
+                onChange={(e) => handleCustomDateChange('end', e.target.value)}
                 className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-400"
               />
             </div>
@@ -265,15 +311,15 @@ const Dashboard = () => {
         )}
 
         {/* KPI Cards */}
-        <MetricsCards calls={filteredCalls} loading={loading} dateLabel={dateLabel} />
+        <MetricsCards kpi={snapshot?.kpi} loading={loading} dateLabel={dateLabel} />
 
         {/* Performance */}
         <LazySection height="220px">
-          <PerformanceCards ownerStatsToday={ownerStatsToday} ownerStatsMonth={ownerStatsMonth} />
+          <PerformanceCards ownerStatsToday={snapshot?.ownerStatsToday} ownerStatsMonth={snapshot?.ownerStatsMonth} />
         </LazySection>
 
         <LazySection height="340px">
-          <PerformanceCharts ownerStats={ownerStatsOverall} />
+          <PerformanceCharts ownerStats={snapshot?.ownerStatsOverall} />
         </LazySection>
       </div>
     </div>

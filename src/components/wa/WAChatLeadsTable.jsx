@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { cn } from '../../lib/utils'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 import { maskLeadId } from '../../lib/userManagement'
 
 function maskPersonName(name, masked) {
@@ -41,6 +43,8 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
     }
     return list
   }, [rows, q, stageFilter])
+
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(filtered, 25)
 
   if (loading) {
     return (
@@ -126,9 +130,11 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
             </tr>
           </thead>
           <tbody className={isDark ? 'divide-y divide-slate-800/80' : 'divide-y divide-slate-100'}>
-            {filtered.map((r, i) => (
-              <tr key={`${r.leadId}-${i}`} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80'}>
-                <td className={cn('px-4 py-2 tabular-nums', isDark ? 'text-slate-500' : 'text-slate-400')}>{r.slNo || i + 1}</td>
+            {paginated.map((r, i) => (
+              <tr key={`${r.leadId}-${(page - 1) * pageSize + i}`} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80'}>
+                <td className={cn('px-4 py-2 tabular-nums', isDark ? 'text-slate-500' : 'text-slate-400')}>
+                  {r.slNo || (page - 1) * pageSize + i + 1}
+                </td>
                 <td className={cn('px-4 py-2 font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskLeadId(r.leadId, dataMasked)}</td>
                 <td className={cn('px-4 py-2 font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}>{maskPersonName(r.registeredName, dataMasked)}</td>
                 <td className={cn('px-4 py-2', isDark ? 'text-slate-400' : 'text-slate-600')}>{r.source || '—'}</td>
@@ -149,6 +155,16 @@ export default function WAChatLeadsTable({ rows, theme, dataMasked, fetchedAt, l
         </table>
         {filtered.length === 0 && (
           <p className={cn('text-center py-10 text-sm', isDark ? 'text-slate-500' : 'text-slate-400')}>No rows match your filters.</p>
+        )}
+        {filtered.length > 0 && (
+          <PaginationBar
+            page={page}
+            setPage={setPage}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            className={isDark ? 'border-slate-700/50' : ''}
+          />
         )}
       </div>
     </div>

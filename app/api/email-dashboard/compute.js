@@ -1,5 +1,5 @@
 import clientPromise from '../../../src/lib/mongodb'
-import { isOnOrAfter } from '../../../src/lib/conversionAttribution'
+import { isOnOrAfter, parseOptDate } from '../../../src/lib/conversionAttribution'
 
 const DB = 'itm'
 const EMAIL_COL = 'aws_ses_webhook_ibs'
@@ -51,117 +51,137 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
 
   const validEventTypes = Object.keys(STAGE_MAP)
 
-  const [subjectResult, clickedEmailsResult, clickBreakdownResult, totalDocs] = await Promise.all([
-    col.aggregate([
-      { $match: { ...matchFilter, 'detail.eventType': { $in: validEventTypes } } },
-      {
-        $group: {
-          _id: {
-            subject: '$detail.mail.commonHeaders.subject',
-            eventType: '$detail.eventType',
-          },
-          count: { $sum: 1 },
-          firstSeen: { $min: '$time' },
-          lastSeen: { $max: '$time' },
-          sampleSource: { $first: '$detail.mail.source' },
-          sampleFrom: { $first: { $arrayElemAt: ['$detail.mail.commonHeaders.from', 0] } },
-          sampleDate: { $first: '$detail.mail.commonHeaders.date' },
-          templateId: { $first: { $arrayElemAt: ['$detail.mail.tags.templateId', 0] } },
-        },
-      },
-    ]).toArray(),
+  const aggOpts = { allowDiskUse: true }
 
-    col.aggregate([
-      { $match: { ...matchFilter, 'detail.eventType': 'Click' } },
-      {
-        $group: {
-          _id: {
-            subject: '$detail.mail.commonHeaders.subject',
-            email: { $arrayElemAt: ['$detail.mail.destination', 0] },
-          },
-        },
-      },
-    ]).toArray(),
-
-    col.aggregate([
-      { $match: { ...matchFilter, 'detail.eventType': 'Click' } },
-      { $sort: { time: -1 } },
-      {
-        $addFields: {
-          _emailLower: {
-            $toLower: {
-              $trim: {
-                input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
+  /** Single scan of Click events: subject×email + per-email click lists (was two separate aggregations). */
+  const clickFacetPipeline = [
+    { $match: { ...matchFilter, 'detail.eventType': 'Click' } },
+    {
+      $facet: {
+        bySubjectEmail: [
+          {
+            $group: {
+              _id: {
+                subject: '$detail.mail.commonHeaders.subject',
+                email: { $arrayElemAt: ['$detail.mail.destination', 0] },
               },
             },
           },
-          _buttonLabel: {
-            $cond: {
-              if: { $gt: [{ $size: { $ifNull: ['$detail.click.linkTags', []] } }, 0] },
-              then: {
-                $let: {
-                  vars: { ft: { $arrayElemAt: ['$detail.click.linkTags', 0] } },
-                  in: {
-                    $trim: {
-                      input: {
+        ],
+        byEmailClicks: [
+          { $sort: { time: -1 } },
+          {
+            $addFields: {
+              _emailLower: {
+                $toLower: {
+                  $trim: {
+                    input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
+                  },
+                },
+              },
+              _buttonLabel: {
+                $cond: {
+                  if: { $gt: [{ $size: { $ifNull: ['$detail.click.linkTags', []] } }, 0] },
+                  then: {
+                    $let: {
+                      vars: { ft: { $arrayElemAt: ['$detail.click.linkTags', 0] } },
+                      in: {
+                        $trim: {
+                          input: {
+                            $ifNull: [
+                              '$$ft.value',
+                              { $ifNull: ['$$ft.name', ''] },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  },
+                  else: '',
+                },
+              },
+            },
+          },
+          { $match: { _emailLower: { $nin: [null, ''] } } },
+          {
+            $group: {
+              _id: '$_emailLower',
+              clicks: {
+                $push: {
+                  template: {
+                    $cond: {
+                      if: {
+                        $gt: [
+                          { $strLenCP: { $ifNull: ['$detail.mail.commonHeaders.subject', ''] } },
+                          0,
+                        ],
+                      },
+                      then: '$detail.mail.commonHeaders.subject',
+                      else: {
                         $ifNull: [
-                          '$$ft.value',
-                          { $ifNull: ['$$ft.name', ''] },
+                          { $arrayElemAt: ['$detail.mail.tags.templateId', 0] },
+                          '(no subject)',
                         ],
                       },
                     },
                   },
+                  templateId: { $ifNull: [{ $arrayElemAt: ['$detail.mail.tags.templateId', 0] }, ''] },
+                  button: {
+                    $cond: {
+                      if: { $gt: [{ $strLenCP: { $ifNull: ['$_buttonLabel', ''] } }, 0] },
+                      then: '$_buttonLabel',
+                      else: 'Link',
+                    },
+                  },
+                  link: { $ifNull: ['$detail.click.link', ''] },
+                  type: 'click',
+                  time: '$time',
                 },
               },
-              else: '',
             },
           },
-        },
+        ],
       },
-      { $match: { _emailLower: { $nin: [null, ''] } } },
-      {
-        $group: {
-          _id: '$_emailLower',
-          clicks: {
-            $push: {
-              template: {
-                $cond: {
-                  if: {
-                    $gt: [
-                      { $strLenCP: { $ifNull: ['$detail.mail.commonHeaders.subject', ''] } },
-                      0,
-                    ],
-                  },
-                  then: '$detail.mail.commonHeaders.subject',
-                  else: {
-                    $ifNull: [
-                      { $arrayElemAt: ['$detail.mail.tags.templateId', 0] },
-                      '(no subject)',
-                    ],
-                  },
-                },
+    },
+  ]
+
+  const [subjectResult, clickFacetRows, totalDocs, lastDocArr] = await Promise.all([
+    col
+      .aggregate(
+        [
+          { $match: { ...matchFilter, 'detail.eventType': { $in: validEventTypes } } },
+          {
+            $group: {
+              _id: {
+                subject: '$detail.mail.commonHeaders.subject',
+                eventType: '$detail.eventType',
               },
-              templateId: { $ifNull: [{ $arrayElemAt: ['$detail.mail.tags.templateId', 0] }, ''] },
-              button: {
-                $cond: {
-                  if: { $gt: [{ $strLenCP: { $ifNull: ['$_buttonLabel', ''] } }, 0] },
-                  then: '$_buttonLabel',
-                  else: 'Link',
-                },
-              },
-              link: { $ifNull: ['$detail.click.link', ''] },
-              type: 'click',
-              time: '$time',
+              count: { $sum: 1 },
+              firstSeen: { $min: '$time' },
+              lastSeen: { $max: '$time' },
+              sampleSource: { $first: '$detail.mail.source' },
+              sampleFrom: { $first: { $arrayElemAt: ['$detail.mail.commonHeaders.from', 0] } },
+              sampleDate: { $first: '$detail.mail.commonHeaders.date' },
+              templateId: { $first: { $arrayElemAt: ['$detail.mail.tags.templateId', 0] } },
             },
           },
-        },
-      },
-    ]).toArray(),
+        ],
+        aggOpts,
+      )
+      .toArray(),
+
+    col.aggregate(clickFacetPipeline, aggOpts).toArray(),
 
     Object.keys(matchFilter).length === 0
       ? col.estimatedDocumentCount()
       : col.countDocuments(matchFilter),
+
+    col.find({}).sort({ time: -1 }).limit(1).project({ time: 1 }).toArray(),
   ])
+
+  const clickFacet = clickFacetRows[0] || { bySubjectEmail: [], byEmailClicks: [] }
+  const clickedEmailsResult = clickFacet.bySubjectEmail
+  const clickBreakdownResult = clickFacet.byEmailClicks
 
   const rawKpi = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 }
   const subjectMap = {}
@@ -228,118 +248,74 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     }
   }
 
-  /** First SES Send time per (email, subject); not limited to dashboard date range */
-  const firstSendRows = clickedEmailList.length > 0
-    ? await col.aggregate([
-        { $match: { 'detail.eventType': 'Send' } },
-        {
-          $addFields: {
-            em: {
-              $toLower: {
-                $trim: {
-                  input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
-                },
-              },
-            },
-          },
-        },
-        { $match: { em: { $in: clickedEmailList } } },
-        {
-          $group: {
-            _id: {
-              email: '$em',
-              subject: '$detail.mail.commonHeaders.subject',
-            },
-            firstSent: { $min: '$time' },
-          },
-        },
-      ]).toArray()
-    : []
-
-  const firstSendMap = new Map()
-  for (const row of firstSendRows) {
-    const em = row._id?.email
-    const sub = row._id?.subject
-    if (!em || !sub) continue
-    firstSendMap.set(emailSubjectKey(em, sub), row.firstSent)
-  }
-
-  function emailQualifiesAfterSend(emailLower, eventTime) {
-    const subs = emailToSubjects.get(emailLower)
-    if (!subs || eventTime == null) return false
-    for (const sub of subs) {
-      const sent = firstSendMap.get(emailSubjectKey(emailLower, sub))
-      if (sent != null && isOnOrAfter(eventTime, sent)) return true
-    }
-    return false
-  }
-
   const crmSnapshotCol = db.collection(CRM_SNAPSHOT_COL)
   const clickEmailsForLead = [...new Set(clickBreakdownResult.map((r) => r._id).filter(Boolean))]
-  const leadByEmail = new Map()
-  if (clickEmailsForLead.length > 0) {
-    const leadRows = await crmSnapshotCol
-      .aggregate([
-        {
-          $match: {
-            $expr: {
-              $in: [
-                {
-                  $toLower: {
-                    $trim: {
-                      input: { $ifNull: ['$email', ''] },
-                    },
-                  },
-                },
-                clickEmailsForLead,
-              ],
-            },
-          },
-        },
-        { $sort: { _id: -1 } },
-        {
-          $group: {
-            _id: {
-              $toLower: {
-                $trim: {
-                  input: { $ifNull: ['$email', ''] },
-                },
-              },
-            },
-            leadId: { $first: { $ifNull: ['$lead_id', ''] } },
-          },
-        },
-      ])
-      .toArray()
-    for (const row of leadRows) {
-      const lid = row.leadId != null && String(row.leadId).trim() !== '' ? String(row.leadId) : ''
-      if (row._id && lid) leadByEmail.set(row._id, lid)
-    }
-  }
-
-  const clickBreakdown = clickBreakdownResult
-    .filter((r) => r._id)
-    .map((r) => ({
-      email: r._id,
-      leadId: leadByEmail.get(r._id) || null,
-      totalClicks: r.clicks.length,
-      clicks: r.clicks.slice(0, 20),
-    }))
-    .sort((a, b) => b.totalClicks - a.totalClicks)
-
-  const templateRows = Object.values(subjectMap).map((row) => ({
-    ...row,
-    deliveryRate: pct(row.delivered, row.sent),
-    openRate: pct(row.opened, row.delivered),
-    clickRate: pct(row.clicked, row.delivered),
-    bounceRate: pct(row.bounced, row.sent),
-  })).sort((a, b) => b.sent - a.sent)
-
   const appsCol = db.collection(APPS_COL)
 
-  const [formSubmittedAgg, paidAgg] = await Promise.all([
+  /** Parallel follow-ups (same pattern as WA dashboard: cache miss / full recompute). */
+  const firstSendPipeline = [
+    { $match: { 'detail.eventType': 'Send' } },
+    {
+      $addFields: {
+        em: {
+          $toLower: {
+            $trim: {
+              input: { $ifNull: [{ $arrayElemAt: ['$detail.mail.destination', 0] }, ''] },
+            },
+          },
+        },
+      },
+    },
+    { $match: { em: { $in: clickedEmailList } } },
+    {
+      $group: {
+        _id: {
+          email: '$em',
+          subject: '$detail.mail.commonHeaders.subject',
+        },
+        firstSent: { $min: '$time' },
+      },
+    },
+  ]
+
+  const crmLeadPipeline =
+    clickEmailsForLead.length > 0
+      ? [
+          {
+            $match: {
+              $expr: {
+                $in: [
+                  {
+                    $toLower: {
+                      $trim: {
+                        input: { $ifNull: ['$email', ''] },
+                      },
+                    },
+                  },
+                  clickEmailsForLead,
+                ],
+              },
+            },
+          },
+          { $sort: { _id: -1 } },
+          {
+            $group: {
+              _id: {
+                $toLower: {
+                  $trim: {
+                    input: { $ifNull: ['$email', ''] },
+                  },
+                },
+              },
+              leadId: { $first: { $ifNull: ['$lead_id', ''] } },
+            },
+          },
+        ]
+      : []
+
+  const formPipeline =
     clickedEmailList.length > 0
-      ? appsCol.aggregate([
+      ? [
           {
             $match: {
               'personal_details.email_id': { $in: clickedEmailList },
@@ -347,16 +323,30 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
             },
           },
           {
-            $group: {
-              _id: { $toLower: '$personal_details.email_id' },
-              formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
+            $addFields: {
+              _sortAt: { $ifNull: ['$createdAt', '$updatedAt'] },
+              _npfLead: {
+                $ifNull: [
+                  '$other_info.lead_id',
+                  { $ifNull: ['$npfData.lead_id', '$npfData.leadId'] },
+                ],
+              },
             },
           },
-        ]).toArray()
-      : Promise.resolve([]),
+          { $sort: { _sortAt: 1 } },
+          {
+            $group: {
+              _id: { $toLower: '$personal_details.email_id' },
+              formSubmittedAt: { $max: '$_sortAt' },
+              leadIdRaw: { $last: '$_npfLead' },
+            },
+          },
+        ]
+      : []
 
+  const paidPipeline =
     clickedEmailList.length > 0
-      ? appsCol.aggregate([
+      ? [
           {
             $match: {
               'personal_details.email_id': { $in: clickedEmailList },
@@ -379,9 +369,65 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
               payment_amount: { $first: '$payment_details.payment_amount1' },
             },
           },
-        ]).toArray()
+        ]
+      : []
+
+  const [firstSendRows, leadRows, formSubmittedAgg, paidAgg] = await Promise.all([
+    clickedEmailList.length > 0
+      ? col.aggregate(firstSendPipeline, aggOpts).toArray()
+      : Promise.resolve([]),
+    clickEmailsForLead.length > 0
+      ? crmSnapshotCol.aggregate(crmLeadPipeline, aggOpts).toArray()
+      : Promise.resolve([]),
+    clickedEmailList.length > 0
+      ? appsCol.aggregate(formPipeline, aggOpts).toArray()
+      : Promise.resolve([]),
+    clickedEmailList.length > 0
+      ? appsCol.aggregate(paidPipeline, aggOpts).toArray()
       : Promise.resolve([]),
   ])
+
+  const firstSendMap = new Map()
+  for (const row of firstSendRows) {
+    const em = row._id?.email
+    const sub = row._id?.subject
+    if (!em || !sub) continue
+    firstSendMap.set(emailSubjectKey(em, sub), row.firstSent)
+  }
+
+  function emailQualifiesAfterSend(emailLower, eventTime) {
+    const subs = emailToSubjects.get(emailLower)
+    if (!subs || eventTime == null) return false
+    for (const sub of subs) {
+      const sent = firstSendMap.get(emailSubjectKey(emailLower, sub))
+      if (sent != null && isOnOrAfter(eventTime, sent)) return true
+    }
+    return false
+  }
+
+  const leadByEmail = new Map()
+  for (const row of leadRows) {
+    const lid = row.leadId != null && String(row.leadId).trim() !== '' ? String(row.leadId) : ''
+    if (row._id && lid) leadByEmail.set(row._id, lid)
+  }
+
+  const clickBreakdown = clickBreakdownResult
+    .filter((r) => r._id)
+    .map((r) => ({
+      email: r._id,
+      leadId: leadByEmail.get(r._id) || null,
+      totalClicks: r.clicks.length,
+      clicks: r.clicks.slice(0, 20),
+    }))
+    .sort((a, b) => b.totalClicks - a.totalClicks)
+
+  const templateRows = Object.values(subjectMap).map((row) => ({
+    ...row,
+    deliveryRate: pct(row.delivered, row.sent),
+    openRate: pct(row.opened, row.delivered),
+    clickRate: pct(row.clicked, row.delivered),
+    bounceRate: pct(row.bounced, row.sent),
+  })).sort((a, b) => b.sent - a.sent)
 
   const formByEmail = new Map(formSubmittedAgg.map((r) => [r._id, r.formSubmittedAt]))
   const paidByEmail = new Map(paidAgg.map((r) => [r._id, r]))
@@ -411,17 +457,61 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
       clicked: emails.length,
       formSubmitted: formCount,
       paid: paidCount,
+      /** % of clicked users on this subject who submitted a form */
+      formRate: emails.length > 0 ? parseFloat(((formCount / emails.length) * 100).toFixed(1)) : 0,
+      /** % of clicked users on this subject who paid */
+      paidRate: emails.length > 0 ? parseFloat(((paidCount / emails.length) * 100).toFixed(1)) : 0,
       rate: emails.length > 0 ? parseFloat(((paidCount / emails.length) * 100).toFixed(1)) : 0,
     }
   }
+
+  function stringifyLeadId(raw) {
+    if (raw == null || raw === '') return null
+    const s = String(raw).trim()
+    return s === '' ? null : s
+  }
+
+  const formSubmittedDetails = formSubmittedResult
+    .map((r) => {
+      const email = r._id
+      const dt = parseOptDate(r.formSubmittedAt)
+      const npfLead = stringifyLeadId(r.leadIdRaw)
+      const crmLead = leadByEmail.get(email) || null
+      const subjectsClicked = [...(emailToSubjects.get(email) || [])]
+      return {
+        email,
+        leadId: npfLead || crmLead,
+        formSubmittedAtIso: dt ? dt.toISOString() : null,
+        formSubmittedAtDisplay: dt
+          ? dt.toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Kolkata',
+            })
+          : '—',
+        subjectsClicked,
+      }
+    })
+    .sort((a, b) => {
+      const ta = a.formSubmittedAtIso ? Date.parse(a.formSubmittedAtIso) : 0
+      const tb = b.formSubmittedAtIso ? Date.parse(b.formSubmittedAtIso) : 0
+      return tb - ta
+    })
 
   const emailPaymentConversion = {
     totalClicked: clickedEmailList.length,
     formSubmitted: formSubmittedResult.length,
     paid: paidResult.length,
     conversionRate: clickedEmailList.length > 0
+      ? parseFloat(((formSubmittedResult.length / clickedEmailList.length) * 100).toFixed(2))
+      : 0,
+    paidConversionRate: clickedEmailList.length > 0
       ? parseFloat(((paidResult.length / clickedEmailList.length) * 100).toFixed(2))
       : 0,
+    formSubmittedDetails,
     paidDetails: paidResult.map((r) => ({
       email: r._id,
       application_no: r.application_no,
@@ -438,8 +528,7 @@ export async function computeEmailDashboard({ mode = 'cached', startDate, endDat
     { label: 'Bounced', value: rawKpi.bounced },
   ]
 
-  const lastDoc = await col.find({}).sort({ time: -1 }).limit(1).project({ time: 1 }).toArray()
-  const lastRawDocTime = lastDoc[0]?.time || new Date().toISOString()
+  const lastRawDocTime = lastDocArr[0]?.time || new Date().toISOString()
 
   const dashboard = {
     channel: 'email',

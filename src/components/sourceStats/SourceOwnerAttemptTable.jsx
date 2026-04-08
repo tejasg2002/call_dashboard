@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react'
 import { cn } from '../../lib/utils'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 function stripEmail(name) {
   if (!name) return name
@@ -61,6 +63,7 @@ export default function SourceOwnerAttemptTable({
 }) {
   const list = Array.isArray(rows) ? rows : []
   const hasRows = list.length > 0
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(list, 25)
 
   const colMaxes = useMemo(() => {
     if (!hasRows) return {}
@@ -224,7 +227,7 @@ export default function SourceOwnerAttemptTable({
               </tr>
             )}
             {!loading &&
-              list.map((row) => (
+              paginated.map((row) => (
                 <tr
                   key={row.owner}
                   className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
@@ -269,6 +272,15 @@ export default function SourceOwnerAttemptTable({
             )}
           </tbody>
         </table>
+        {!loading && hasRows && (
+          <PaginationBar
+            page={page}
+            setPage={setPage}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+          />
+        )}
       </div>
     </div>
   )

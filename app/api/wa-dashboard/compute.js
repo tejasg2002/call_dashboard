@@ -250,9 +250,22 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
           },
         },
         {
+          $addFields: {
+            _sortAt: { $ifNull: ['$createdAt', '$updatedAt'] },
+            _npfLead: {
+              $ifNull: [
+                '$other_info.lead_id',
+                { $ifNull: ['$npfData.lead_id', '$npfData.leadId'] },
+              ],
+            },
+          },
+        },
+        { $sort: { _sortAt: 1 } },
+        {
           $group: {
             _id: '$personal_details.mobile_number',
-            formSubmittedAt: { $max: { $ifNull: ['$createdAt', '$updatedAt'] } },
+            formSubmittedAt: { $max: '$_sortAt' },
+            leadIdRaw: { $last: '$_npfLead' },
           },
         },
       ]).toArray()
@@ -293,22 +306,6 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
   const formConversionRate = clickedPhones.length > 0
     ? parseFloat(((formSubmittedCount / clickedPhones.length) * 100).toFixed(2))
     : 0
-
-  const paymentConversion = {
-    totalClicked: clickedPhones.length,
-    formSubmitted: formSubmittedCount,
-    conversionRate: formConversionRate,
-    formSubmittedMobiles,
-    formSubmittedDetails: formSubmittedMobiles.map((m) => {
-      const norm = normaliseMobile(m)
-      const attr = clickAttrMap.get(norm)
-      return {
-        mobile: m,
-        clickedTemplates: attr?.templates || [],
-        clickedButtons: attr?.buttons || [],
-      }
-    }),
-  }
 
   const engagementSummary = {
     total: clickedPhones.length,
@@ -352,8 +349,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
   ]).toArray()
 
   const phoneVariantsForLead = [
-    ...new Set(
-      clickBreakdownResult
+    ...new Set([
+      ...clickBreakdownResult
         .map((r) => r._id)
         .filter(Boolean)
         .flatMap((p) => {
@@ -363,7 +360,14 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
           if (n.length === 10) v.push(`91${n}`)
           return v
         }),
-    ),
+      ...formSubmittedMobiles.flatMap((p) => {
+        const n = normaliseMobile(p)
+        if (!n) return []
+        const v = [n]
+        if (n.length === 10) v.push(`91${n}`)
+        return v
+      }),
+    ]),
   ]
 
   const crmSnapshotCol = db.collection(CRM_SNAPSHOT_COL)
@@ -398,6 +402,105 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
       clicks: r.clicks.slice(0, 20),
     }))
     .sort((a, b) => b.totalClicks - a.totalClicks)
+
+  function stringifyLeadId(raw) {
+    if (raw == null || raw === '') return null
+    const s = String(raw).trim()
+    return s === '' ? null : s
+  }
+
+  const formMetaByNorm = new Map()
+  for (const row of formSubmittedResult) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const dt = parseOptDate(row.formSubmittedAt)
+    formMetaByNorm.set(norm, {
+      formSubmittedAtIso: dt ? dt.toISOString() : null,
+      formSubmittedAtDisplay: dt
+        ? dt.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Kolkata',
+          })
+        : '—',
+      leadIdFromNpf: stringifyLeadId(row.leadIdRaw),
+    })
+  }
+
+  const clickTimelineByNorm = new Map()
+  const MAX_TIMELINE_EVENTS = 40
+  if (convertedMobiles.length > 0) {
+    const clickTimelineResult = await waCol.aggregate([
+      { $match: { ...matchFilter, stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+      { $sort: { event_timestamp: 1 } },
+      {
+        $group: {
+          _id: '$phone_number',
+          events: {
+            $push: {
+              template: '$template_name',
+              button: '$button_text',
+              clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+            },
+          },
+        },
+      },
+    ]).toArray()
+
+    for (const row of clickTimelineResult) {
+      const norm = normaliseMobile(row._id)
+      if (!norm) continue
+      const rawEvents = row.events || []
+      const slice = rawEvents.length > MAX_TIMELINE_EVENTS
+        ? rawEvents.slice(-MAX_TIMELINE_EVENTS)
+        : rawEvents
+      const events = slice.map((e) => {
+        const dt = parseOptDate(e.clickAt)
+        return {
+          template: e.template || '',
+          button: e.button || '',
+          clickAtIso: dt ? dt.toISOString() : null,
+          clickAtDisplay: dt
+            ? dt.toLocaleString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Kolkata',
+              })
+            : '—',
+        }
+      })
+      clickTimelineByNorm.set(norm, events)
+    }
+  }
+
+  const paymentConversion = {
+    totalClicked: clickedPhones.length,
+    formSubmitted: formSubmittedCount,
+    conversionRate: formConversionRate,
+    formSubmittedMobiles,
+    formSubmittedDetails: formSubmittedMobiles.map((m) => {
+      const norm = normaliseMobile(m)
+      const attr = clickAttrMap.get(norm)
+      const meta = formMetaByNorm.get(norm)
+      const npfLead = meta?.leadIdFromNpf
+      const crmLead = leadByNormMobile.get(norm)
+      return {
+        mobile: m,
+        leadId: npfLead || crmLead || null,
+        formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
+        formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
+        clickedTemplates: attr?.templates || [],
+        clickedButtons: attr?.buttons || [],
+        clickTimeline: clickTimelineByNorm.get(norm) || [],
+      }
+    }),
+  }
 
   const lastDoc = await waCol.find({}).sort({ event_timestamp: -1 }).limit(1).toArray()
   const lastRawDocTime = lastDoc[0]?.event_timestamp

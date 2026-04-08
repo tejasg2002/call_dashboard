@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { fetchSmsDashboard } from '../../../src/lib/smsDashboardApi'
 import { useTheme } from '../../providers'
 import { cn } from '../../../src/lib/utils'
+import { useClientPagination } from '../../../src/hooks/useClientPagination'
+import PaginationBar from '../../../src/components/PaginationBar'
 
 function fmt(n) { return (n || 0).toLocaleString('en-IN') }
 
@@ -69,6 +71,8 @@ export default function SmsPage() {
   const kpi = snapshot?.kpi || {}
   const campaignRows = snapshot?.campaignRows || []
   const topFailures = snapshot?.topFailures || []
+  const campPag = useClientPagination(campaignRows, 25)
+  const failPag = useClientPagination(topFailures, 25)
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
@@ -156,7 +160,7 @@ export default function SmsPage() {
                 </tr>
               </thead>
               <tbody>
-                {campaignRows.map((r) => (
+                {campPag.paginated.map((r) => (
                   <tr key={r.campaign} className="border-b last:border-b-0 border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                     <td className="px-5 py-3 font-medium text-slate-900 dark:text-white text-xs">{r.campaign}</td>
                     <td className="px-5 py-3 text-right text-slate-600 dark:text-slate-300 font-mono text-xs">{fmt(r.sent)}</td>
@@ -178,6 +182,13 @@ export default function SmsPage() {
                 ))}
               </tbody>
             </table>
+            <PaginationBar
+              page={campPag.page}
+              setPage={campPag.setPage}
+              totalPages={campPag.totalPages}
+              total={campPag.total}
+              pageSize={campPag.pageSize}
+            />
           </div>
         </div>
       )}
@@ -192,13 +203,20 @@ export default function SmsPage() {
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Top Failure Reasons</h3>
           </div>
           <div className="px-5 py-3 space-y-2">
-            {topFailures.map((f) => (
+            {failPag.paginated.map((f) => (
               <div key={f.reason} className="flex items-center justify-between gap-4">
                 <span className="text-xs text-slate-600 dark:text-slate-300 truncate flex-1">{f.reason}</span>
                 <span className="text-xs font-mono font-semibold text-red-500 dark:text-red-400 shrink-0">{fmt(f.count)}</span>
               </div>
             ))}
           </div>
+          <PaginationBar
+            page={failPag.page}
+            setPage={failPag.setPage}
+            totalPages={failPag.totalPages}
+            total={failPag.total}
+            pageSize={failPag.pageSize}
+          />
         </div>
       )}
 

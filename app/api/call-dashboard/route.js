@@ -1,6 +1,5 @@
-import { computeEmailDashboard } from './compute'
+import { computeCallDashboard } from './compute'
 
-/** Full email recompute can exceed 60s on large SES collections; align with other heavy dashboard routes. */
 export const maxDuration = 120
 
 export async function GET(request) {
@@ -10,10 +9,10 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    const result = await computeEmailDashboard({ mode, startDate, endDate })
+    const result = await computeCallDashboard({ mode, startDate, endDate })
     return Response.json(result)
   } catch (err) {
-    console.error('[api/email-dashboard]', err)
+    console.error('[api/call-dashboard]', err)
     return Response.json({ error: err.message || 'Failed' }, { status: 500 })
   }
 }

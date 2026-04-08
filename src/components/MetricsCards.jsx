@@ -2,24 +2,15 @@
 
 import { cn } from '../lib/utils'
 
-const MetricsCards = ({ calls, loading, dateLabel = 'All time' }) => {
-  const totalCalls = calls.length
-  const averageScore = totalCalls > 0
-    ? Math.round(calls.reduce((acc, call) => acc + (call.scores?.overall || 0), 0) / totalCalls)
-    : 0
-
-  const interestedCount = calls.filter(
-    (call) => call.Disposition?.counselor === 'interested' || call.lead_stage === 'Interested'
-  ).length
-
-  const notInterestedCount = calls.filter(
-    (call) => call.Disposition?.counselor === 'not_interested' || call.lead_stage === 'Not Interested'
-  ).length
-
-  const interestedPct = totalCalls > 0 ? Math.round((interestedCount / totalCalls) * 100) : 0
-  const notInterestedPct = totalCalls > 0 ? Math.round((notInterestedCount / totalCalls) * 100) : 0
+const MetricsCards = ({ kpi, loading, dateLabel = 'All time' }) => {
+  const totalCalls = kpi?.totalCalls ?? 0
+  const averageScore = kpi?.averageScore ?? 0
+  const interestedCount = kpi?.interestedCount ?? 0
+  const notInterestedCount = kpi?.notInterestedCount ?? 0
+  const interestedPct = kpi?.interestedPct ?? 0
+  const notInterestedPct = kpi?.notInterestedPct ?? 0
   const scorePct = Math.min(averageScore, 100)
-  const isEmpty = loading && calls.length === 0
+  const isEmpty = loading && !kpi
 
   const cards = [
     {

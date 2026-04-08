@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { maskEmail, maskLeadId } from '../../lib/userManagement'
 import { cn } from '../../lib/utils'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 export default function EmailClickBreakdown({ data, theme, dataMasked }) {
   const isDark = theme === 'dark'
@@ -61,6 +63,8 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
     }
     return result
   }, [data, search, filterTemplate, filterButton])
+
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(filtered, 25)
 
   if (!data || data.length === 0) return null
 
@@ -145,7 +149,7 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.slice(0, 100).map((u) => {
+            {paginated.map((u) => {
               const isExpanded = expandedEmail === u.email
               const templates = [...new Set(u.clicks.map((c) => c.template).filter(Boolean))]
               const buttons = [...new Set(u.clicks.map((c) => c.button).filter(Boolean))]
@@ -293,12 +297,17 @@ export default function EmailClickBreakdown({ data, theme, dataMasked }) {
             })}
           </tbody>
         </table>
-        {filtered.length > 100 && (
-          <p className={cn('text-center py-3 text-[10px]', isDark ? 'text-slate-500' : 'text-slate-400')}>
-            Showing 100 of {filtered.length} users
-          </p>
-        )}
       </div>
+      {filtered.length > 0 && (
+        <PaginationBar
+          page={page}
+          setPage={setPage}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          className={isDark ? 'border-slate-700/50' : ''}
+        />
+      )}
     </div>
   )
 }

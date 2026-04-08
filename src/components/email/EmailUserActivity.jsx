@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import { maskEmail, maskLeadId } from '../../lib/userManagement'
 import { fetchLeadByEmail } from '../../lib/firebase'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 
 const STAGES = {
   sent:      { label: 'Sent',      dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'         },
@@ -320,11 +322,13 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return processed.slice(0, 8)
+    if (!q) return processed
     return byEmail
       .filter((u) => u.email.toLowerCase().includes(q))
       .map((u) => processed.find((p) => p.rawEmail === u.email) || u)
   }, [processed, byEmail, search])
+
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(filtered, 8)
 
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`}>
@@ -364,7 +368,7 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
           </div>
         ) : (
           <>
-            {filtered.map(({ email, rawEmail, events }) => (
+            {paginated.map(({ email, rawEmail, events }) => (
               <EmailCard
                 key={rawEmail || email}
                 email={email}
@@ -374,11 +378,14 @@ export default function EmailUserActivity({ byEmail, theme, dataMasked }) {
                 dataMasked={dataMasked}
               />
             ))}
-            {!search.trim() && byEmail.length > 8 && (
-              <p className={`text-xs text-center pt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                Showing 8 of {byEmail.length} recipients. Search to find specific emails.
-              </p>
-            )}
+            <PaginationBar
+              page={page}
+              setPage={setPage}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pageSize}
+              className={isDark ? 'border-slate-700' : ''}
+            />
           </>
         )}
       </div>

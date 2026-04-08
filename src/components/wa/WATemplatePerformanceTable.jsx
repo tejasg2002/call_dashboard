@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useClientPagination } from '../../hooks/useClientPagination'
+import PaginationBar from '../PaginationBar'
 import WATemplatePreview from './WATemplatePreview'
 
 const COLUMNS = [
@@ -63,6 +65,8 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
     return sorted
   }, [rows, sortKey, sortDir])
 
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(sortedRows, 25)
+
   const thBase = `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-50'}`
   const thSortable = `cursor-pointer hover:${isDark ? 'text-slate-200' : 'text-slate-800'} transition-colors`
   const tdClass = `px-4 py-3 text-sm ${isDark ? 'text-slate-200' : 'text-slate-700'}`
@@ -103,7 +107,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                   <td colSpan={13} className={`${tdClass} py-8 text-center`}>No data</td>
                 </tr>
               ) : (
-                sortedRows.map((r) => (
+                paginated.map((r) => (
                   <tr key={r.template_name} className={isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}>
                     <td className={tdClass}>
                       <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
@@ -191,6 +195,17 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
             </tbody>
           </table>
         </div>
+
+        {total > 0 && (
+          <PaginationBar
+            page={page}
+            setPage={setPage}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            className={isDark ? 'border-slate-700' : ''}
+          />
+        )}
 
         {previewRow && (
           <WATemplatePreview
