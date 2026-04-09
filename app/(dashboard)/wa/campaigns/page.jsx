@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { fetchWADashboard } from '../../../../src/lib/waDashboardApi'
+import { useBuWorkspace } from '../../../../src/context/BuWorkspaceProvider'
+import { WA_WORKSPACE_IHM, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
 import { useAuth } from '../../../providers'
 import { useTheme } from '../../../providers'
 import WAKpiCards from '../../../../src/components/wa/WAKpiCards'
@@ -13,9 +16,18 @@ function formatCount(n) {
 }
 
 export default function WACampaignsPage() {
+  const router = useRouter()
+  const { workspace } = useBuWorkspace()
+  const ws = normalizeWAWorkspace(workspace)
   const { isAdmin, dataMasked } = useAuth()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+
+  useEffect(() => {
+    if (ws === WA_WORKSPACE_IHM) {
+      router.replace('/wa?workspace=ihm')
+    }
+  }, [ws, router])
   const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
@@ -24,9 +36,10 @@ export default function WACampaignsPage() {
   const [elapsed, setElapsed] = useState(null)
 
   const loadData = useCallback(async () => {
+    if (ws === WA_WORKSPACE_IHM) return
     try {
       setLoading(true)
-      const data = await fetchWADashboard({ mode: 'cached' })
+      const data = await fetchWADashboard({ mode: 'cached', workspace: ws })
       setSnapshot(data)
       setElapsed(data.elapsed)
       setError(null)
@@ -36,13 +49,13 @@ export default function WACampaignsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [ws])
 
   const handleRecomputeAll = useCallback(async () => {
     try {
       setFetching(true)
       setToast(null)
-      const data = await fetchWADashboard({ mode: 'full' })
+      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
       setSnapshot(data)
       setElapsed(data.elapsed)
       setToast(`Recomputed in ${(data.elapsed / 1000).toFixed(1)}s`)
@@ -54,13 +67,13 @@ export default function WACampaignsPage() {
     } finally {
       setFetching(false)
     }
-  }, [])
+  }, [ws])
 
   const handleRefresh = useCallback(async () => {
     try {
       setFetching(true)
       setToast(null)
-      const data = await fetchWADashboard({ mode: 'full' })
+      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
       setSnapshot(data)
       setElapsed(data.elapsed)
       setToast(`Loaded in ${(data.elapsed / 1000).toFixed(1)}s`)
@@ -72,7 +85,7 @@ export default function WACampaignsPage() {
     } finally {
       setFetching(false)
     }
-  }, [])
+  }, [ws])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -195,7 +208,7 @@ export default function WACampaignsPage() {
           <WAKpiCards kpi={campaignKpi} theme={theme} />
 
           <LazySection height="320px">
-            <WATemplatePerformanceTable rows={campaignTemplateRows} ctaRows={[]} theme={theme} dataMasked={dataMasked} />
+            <WATemplatePerformanceTable rows={campaignTemplateRows} ctaRows={[]} theme={theme} dataMasked={dataMasked} workspace={ws} />
           </LazySection>
         </div>
       )}

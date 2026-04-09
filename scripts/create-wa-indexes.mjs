@@ -1,12 +1,19 @@
 /**
- * Create MongoDB indexes on the marketingwa collection for fast aggregation.
+ * Create MongoDB indexes on WhatsApp marketing collections for fast aggregation.
  * Run once: node scripts/create-wa-indexes.mjs
+ *
+ * - itm.marketingwa (MBA workspace)
+ * - analytics.IHMmarketingwa (IHM workspace)
  */
 import 'dotenv/config'
 import { MongoClient } from 'mongodb'
 
 const MONGO_URI = process.env.COMMUNITY_URI
-const DB = 'itm'
+
+const TARGETS = [
+  { db: 'itm', collection: 'marketingwa' },
+  { db: 'analytics', collection: 'IHMmarketingwa' },
+]
 
 const INDEXES = [
   { key: { stage: 1, template_name: 1, source: 1 }, name: 'idx_stage_tpl_src' },
@@ -19,27 +26,30 @@ const INDEXES = [
 async function main() {
   const client = new MongoClient(MONGO_URI)
   await client.connect()
-  const db = client.db(DB)
-  const col = db.collection('marketingwa')
 
-  console.log('Creating indexes on marketingwa...')
+  for (const { db: dbName, collection: colName } of TARGETS) {
+    const db = client.db(dbName)
+    const col = db.collection(colName)
 
-  for (const idx of INDEXES) {
-    try {
-      await col.createIndex(idx.key, { name: idx.name })
-      console.log(`  Created: ${idx.name}`)
-    } catch (err) {
-      if (err.code === 85 || err.code === 86) {
-        console.log(`  Skipped (already exists): ${idx.name}`)
-      } else {
-        console.error(`  Error for ${idx.name}:`, err.message)
+    console.log(`\nCreating indexes on ${dbName}.${colName}...`)
+
+    for (const idx of INDEXES) {
+      try {
+        await col.createIndex(idx.key, { name: idx.name })
+        console.log(`  Created: ${idx.name}`)
+      } catch (err) {
+        if (err.code === 85 || err.code === 86) {
+          console.log(`  Skipped (already exists): ${idx.name}`)
+        } else {
+          console.error(`  Error for ${idx.name}:`, err.message)
+        }
       }
     }
-  }
 
-  const indexes = await col.indexes()
-  console.log('\nCurrent indexes:')
-  indexes.forEach((idx) => console.log(`  ${idx.name}: ${JSON.stringify(idx.key)}`))
+    const indexes = await col.indexes()
+    console.log('Current indexes:')
+    indexes.forEach((idx) => console.log(`  ${idx.name}: ${JSON.stringify(idx.key)}`))
+  }
 
   await client.close()
 }

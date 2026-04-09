@@ -40,7 +40,7 @@ function SortIcon({ dir }) {
   )
 }
 
-export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, dataMasked }) {
+export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, dataMasked, workspace }) {
   const isDark = theme === 'dark'
   const [sortKey, setSortKey] = useState('ctr')
   const [sortDir, setSortDir] = useState('desc')
@@ -215,6 +215,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
             )}
             theme={theme}
             dataMasked={dataMasked}
+            workspace={workspace}
             onClose={() => setPreviewRow(null)}
           />
         )}

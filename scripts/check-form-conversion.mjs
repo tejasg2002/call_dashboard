@@ -18,6 +18,10 @@ import { MongoClient } from 'mongodb'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { isOnOrAfter, parseOptDate } from '../src/lib/conversionAttribution.js'
+import {
+  WA_DASHBOARD_CACHE_ID_MBA,
+  WA_DASHBOARD_CACHE_ID_MBA_LEGACY,
+} from '../src/lib/waWorkspace.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 config({ path: join(__dirname, '..', '.env') })
@@ -45,12 +49,12 @@ function parseArgs(argv) {
       console.log(`
 Usage: node scripts/check-form-conversion.mjs [options]
 
-  --fresh              Do not read wa_latest cache (always query Mongo)
+  --fresh              Do not read wa_dashboard_cache (always query Mongo)
   --from YYYY-MM-DD    Filter WA rows by event_timestamp
   --to YYYY-MM-DD
   -h, --help
 
-Default: try wa_latest.paymentConversion from wa_dashboard_cache (fast), unless --fresh or date range.
+Default: try wa_latest_mba (or legacy wa_latest) paymentConversion from wa_dashboard_cache (fast), unless --fresh or date range.
 `)
       process.exit(0)
     }
@@ -76,16 +80,17 @@ async function main() {
 
   try {
     if (!fresh && !hasRange) {
-      const cached = await cacheCol.findOne({ _id: 'wa_latest' })
+      let cached = await cacheCol.findOne({ _id: WA_DASHBOARD_CACHE_ID_MBA })
+      if (!cached) cached = await cacheCol.findOne({ _id: WA_DASHBOARD_CACHE_ID_MBA_LEGACY })
       if (cached?.paymentConversion) {
         printResult(cached.paymentConversion, {
-          source: 'wa_latest cache',
+          source: 'wa_dashboard_cache (MBA)',
           elapsedMs: 0,
           dateRange: null,
         })
         return
       }
-      console.log('(no wa_latest cache — computing…)\n')
+      console.log('(no MBA wa_dashboard_cache doc — computing…)\n')
     }
 
     const matchFilter = {}

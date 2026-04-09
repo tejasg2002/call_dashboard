@@ -1,15 +1,15 @@
 import clientPromise from '../../../src/lib/mongodb'
+import { waWorkspaceConfig, normalizeWAWorkspace } from '../../../src/lib/waWorkspace'
 
-const DB_NAME = 'itm'
-const COLLECTION = 'marketingwa'
 const DEFAULT_PAGE_SIZE = 50_000
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const client = await clientPromise
-    const db = client.db(DB_NAME)
-    const col = db.collection(COLLECTION)
+    const cfg = waWorkspaceConfig(normalizeWAWorkspace(searchParams.get('workspace')))
+    const db = client.db(cfg.dataDb)
+    const col = db.collection(cfg.waCollection)
 
     const filter = {}
 

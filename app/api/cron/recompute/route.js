@@ -23,8 +23,9 @@ export async function GET(request) {
 
   const start = Date.now()
   try {
-    const [waResult, emailResult, sourceStatsResult, smsResult, callResult] = await Promise.all([
-      computeWADashboard({ mode: 'full' }),
+    const [waMba, waIhm, emailResult, sourceStatsResult, smsResult, callResult] = await Promise.all([
+      computeWADashboard({ mode: 'full', workspace: 'mba' }),
+      computeWADashboard({ mode: 'full', workspace: 'ihm' }),
       computeEmailDashboard({ mode: 'full' }),
       computeSourceStats({ mode: 'full' }),
       computeSmsDashboard({ mode: 'full' }),
@@ -34,10 +35,17 @@ export async function GET(request) {
     return Response.json({
       ok: true,
       wa: {
-        rawDocCount: waResult.rawDocCount,
-        templateRows: waResult.templateRows?.length,
-        formSubmitted: waResult.formSubmittedCount,
-        computeTime: waResult.elapsed,
+        mba: {
+          rawDocCount: waMba.rawDocCount,
+          templateRows: waMba.templateRows?.length,
+          formSubmitted: waMba.formSubmittedCount,
+          computeTime: waMba.elapsed,
+        },
+        ihm: {
+          rawDocCount: waIhm.rawDocCount,
+          templateRows: waIhm.templateRows?.length,
+          computeTime: waIhm.elapsed,
+        },
       },
       email: {
         rawDocCount: emailResult.rawDocCount,

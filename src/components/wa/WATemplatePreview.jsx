@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchLeadByMobile } from '../../lib/firebase'
 import { fetchWATemplateUsers } from '../../lib/waApi'
+import { normalizeWAWorkspace } from '../../lib/waWorkspace'
 import { maskPhone, maskLeadId } from '../../lib/userManagement'
 
 // ── WhatsApp text formatter ──────────────────────────────────────────────────
@@ -305,8 +306,9 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
 }
 
 // ── Main export ──────────────────────────────────────────────────────────────
-export default function WATemplatePreview({ row, buttonStats = [], theme, dataMasked, onClose }) {
+export default function WATemplatePreview({ row, buttonStats = [], theme, dataMasked, onClose, workspace }) {
   const isDark = theme === 'dark'
+  const ws = normalizeWAWorkspace(workspace)
 
   const [fetchedPayload, setFetchedPayload] = useState(null)
   const [payloadLoading, setPayloadLoading] = useState(false)
@@ -317,7 +319,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
     if (row?.template_preview || row?.raw_payload || !row?.template_name) return
     setFetchedPayload(null)
     setPayloadLoading(true)
-    fetch(`/api/wa-events?template_name=${encodeURIComponent(row.template_name)}&limit=5`)
+    fetch(`/api/wa-events?template_name=${encodeURIComponent(row.template_name)}&limit=5&workspace=${encodeURIComponent(ws)}`)
       .then((r) => r.json())
       .then((data) => {
         const doc = (data.docs || []).find((d) => d.template_preview || d.raw_payload)
@@ -326,7 +328,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
       })
       .catch(() => {})
       .finally(() => setPayloadLoading(false))
-  }, [row?.template_name, row?.raw_payload])
+  }, [row?.template_name, row?.raw_payload, ws])
 
   const parsed = parsePayload(effectivePayload)
   const hasStructured = parsed && (parsed.body || parsed.headerImageUrl || parsed.buttons?.length > 0)
@@ -355,7 +357,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  useEffect(() => { setActiveStage(null); setLoadedStageUsers(null); setFetchedPayload(null) }, [row?.template_name])
+  useEffect(() => { setActiveStage(null); setLoadedStageUsers(null); setFetchedPayload(null) }, [row?.template_name, ws])
 
   const resolveStageUsers = useCallback(async (stage) => {
     if (row?.stageUsers?.[stage]) return
@@ -364,7 +366,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
 
     setStageUsersLoading(true)
     try {
-      const docs = await fetchWATemplateUsers(row.template_name)
+      const docs = await fetchWATemplateUsers(row.template_name, { workspace: ws })
       const stageMap = { sent: {}, delivered: {}, read: {}, clicked: {}, failed: {} }
       const getStage = (d) => {
         if (d.stage) return d.stage
@@ -408,7 +410,7 @@ export default function WATemplatePreview({ row, buttonStats = [], theme, dataMa
     } finally {
       setStageUsersLoading(false)
     }
-  }, [row?.template_name, row?.stageUsers, loadedStageUsers])
+  }, [row?.template_name, row?.stageUsers, loadedStageUsers, ws])
 
   const handleStageClick = useCallback((stage) => {
     const isActive = activeStage === stage

@@ -31,11 +31,26 @@ function getFirebaseAdminApp() {
     return initializeApp({ credential: cert(serviceAccount) })
   }
 
+  /**
+   * `applicationDefault()` often “works” until the first Firestore call, then throws
+   * “Unable to detect a Project Id” on laptops without gcloud/ADC — confusing.
+   * Opt in with FIREBASE_ADMIN_USE_ADC=1 (GCP metadata / gcloud auth).
+   */
+  if (process.env.FIREBASE_ADMIN_USE_ADC !== '1') {
+    throw new Error(
+      'Firebase Admin is not configured for server routes (e.g. /api/call-dashboard). ' +
+        'Add FIREBASE_SERVICE_ACCOUNT_JSON (full service account JSON string) or all of: ' +
+        'FIREBASE_ADMIN_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY. ' +
+        'NEXT_PUBLIC_FIREBASE_* alone is client-only and does not authenticate the Admin SDK. ' +
+        'To try Application Default Credentials instead, set FIREBASE_ADMIN_USE_ADC=1.',
+    )
+  }
+
   try {
     return initializeApp({ credential: applicationDefault() })
   } catch (error) {
     throw new Error(
-      'Firebase Admin credentials are not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_ADMIN_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY.'
+      `Firebase Admin (ADC): ${error.message}. Check gcloud auth or GOOGLE_APPLICATION_CREDENTIALS.`,
     )
   }
 }

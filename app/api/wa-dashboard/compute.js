@@ -1,10 +1,15 @@
 import clientPromise from '../../../src/lib/mongodb'
 import { isOnOrAfter, parseOptDate } from '../../../src/lib/conversionAttribution'
+import {
+  WA_DASHBOARD_CACHE_ID_MBA_LEGACY,
+  waWorkspaceConfig,
+  workspacePayloadMatchesExpected,
+} from '../../../src/lib/waWorkspace'
 
-const DB = 'itm'
-const WA_COL = 'marketingwa'
+const ITM_DB = 'itm'
 const APPS_COL = 'npfMbaApplications'
 const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
+/** Cached snapshots in itm.wa_dashboard_cache: _id wa_latest_mba | wa_latest_ihm (see waWorkspace.js). */
 const CACHE_COL = 'wa_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
@@ -17,21 +22,26 @@ function normaliseMobile(raw) {
   return n
 }
 
-export async function computeWADashboard({ mode = 'cached', startDate, endDate } = {}) {
+export async function computeWADashboard({ mode = 'cached', startDate, endDate, workspace } = {}) {
   const start = Date.now()
+  const cfg = waWorkspaceConfig(workspace)
 
   const client = await clientPromise
-  const db = client.db(DB)
+  const db = client.db(ITM_DB)
   const cacheCol = db.collection(CACHE_COL)
 
   if (mode === 'cached' && !startDate && !endDate) {
-    const cached = await cacheCol.findOne({ _id: 'wa_latest' })
-    if (cached) {
+    let cached = await cacheCol.findOne({ _id: cfg.cacheKey })
+    if (!cached && cfg.includeMbaConversion) {
+      cached = await cacheCol.findOne({ _id: WA_DASHBOARD_CACHE_ID_MBA_LEGACY })
+    }
+    if (cached && workspacePayloadMatchesExpected(cached, cfg.workspace)) {
       return { ...cached, _id: undefined, fromCache: true, elapsed: Date.now() - start }
     }
   }
 
-  const waCol = db.collection(WA_COL)
+  const waDb = client.db(cfg.dataDb)
+  const waCol = waDb.collection(cfg.waCollection)
 
   const matchFilter = {}
   if (startDate || endDate) {
@@ -211,6 +221,70 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
   const normalisedClickedMobiles = [...new Set(clickedPhones.map(normaliseMobile).filter(Boolean))]
   const clickedPhoneDedup = [...new Set(clickedPhones.filter(Boolean))]
 
+  const engagementSummary = {
+    total: clickedPhones.length,
+    clickedCount: clickedPhones.length,
+  }
+
+  const buttonPhones = {}
+  for (const r of ctaResult) {
+    if (r._id.button_text) {
+      buttonPhones[r._id.button_text] = r.unique_users || []
+    }
+  }
+
+  let templatePhones = {}
+  let clickBreakdown = []
+  let formSubmittedCount = 0
+  let paymentConversion
+
+  if (!cfg.includeMbaConversion) {
+    const templatePhoneResultIhm = await waCol.aggregate([
+      { $match: { ...matchFilter, stage: 'clicked', template_name: { $nin: [null, ''] } } },
+      { $group: { _id: '$template_name', phones: { $addToSet: '$phone_number' } } },
+    ]).toArray()
+
+    for (const r of templatePhoneResultIhm) {
+      if (r._id) templatePhones[r._id] = r.phones || []
+    }
+
+    const clickBreakdownResultIhm = await waCol.aggregate([
+      { $match: { ...matchFilter, stage: 'clicked' } },
+      { $sort: { event_timestamp: -1 } },
+      {
+        $group: {
+          _id: '$phone_number',
+          clicks: {
+            $push: {
+              template: '$template_name',
+              button: '$button_text',
+              link: '$button_link',
+              type: '$click_type',
+              time: '$click_timestamp',
+            },
+          },
+        },
+      },
+    ]).toArray()
+
+    clickBreakdown = clickBreakdownResultIhm
+      .filter((r) => r._id)
+      .map((r) => ({
+        phone: r._id,
+        leadId: null,
+        totalClicks: r.clicks.length,
+        clicks: r.clicks.slice(0, 20),
+      }))
+      .sort((a, b) => b.totalClicks - a.totalClicks)
+
+    paymentConversion = {
+      totalClicked: clickedPhones.length,
+      formSubmitted: 0,
+      conversionRate: 0,
+      formSubmittedMobiles: [],
+      formSubmittedDetails: [],
+    }
+  } else {
   /** Earliest outbound (sent/delivered) per normalised mobile — full history, not date-filtered */
   const firstOutboundResult = clickedPhoneDedup.length > 0
     ? await waCol.aggregate([
@@ -278,7 +352,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     return isOnOrAfter(r.formSubmittedAt, anchor)
   })
 
-  const formSubmittedCount = formSubmittedResult.length
+  formSubmittedCount = formSubmittedResult.length
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
 
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
@@ -307,24 +381,12 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     ? parseFloat(((formSubmittedCount / clickedPhones.length) * 100).toFixed(2))
     : 0
 
-  const engagementSummary = {
-    total: clickedPhones.length,
-    clickedCount: clickedPhones.length,
-  }
-
-  const buttonPhones = {}
-  for (const r of ctaResult) {
-    if (r._id.button_text) {
-      buttonPhones[r._id.button_text] = r.unique_users || []
-    }
-  }
-
   const templatePhoneResult = await waCol.aggregate([
     { $match: { ...matchFilter, stage: 'clicked', template_name: { $nin: [null, ''] } } },
     { $group: { _id: '$template_name', phones: { $addToSet: '$phone_number' } } },
   ]).toArray()
 
-  const templatePhones = {}
+  templatePhones = {}
   for (const r of templatePhoneResult) {
     if (r._id) templatePhones[r._id] = r.phones || []
   }
@@ -393,7 +455,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     }
   }
 
-  const clickBreakdown = clickBreakdownResult
+  clickBreakdown = clickBreakdownResult
     .filter((r) => r._id)
     .map((r) => ({
       phone: r._id,
@@ -479,7 +541,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     }
   }
 
-  const paymentConversion = {
+  paymentConversion = {
     totalClicked: clickedPhones.length,
     formSubmitted: formSubmittedCount,
     conversionRate: formConversionRate,
@@ -502,6 +564,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
     }),
   }
 
+  }
+
   const lastDoc = await waCol.find({}).sort({ event_timestamp: -1 }).limit(1).toArray()
   const lastRawDocTime = lastDoc[0]?.event_timestamp
     ? new Date(lastDoc[0].event_timestamp).toISOString()
@@ -509,6 +573,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
 
   const dashboard = {
     channel: 'wa',
+    workspace: cfg.workspace,
     kpi: rawKpi,
     funnel,
     templateRows,
@@ -528,10 +593,13 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate }
 
   if (mode !== 'range') {
     await cacheCol.updateOne(
-      { _id: 'wa_latest' },
+      { _id: cfg.cacheKey },
       { $set: dashboard },
       { upsert: true },
     )
+    if (cfg.includeMbaConversion) {
+      await cacheCol.deleteOne({ _id: WA_DASHBOARD_CACHE_ID_MBA_LEGACY })
+    }
   }
 
   return {

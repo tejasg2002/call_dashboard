@@ -1,9 +1,14 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { fetchWADashboard } from '../../../src/lib/waDashboardApi'
-import { useAuth } from '../../providers'
-import { useTheme } from '../../providers'
+import {
+  WA_WORKSPACE_MBA,
+  normalizeWAWorkspace,
+  workspacePayloadMatchesExpected,
+} from '../../../src/lib/waWorkspace'
+import { useAuth, useTheme } from '../../providers'
+import { useWAWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import WAKpiCards from '../../../src/components/wa/WAKpiCards'
 import WATemplatePerformanceTable from '../../../src/components/wa/WATemplatePerformanceTable'
 import WATemplatePerformanceChart from '../../../src/components/wa/WATemplatePerformanceChart'
@@ -44,6 +49,9 @@ function SectionHeader({ title, description, isDark }) {
 export default function WAApiPage() {
   const { isAdmin, dataMasked } = useAuth()
   const { theme } = useTheme()
+  const { workspace } = useWAWorkspace()
+  const workspaceRef = useRef(workspace)
+  workspaceRef.current = workspace
   const isDark = theme === 'dark'
   const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -54,6 +62,29 @@ export default function WAApiPage() {
   const [toast, setToast] = useState(null)
   const [elapsed, setElapsed] = useState(null)
 
+  const finishWADashboardFetch = useCallback((requestedWs, data) => {
+    const ws = normalizeWAWorkspace(requestedWs)
+    if (normalizeWAWorkspace(workspaceRef.current) !== ws) {
+      return false
+    }
+    if (!workspacePayloadMatchesExpected(data, ws)) {
+      setError(
+        'Analytics did not match the selected workspace. MBA and IHM are separate—pick the workspace again or refresh.',
+      )
+      setSnapshot(null)
+      return false
+    }
+    setSnapshot(data)
+    setElapsed(data.elapsed)
+    setError(null)
+    return true
+  }, [])
+
+  useEffect(() => {
+    setSnapshot(null)
+    setError(null)
+  }, [workspace])
+
   function setCampaigns(updater) {
     _setCampaigns((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater
@@ -63,56 +94,55 @@ export default function WAApiPage() {
   }
 
   const loadData = useCallback(async () => {
+    const ws = normalizeWAWorkspace(workspace)
     try {
       setLoading(true)
-      const data = await fetchWADashboard({ mode: 'cached' })
-      setSnapshot(data)
-      setElapsed(data.elapsed)
-      setError(null)
+      const data = await fetchWADashboard({ mode: 'cached', workspace: ws })
+      finishWADashboardFetch(ws, data)
     } catch (err) {
       console.error('[WAPage] load error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [workspace, finishWADashboardFetch])
 
   const handleRefresh = useCallback(async () => {
+    const ws = normalizeWAWorkspace(workspace)
     try {
       setFetching(true)
       setToast(null)
-      const data = await fetchWADashboard({ mode: 'full' })
-      setSnapshot(data)
-      setElapsed(data.elapsed)
-      setToast(`Loaded ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
-      setTimeout(() => setToast(null), 4000)
-      setError(null)
+      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
+      if (finishWADashboardFetch(ws, data)) {
+        setToast(`Loaded ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
+        setTimeout(() => setToast(null), 4000)
+      }
     } catch (err) {
       console.error('[WAPage] refresh error:', err)
       setError(err.message)
     } finally {
       setFetching(false)
     }
-  }, [])
+  }, [workspace, finishWADashboardFetch])
 
   const handleRecomputeAll = useCallback(async () => {
+    const ws = normalizeWAWorkspace(workspace)
     try {
       setFetching(true)
       setToast(null)
       setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
-      const data = await fetchWADashboard({ mode: 'full' })
-      setSnapshot(data)
-      setElapsed(data.elapsed)
-      setToast(`Recomputed ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
-      setTimeout(() => setToast(null), 4000)
-      setError(null)
+      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
+      if (finishWADashboardFetch(ws, data)) {
+        setToast(`Recomputed ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
+        setTimeout(() => setToast(null), 4000)
+      }
     } catch (err) {
       console.error('[WAPage] recompute error:', err)
       setError(err.message)
     } finally {
       setFetching(false)
     }
-  }, [])
+  }, [workspace, finishWADashboardFetch])
 
   const recalibrateForDateRange = useCallback(async () => {
     const hasRange = filters.startDate || filters.endDate
@@ -123,21 +153,23 @@ export default function WAApiPage() {
     }
     try {
       setFetching(true)
+      const ws = normalizeWAWorkspace(workspace)
       const data = await fetchWADashboard({
         mode: 'range',
         startDate: filters.startDate || '',
         endDate: filters.endDate || '',
+        workspace: ws,
       })
-      setSnapshot(data)
-      setElapsed(data.elapsed)
-      setToast(`Date range loaded in ${(data.elapsed / 1000).toFixed(1)}s`)
-      setTimeout(() => setToast(null), 4000)
+      if (finishWADashboardFetch(ws, data)) {
+        setToast(`Date range loaded in ${(data.elapsed / 1000).toFixed(1)}s`)
+        setTimeout(() => setToast(null), 4000)
+      }
     } catch (err) {
       console.error('[WAPage] range recalibrate error:', err)
     } finally {
       setFetching(false)
     }
-  }, [filters.startDate, filters.endDate, snapshot, handleRefresh])
+  }, [filters.startDate, filters.endDate, snapshot, handleRefresh, workspace, finishWADashboardFetch])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -333,7 +365,7 @@ export default function WAApiPage() {
             <SectionHeader title="Template Performance" description={`${filteredTemplateRows.length} templates tracked across all API messages`} isDark={isDark} />
 
             <LazySection height="320px">
-              <WATemplatePerformanceTable rows={filteredTemplateRows} ctaRows={apiCtaRows} theme={theme} dataMasked={dataMasked} />
+              <WATemplatePerformanceTable rows={filteredTemplateRows} ctaRows={apiCtaRows} theme={theme} dataMasked={dataMasked} workspace={workspace} />
             </LazySection>
 
             <LazySection height="300px">
@@ -388,7 +420,7 @@ export default function WAApiPage() {
           )}
 
           {/* ── Payment Conversion ────────────────────────────────────────── */}
-          {snapshot?.paymentConversion && (
+          {workspace === WA_WORKSPACE_MBA && snapshot?.paymentConversion && (
             <div className="space-y-4">
               <SectionHeader title="Form conversion" description="Clicked users who submitted an MBA application after template send" isDark={isDark} />
               <LazySection height="280px">

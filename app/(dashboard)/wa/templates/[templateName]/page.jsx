@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { fetchWADashboard } from '../../../../../src/lib/waDashboardApi'
+import { normalizeWAWorkspace, workspacePayloadMatchesExpected } from '../../../../../src/lib/waWorkspace'
 import { useTheme } from '../../../../providers'
 
 import WATemplatePreview from '../../../../../src/components/wa/WATemplatePreview'
@@ -10,6 +11,8 @@ import WATemplatePreview from '../../../../../src/components/wa/WATemplatePrevie
 export default function WATemplateTemplatePage() {
   const { templateName } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const workspace = normalizeWAWorkspace(searchParams.get('workspace'))
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -21,8 +24,14 @@ export default function WATemplateTemplatePage() {
     let mounted = true
     ;(async () => {
       try {
-        const snap = await fetchWADashboard({ mode: 'cached' })
+        const ws = normalizeWAWorkspace(workspace)
+        const snap = await fetchWADashboard({ mode: 'cached', workspace: ws })
         if (!mounted) return
+        if (!workspacePayloadMatchesExpected(snap, ws)) {
+          setError('Analytics did not match this workspace.')
+          setSnapshot(null)
+          return
+        }
         setSnapshot(snap)
       } catch (err) {
         if (!mounted) return
@@ -32,7 +41,7 @@ export default function WATemplateTemplatePage() {
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [workspace])
 
   const { row, btnStats } = useMemo(() => {
     if (!snapshot || !templateName) return { row: null, btnStats: [] }
@@ -48,7 +57,7 @@ export default function WATemplateTemplatePage() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push('/wa')}
+          onClick={() => router.push(workspace === 'ihm' ? '/wa?workspace=ihm' : '/wa')}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
             isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
@@ -90,8 +99,8 @@ export default function WATemplateTemplatePage() {
                 buttonStats={btnStats}
                 theme={theme}
                 dataMasked={false}
-                // On this page, close just navigates back
-                onClose={() => router.push('/wa')}
+                workspace={workspace}
+                onClose={() => router.push(workspace === 'ihm' ? '/wa?workspace=ihm' : '/wa')}
               />
             </div>
           </div>

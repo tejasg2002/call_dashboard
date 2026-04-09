@@ -1,6 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useBuWorkspace } from '../../../../src/context/BuWorkspaceProvider'
+import { WA_WORKSPACE_IHM, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
 import { useAuth } from '../../../providers'
 import { useTheme } from '../../../providers'
 import { fetchWaChatSheet } from '../../../../src/lib/waChatSheetApi'
@@ -8,9 +11,18 @@ import WAChatLeadsTable from '../../../../src/components/wa/WAChatLeadsTable'
 import WAChatKpiCards from '../../../../src/components/wa/WAChatKpiCards'
 
 export default function WAChatPage() {
+  const router = useRouter()
+  const { workspace } = useBuWorkspace()
+  const ws = normalizeWAWorkspace(workspace)
   const { dataMasked } = useAuth()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+
+  useEffect(() => {
+    if (ws === WA_WORKSPACE_IHM) {
+      router.replace('/wa?workspace=ihm')
+    }
+  }, [ws, router])
   const [rows, setRows] = useState([])
   const [fetchedAt, setFetchedAt] = useState(null)
   const [loading, setLoading] = useState(true)
