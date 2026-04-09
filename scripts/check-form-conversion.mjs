@@ -3,7 +3,8 @@
  * Print WhatsApp "Form conversion" metrics (mirrors app/api/wa-dashboard/compute.js).
  *
  * Clicked users (marketingwa) with npfMbaApplications application_no set,
- * where form timestamp is on/after first sent/delivered for that phone.
+ * where form timestamp is on/after first sent/delivered and on/after the latest
+ * WA click for that phone (full click history), so clicks after submit do not count.
  *
  * Usage:
  *   npm run check-form-conversion
@@ -147,6 +148,41 @@ async function main() {
       if (!prev || anchor.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, anchor)
     }
 
+    const lastClickResult =
+      clickedPhoneDedup.length > 0
+        ? await waCol
+            .aggregate([
+              {
+                $match: {
+                  phone_number: { $in: clickedPhoneDedup },
+                  stage: 'clicked',
+                },
+              },
+              {
+                $addFields: {
+                  _clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+                },
+              },
+              {
+                $group: {
+                  _id: '$phone_number',
+                  lastClickAt: { $max: '$_clickAt' },
+                },
+              },
+            ])
+            .toArray()
+        : []
+
+    const lastClickByNorm = new Map()
+    for (const row of lastClickResult) {
+      const norm = normaliseMobile(row._id)
+      if (!norm) continue
+      const t = parseOptDate(row.lastClickAt)
+      if (!t) continue
+      const prev = lastClickByNorm.get(norm)
+      if (!prev || t.getTime() > prev.getTime()) lastClickByNorm.set(norm, t)
+    }
+
     const appsCol = db.collection(APPS_COL)
     const formSubmittedAgg =
       normalisedClickedMobiles.length > 0
@@ -170,9 +206,11 @@ async function main() {
 
     const formSubmittedResult = formSubmittedAgg.filter((r) => {
       const norm = normaliseMobile(r._id)
-      const anchor = firstOutboundByNorm.get(norm)
-      if (!anchor || r.formSubmittedAt == null) return false
-      return isOnOrAfter(r.formSubmittedAt, anchor)
+      const outboundAnchor = firstOutboundByNorm.get(norm)
+      const lastClick = lastClickByNorm.get(norm)
+      if (!outboundAnchor || !lastClick || r.formSubmittedAt == null) return false
+      if (!isOnOrAfter(r.formSubmittedAt, outboundAnchor)) return false
+      return isOnOrAfter(r.formSubmittedAt, lastClick)
     })
 
     const formSubmittedCount = formSubmittedResult.length
