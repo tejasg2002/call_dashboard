@@ -3,9 +3,10 @@
 import { Suspense, createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  WA_WORKSPACE_IHM,
   WA_WORKSPACE_MBA,
+  isNonMbaWaWorkspace,
   isRouteAllowedForBuWorkspace,
+  nonMbaWaHomePath,
   normalizeWAWorkspace,
 } from '../lib/waWorkspace'
 
@@ -47,8 +48,8 @@ function syncUrlWorkspace(router, pathname, w) {
   const params = new URLSearchParams(
     typeof window !== 'undefined' ? window.location.search : '',
   )
-  if (w === WA_WORKSPACE_IHM) {
-    params.set('workspace', 'ihm')
+  if (w !== WA_WORKSPACE_MBA) {
+    params.set('workspace', w)
   } else {
     params.delete('workspace')
   }
@@ -74,7 +75,7 @@ function BuWorkspaceProviderInner({ children }) {
   useEffect(() => {
     const pathOnly = pathname.split('?')[0] || pathname
     if (!isRouteAllowedForBuWorkspace(pathOnly, workspace)) {
-      router.replace('/wa?workspace=ihm', { scroll: false })
+      router.replace(nonMbaWaHomePath(workspace), { scroll: false })
     }
   }, [workspace, pathname, router])
 
@@ -87,8 +88,8 @@ function BuWorkspaceProviderInner({ children }) {
       } catch {}
 
       const pathOnly = pathname.split('?')[0] || pathname
-      if (w === WA_WORKSPACE_IHM && !isRouteAllowedForBuWorkspace(pathOnly, w)) {
-        router.replace('/wa?workspace=ihm', { scroll: false })
+      if (isNonMbaWaWorkspace(w) && !isRouteAllowedForBuWorkspace(pathOnly, w)) {
+        router.replace(nonMbaWaHomePath(w), { scroll: false })
         return
       }
       syncUrlWorkspace(router, pathname, w)

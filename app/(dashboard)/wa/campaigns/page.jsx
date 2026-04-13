@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWADashboard } from '../../../../src/lib/waDashboardApi'
 import { useBuWorkspace } from '../../../../src/context/BuWorkspaceProvider'
-import { WA_WORKSPACE_IHM, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
+import { isNonMbaWaWorkspace, nonMbaWaHomePath, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
 import { useAuth } from '../../../providers'
 import { useTheme } from '../../../providers'
 import WAKpiCards from '../../../../src/components/wa/WAKpiCards'
@@ -24,8 +24,8 @@ export default function WACampaignsPage() {
   const isDark = theme === 'dark'
 
   useEffect(() => {
-    if (ws === WA_WORKSPACE_IHM) {
-      router.replace('/wa?workspace=ihm')
+    if (isNonMbaWaWorkspace(ws)) {
+      router.replace(nonMbaWaHomePath(ws))
     }
   }, [ws, router])
   const [snapshot, setSnapshot] = useState(null)
@@ -36,7 +36,7 @@ export default function WACampaignsPage() {
   const [elapsed, setElapsed] = useState(null)
 
   const loadData = useCallback(async () => {
-    if (ws === WA_WORKSPACE_IHM) return
+    if (isNonMbaWaWorkspace(ws)) return
     try {
       setLoading(true)
       const data = await fetchWADashboard({ mode: 'cached', workspace: ws })

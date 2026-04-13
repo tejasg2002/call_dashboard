@@ -9,7 +9,7 @@ import {
 const ITM_DB = 'itm'
 const APPS_COL = 'npfMbaApplications'
 const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
-/** Cached snapshots in itm.wa_dashboard_cache: _id wa_latest_mba | wa_latest_ihm (see waWorkspace.js). */
+/** Cached snapshots in itm.wa_dashboard_cache: _id wa_latest_mba | wa_latest_ihm | wa_latest_idm (see waWorkspace.js). */
 const CACHE_COL = 'wa_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)

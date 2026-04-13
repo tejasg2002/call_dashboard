@@ -3,7 +3,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { fetchWADashboard } from '../../../../../src/lib/waDashboardApi'
-import { normalizeWAWorkspace, workspacePayloadMatchesExpected } from '../../../../../src/lib/waWorkspace'
+import {
+  normalizeWAWorkspace,
+  withWorkspaceQuery,
+  workspacePayloadMatchesExpected,
+} from '../../../../../src/lib/waWorkspace'
 import { useTheme } from '../../../../providers'
 
 import WATemplatePreview from '../../../../../src/components/wa/WATemplatePreview'
@@ -57,7 +61,7 @@ export default function WATemplateTemplatePage() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push(workspace === 'ihm' ? '/wa?workspace=ihm' : '/wa')}
+          onClick={() => router.push(withWorkspaceQuery('/wa', workspace))}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
             isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
@@ -100,7 +104,7 @@ export default function WATemplateTemplatePage() {
                 theme={theme}
                 dataMasked={false}
                 workspace={workspace}
-                onClose={() => router.push(workspace === 'ihm' ? '/wa?workspace=ihm' : '/wa')}
+                onClose={() => router.push(withWorkspaceQuery('/wa', workspace))}
               />
             </div>
           </div>

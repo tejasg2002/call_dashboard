@@ -6,13 +6,13 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '../../providers'
 import { useBuWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import { cn } from '../../../src/lib/utils'
-import { WA_WORKSPACE_IHM, withWorkspaceQuery } from '../../../src/lib/waWorkspace'
+import { isNonMbaWaWorkspace, withWorkspaceQuery } from '../../../src/lib/waWorkspace'
 
 export default function WALayout({ children }) {
   const pathname = usePathname()
   const { isDark } = useTheme()
   const { workspace } = useBuWorkspace()
-  const ihmOnly = workspace === WA_WORKSPACE_IHM
+  const limitedWaNav = isNonMbaWaWorkspace(workspace)
   const waHref = withWorkspaceQuery('/wa', workspace)
 
   return (
@@ -39,7 +39,7 @@ export default function WALayout({ children }) {
               API Messages
             </span>
           </Link>
-          {!ihmOnly && (
+          {!limitedWaNav && (
             <>
               <Link
                 href="/wa/campaigns"

@@ -4,6 +4,7 @@
  *
  * - itm.marketingwa (MBA workspace)
  * - analytics.IHMmarketingwa (IHM workspace)
+ * - analytics.IDMmarketingwa (IDM workspace)
  */
 import 'dotenv/config'
 import { MongoClient } from 'mongodb'
@@ -13,6 +14,7 @@ const MONGO_URI = process.env.COMMUNITY_URI
 const TARGETS = [
   { db: 'itm', collection: 'marketingwa' },
   { db: 'analytics', collection: 'IHMmarketingwa' },
+  { db: 'analytics', collection: 'IDMmarketingwa' },
 ]
 
 const INDEXES = [

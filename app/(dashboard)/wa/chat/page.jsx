@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBuWorkspace } from '../../../../src/context/BuWorkspaceProvider'
-import { WA_WORKSPACE_IHM, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
+import { isNonMbaWaWorkspace, nonMbaWaHomePath, normalizeWAWorkspace } from '../../../../src/lib/waWorkspace'
 import { useAuth } from '../../../providers'
 import { useTheme } from '../../../providers'
 import { fetchWaChatSheet } from '../../../../src/lib/waChatSheetApi'
@@ -19,8 +19,8 @@ export default function WAChatPage() {
   const isDark = theme === 'dark'
 
   useEffect(() => {
-    if (ws === WA_WORKSPACE_IHM) {
-      router.replace('/wa?workspace=ihm')
+    if (isNonMbaWaWorkspace(ws)) {
+      router.replace(nonMbaWaHomePath(ws))
     }
   }, [ws, router])
   const [rows, setRows] = useState([])

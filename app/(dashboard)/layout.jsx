@@ -8,9 +8,12 @@ import { useAuth, useTheme } from '../providers'
 import { BuWorkspaceProvider, useBuWorkspace } from '../../src/context/BuWorkspaceProvider'
 import { cn } from '../../src/lib/utils'
 import {
+  WA_WORKSPACE_IDM,
   WA_WORKSPACE_IHM,
   WA_WORKSPACE_MBA,
+  isNonMbaWaWorkspace,
   withWorkspaceQuery,
+  workspaceDisplayLabel,
 } from '../../src/lib/waWorkspace'
 
 const NAV_SECTIONS = [
@@ -106,7 +109,7 @@ function WorkspaceDropdown({ isDark }) {
     }
   }, [open])
 
-  const currentLabel = workspace === WA_WORKSPACE_IHM ? 'IHM' : 'MBA'
+  const currentLabel = workspaceDisplayLabel(workspace)
 
   return (
     <div className="relative" ref={ref}>
@@ -195,6 +198,27 @@ function WorkspaceDropdown({ isDark }) {
               IHM
             </button>
           </li>
+          <li role="option" aria-selected={workspace === WA_WORKSPACE_IDM}>
+            <button
+              type="button"
+              onClick={() => {
+                setWorkspace(WA_WORKSPACE_IDM)
+                setOpen(false)
+              }}
+              className={cn(
+                'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
+                workspace === WA_WORKSPACE_IDM
+                  ? isDark
+                    ? 'bg-brand-700/25 text-brand-300'
+                    : 'bg-brand-50 text-brand-800'
+                  : isDark
+                    ? 'text-slate-300 hover:bg-slate-700/80'
+                    : 'text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              IDM
+            </button>
+          </li>
         </ul>
       )}
     </div>
@@ -264,7 +288,7 @@ function DashboardLayoutInner({ children }) {
         {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter((item) => {
             if (!permCheck[item.perm]) return false
-            if (workspace === WA_WORKSPACE_IHM && item.hideForIhm) return false
+            if (isNonMbaWaWorkspace(workspace) && item.hideForIhm) return false
             return true
           })
           if (visibleItems.length === 0) return null
