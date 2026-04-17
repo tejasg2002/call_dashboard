@@ -192,17 +192,18 @@ function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, on
             </div>
           </div>
 
-          {/* WhatsApp BU workspaces (restrict which verticals appear in the header switcher) */}
+          {/* Per-user WhatsApp business units (header workspace switcher) */}
           <div className="px-4 pt-2 pb-2">
             <div className="flex items-center gap-2 mb-1">
               <svg className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>WhatsApp BU access</p>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Business units (WhatsApp)</p>
             </div>
-            <p className={`text-[10px] mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              All on = every workspace. Turn off BUs this user must not open. At least one BU must stay on.
-              {buUnrestricted ? ' Currently: unrestricted.' : ' Currently: restricted list.'}
+            <p className={`text-[10px] mb-2 leading-relaxed ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Choose which verticals this user may open in the top workspace menu. Examples: leave <strong>only MBA</strong> on for main marketing WA; leave <strong>only BBA</strong> on for BBA-only access; or enable several BUs.
+              All toggles on means <strong>no restriction</strong> (same as legacy users). At least one BU must stay on.
+              {buUnrestricted ? ' Status: unrestricted.' : ' Status: custom list.'}
             </p>
             <div className={`divide-y rounded-xl border overflow-hidden ${isDark ? 'divide-slate-700 border-slate-700 bg-slate-800/60' : 'divide-slate-100 border-slate-200 bg-white'}`}>
               {ALL_BU_WORKSPACE_SLUGS.map((slug) => (
@@ -521,13 +522,14 @@ export default function Settings({ theme, setTheme, user, isDark, isAdmin }) {
         {isAdmin && (
           <Section
             title="User Management"
-            description="Create viewer accounts and manage access. Only you (admin) can see this section."
+            description="Create viewer accounts, tab access, and which WhatsApp business units (MBA, IHM, BBA, …) each user may open. Only you (admin) can see this section."
             isDark={isDark}
           >
             <div className={`flex items-start gap-3 mb-4 p-3 rounded-xl ${isDark ? 'bg-amber-900/20 border border-amber-800/40' : 'bg-amber-50 border border-amber-200'}`}>
               <svg className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" /></svg>
               <p className={`text-xs ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
                 Users you create will see analytics data with <strong>masked emails and phone numbers</strong> (only last 3 digits visible). They cannot access the Settings tab.
+                Expand <strong>Permissions</strong> on a user to choose business units: e.g. <strong>MBA only</strong>, <strong>BBA only</strong>, or several BUs—the workspace switcher in the header will match what you allow.
               </p>
             </div>
             <UserManagement isDark={isDark} />
