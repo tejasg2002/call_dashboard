@@ -8,7 +8,7 @@ import { computeEmailDashboard } from '../../email-dashboard/compute'
 import { computeSourceStats } from '../../sourceStats/compute'
 import { computeSmsDashboard } from '../../smsDashboard/compute'
 import { computeCallDashboard } from '../../call-dashboard/compute'
-import { ANALYTICS_WA_DEFINITIONS } from '../../../src/lib/waWorkspace'
+import { ANALYTICS_WA_DEFINITIONS } from '../../../../src/lib/waWorkspace'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
