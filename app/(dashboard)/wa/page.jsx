@@ -69,7 +69,7 @@ export default function WAApiPage() {
     }
     if (!workspacePayloadMatchesExpected(data, ws)) {
       setError(
-        'Analytics did not match the selected workspace. MBA, IHM, and IDM are separate—pick the workspace again or refresh.',
+        'Analytics did not match the selected workspace. Pick the correct BU workspace again or refresh.',
       )
       setSnapshot(null)
       return false

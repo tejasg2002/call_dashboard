@@ -2,8 +2,11 @@
 
 import { Suspense, createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '../../app/providers'
 import {
   WA_WORKSPACE_MBA,
+  firstAllowedBuWorkspace,
+  isBuWorkspaceAllowed,
   isNonMbaWaWorkspace,
   isRouteAllowedForBuWorkspace,
   nonMbaWaHomePath,
@@ -61,6 +64,7 @@ function BuWorkspaceProviderInner({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { user, isAdmin, userPermsLoading, allowedBuWorkspaces } = useAuth()
   const [workspace, setWorkspaceState] = useState(WA_WORKSPACE_MBA)
 
   useEffect(() => {
@@ -71,6 +75,27 @@ function BuWorkspaceProviderInner({ children }) {
     }
     setWorkspaceState(readStoredBuWorkspace())
   }, [pathname, searchParams])
+
+  /** Non-admin BU allow-list: redirect off disallowed workspace (after perms load). */
+  useEffect(() => {
+    if (!user || isAdmin || userPermsLoading || allowedBuWorkspaces === undefined) return
+    if (allowedBuWorkspaces === null) return
+    const w = normalizeWAWorkspace(workspace)
+    if (isBuWorkspaceAllowed(w, allowedBuWorkspaces)) return
+    const next = firstAllowedBuWorkspace(allowedBuWorkspaces)
+    setWorkspaceState(next)
+    try {
+      localStorage.setItem(BU_WORKSPACE_STORAGE_KEY, next)
+    } catch {}
+    const path = pathname.split('?')[0] || pathname
+    const params = new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : '',
+    )
+    if (next !== WA_WORKSPACE_MBA) params.set('workspace', next)
+    else params.delete('workspace')
+    const qs = params.toString()
+    router.replace(qs ? `${path}?${qs}` : path, { scroll: false })
+  }, [user, isAdmin, userPermsLoading, allowedBuWorkspaces, workspace, pathname, router])
 
   useEffect(() => {
     const pathOnly = pathname.split('?')[0] || pathname

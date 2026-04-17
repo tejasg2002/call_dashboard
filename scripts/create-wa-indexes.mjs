@@ -5,6 +5,8 @@
  * - itm.marketingwa (MBA workspace)
  * - analytics.IHMmarketingwa (IHM workspace)
  * - analytics.IDMmarketingwa (IDM workspace)
+ * - analytics.BBAmarketingwa (BBA workspace)
+ * - analytics.BTECHmarketingwa (BTECH workspace)
  */
 import 'dotenv/config'
 import { MongoClient } from 'mongodb'
@@ -15,6 +17,8 @@ const TARGETS = [
   { db: 'itm', collection: 'marketingwa' },
   { db: 'analytics', collection: 'IHMmarketingwa' },
   { db: 'analytics', collection: 'IDMmarketingwa' },
+  { db: 'analytics', collection: 'BBAmarketingwa' },
+  { db: 'analytics', collection: 'BTECHmarketingwa' },
 ]
 
 const INDEXES = [

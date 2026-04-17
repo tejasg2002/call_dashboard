@@ -1,26 +1,91 @@
-/** WhatsApp analytics workspace: MBA uses itm.marketingwa; IHM/IDM use analytics.*marketingwa. */
+/** WhatsApp analytics: MBA → itm.marketingwa; other verticals → analytics.<Name>marketingwa */
 
-/** `itm.wa_dashboard_cache` document _id per workspace (separate cache docs). */
+/** `itm.wa_dashboard_cache` document _id per workspace. */
 export const WA_DASHBOARD_CACHE_ID_MBA = 'wa_latest_mba'
-export const WA_DASHBOARD_CACHE_ID_IHM = 'wa_latest_ihm'
-export const WA_DASHBOARD_CACHE_ID_IDM = 'wa_latest_idm'
-/** Legacy MBA cache _id (read fallback only; new writes use WA_DASHBOARD_CACHE_ID_MBA). */
 export const WA_DASHBOARD_CACHE_ID_MBA_LEGACY = 'wa_latest'
+
+const ITM_DB = 'itm'
+const ANALYTICS_DB = 'analytics'
+
+/**
+ * Non-MBA workspaces: same UX (WA-only subset, no MBA form conversion), separate cache + collection.
+ * @type {ReadonlyArray<{ workspace: string, collection: string, cacheKey: string, label: string }>}
+ */
+export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
+  { workspace: 'ihm', collection: 'IHMmarketingwa', cacheKey: 'wa_latest_ihm', label: 'IHM' },
+  { workspace: 'idm', collection: 'IDMmarketingwa', cacheKey: 'wa_latest_idm', label: 'IDM' },
+  { workspace: 'bba', collection: 'BBAmarketingwa', cacheKey: 'wa_latest_bba', label: 'BBA' },
+  { workspace: 'btech', collection: 'BTECHmarketingwa', cacheKey: 'wa_latest_btech', label: 'BTECH' },
+])
+
+/** @type {ReadonlySet<string>} */
+const ANALYTICS_WORKSPACE_SLUGS = new Set(ANALYTICS_WA_DEFINITIONS.map((d) => d.workspace))
 
 export const WA_WORKSPACE_MBA = 'mba'
 export const WA_WORKSPACE_IHM = 'ihm'
 export const WA_WORKSPACE_IDM = 'idm'
+export const WA_WORKSPACE_BBA = 'bba'
+export const WA_WORKSPACE_BTECH = 'btech'
+
+export const WA_DASHBOARD_CACHE_ID_IHM = 'wa_latest_ihm'
+export const WA_DASHBOARD_CACHE_ID_IDM = 'wa_latest_idm'
+export const WA_DASHBOARD_CACHE_ID_BBA = 'wa_latest_bba'
+export const WA_DASHBOARD_CACHE_ID_BTECH = 'wa_latest_btech'
+
+/** MBA first, then analytics workspaces — used for BU access checks and admin Settings. */
+export const ALL_BU_WORKSPACE_SLUGS = Object.freeze([
+  WA_WORKSPACE_MBA,
+  ...ANALYTICS_WA_DEFINITIONS.map((d) => d.workspace),
+])
+
+/**
+ * Firestore `allowedBuWorkspaces`: null/undefined/not-array = unrestricted (all BUs).
+ * Non-empty array shorter than full list = only those workspaces.
+ */
+export function normalizeAllowedBuWorkspaces(raw) {
+  if (raw == null || !Array.isArray(raw)) return null
+  const allowed = new Set()
+  for (const x of raw) {
+    const s = String(x || '').toLowerCase().trim()
+    if (ALL_BU_WORKSPACE_SLUGS.includes(s)) allowed.add(s)
+  }
+  const arr = [...allowed]
+  if (arr.length === 0 || arr.length >= ALL_BU_WORKSPACE_SLUGS.length) return null
+  return arr
+}
+
+export function isBuWorkspaceAllowed(workspace, allowedBuWorkspaces) {
+  const allowed = normalizeAllowedBuWorkspaces(allowedBuWorkspaces)
+  if (allowed == null) return true
+  return allowed.includes(normalizeWAWorkspace(workspace))
+}
+
+/** First slug in ALL_BU_WORKSPACE_SLUGS order that appears in the restricted list. */
+export function firstAllowedBuWorkspace(allowedBuWorkspaces) {
+  const allowed = normalizeAllowedBuWorkspaces(allowedBuWorkspaces)
+  if (allowed == null) return WA_WORKSPACE_MBA
+  for (const slug of ALL_BU_WORKSPACE_SLUGS) {
+    if (allowed.includes(slug)) return slug
+  }
+  return WA_WORKSPACE_MBA
+}
+
+/** Short label for a BU slug (Settings / tooltips). */
+export function buWorkspaceLabel(slug) {
+  if (!slug || slug === WA_WORKSPACE_MBA) return 'MBA'
+  const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === slug)
+  return def?.label ?? String(slug).toUpperCase()
+}
 
 export function normalizeWAWorkspace(raw) {
   const w = String(raw || '').toLowerCase().trim()
-  if (w === WA_WORKSPACE_IHM) return WA_WORKSPACE_IHM
-  if (w === WA_WORKSPACE_IDM) return WA_WORKSPACE_IDM
+  if (ANALYTICS_WORKSPACE_SLUGS.has(w)) return w
   return WA_WORKSPACE_MBA
 }
 
 /**
  * True if a cache/API payload belongs to the expected vertical.
- * MBA may omit workspace only for legacy cache; non-MBA payloads must match.
+ * MBA may omit workspace only for legacy cache; analytics workspaces must match.
  */
 export function workspacePayloadMatchesExpected(payload, expectedWorkspace) {
   const exp = normalizeWAWorkspace(expectedWorkspace)
@@ -31,11 +96,8 @@ export function workspacePayloadMatchesExpected(payload, expectedWorkspace) {
   return normalizeWAWorkspace(gotRaw) === exp
 }
 
-const ITM_DB = 'itm'
-const ANALYTICS_DB = 'analytics'
-
 /**
- * IHM and IDM: hide MBA-only analytics; WhatsApp API Messages + template drill-downs stay.
+ * Analytics-only workspaces: hide MBA-only nav; WhatsApp API Messages + template drill-downs stay.
  * /settings remains reachable (sidebar still enforces admin).
  */
 export function isRouteAllowedForBuWorkspace(pathname, workspace) {
@@ -48,60 +110,49 @@ export function isRouteAllowedForBuWorkspace(pathname, workspace) {
   return false
 }
 
-/** True for IHM or IDM (analytics DB WhatsApp workspaces, no MBA conversion block). */
+/** True for any analytics DB WhatsApp workspace (not MBA). */
 export function isNonMbaWaWorkspace(workspace) {
-  const w = normalizeWAWorkspace(workspace)
-  return w === WA_WORKSPACE_IHM || w === WA_WORKSPACE_IDM
+  return ANALYTICS_WORKSPACE_SLUGS.has(normalizeWAWorkspace(workspace))
 }
 
-/** Main WA URL for the current non-MBA workspace (used when redirecting off disallowed routes). */
+/** Main WA URL when redirecting off a disallowed route for the current analytics workspace. */
 export function nonMbaWaHomePath(workspace) {
   const w = normalizeWAWorkspace(workspace)
-  if (w === WA_WORKSPACE_IHM) return '/wa?workspace=ihm'
-  if (w === WA_WORKSPACE_IDM) return '/wa?workspace=idm'
-  return '/wa'
+  if (w === WA_WORKSPACE_MBA) return '/wa'
+  return `/wa?workspace=${encodeURIComponent(w)}`
 }
 
 /** Human label for the workspace switcher. */
 export function workspaceDisplayLabel(workspace) {
   const w = normalizeWAWorkspace(workspace)
-  if (w === WA_WORKSPACE_IHM) return 'IHM'
-  if (w === WA_WORKSPACE_IDM) return 'IDM'
-  return 'MBA'
+  if (w === WA_WORKSPACE_MBA) return 'MBA'
+  const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === w)
+  return def?.label ?? w.toUpperCase()
 }
 
-/** Append ?workspace=ihm|idm for non-MBA so refreshes and links stay on the right BU. */
+/** Append ?workspace=<slug> for analytics workspaces so refreshes and links stay on the right BU. */
 export function withWorkspaceQuery(href, workspace) {
   const w = normalizeWAWorkspace(workspace)
   if (w === WA_WORKSPACE_MBA) return href
-  const param = w === WA_WORKSPACE_IHM ? 'ihm' : 'idm'
   const hashIdx = href.indexOf('#')
   const hash = hashIdx >= 0 ? href.slice(hashIdx) : ''
   const pathPart = hashIdx >= 0 ? href.slice(0, hashIdx) : href
   const qIdx = pathPart.indexOf('?')
   const p = qIdx >= 0 ? pathPart.slice(0, qIdx) : pathPart
   const params = new URLSearchParams(qIdx >= 0 ? pathPart.slice(qIdx + 1) : '')
-  params.set('workspace', param)
+  params.set('workspace', w)
   return `${p}?${params.toString()}${hash}`
 }
 
 export function waWorkspaceConfig(workspace) {
   const w = normalizeWAWorkspace(workspace)
-  if (w === WA_WORKSPACE_IHM) {
+  const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === w)
+  if (def) {
     return {
-      workspace: WA_WORKSPACE_IHM,
+      workspace: def.workspace,
       dataDb: ANALYTICS_DB,
-      waCollection: 'IHMmarketingwa',
-      cacheKey: WA_DASHBOARD_CACHE_ID_IHM,
-      includeMbaConversion: false,
-    }
-  }
-  if (w === WA_WORKSPACE_IDM) {
-    return {
-      workspace: WA_WORKSPACE_IDM,
-      dataDb: ANALYTICS_DB,
-      waCollection: 'IDMmarketingwa',
-      cacheKey: WA_DASHBOARD_CACHE_ID_IDM,
+      waCollection: def.collection,
+      cacheKey: def.cacheKey,
       includeMbaConversion: false,
     }
   }

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { auth, db, onAuthStateChanged, signOut } from '../src/firebase'
 import { fetchUserPermissions } from '../src/lib/userManagement'
+import { normalizeAllowedBuWorkspaces } from '../src/lib/waWorkspace'
 
 export const ADMIN_EMAIL = 'server@letsupgrade.in'
 
@@ -19,16 +20,27 @@ function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [userPerms, setUserPerms] = useState(null)
+  const [userPermsLoading, setUserPermsLoading] = useState(false)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser)
       setCheckingAuth(false)
-      if (firebaseUser && firebaseUser.email !== ADMIN_EMAIL) {
-        fetchUserPermissions(db, firebaseUser.uid).then(setUserPerms)
-      } else {
+      if (!firebaseUser) {
         setUserPerms(null)
+        setUserPermsLoading(false)
+        return
       }
+      if (firebaseUser.email === ADMIN_EMAIL) {
+        setUserPerms(null)
+        setUserPermsLoading(false)
+        return
+      }
+      setUserPermsLoading(true)
+      setUserPerms(null)
+      fetchUserPermissions(db, firebaseUser.uid)
+        .then(setUserPerms)
+        .finally(() => setUserPermsLoading(false))
     })
     return () => unsub()
   }, [])
@@ -44,12 +56,15 @@ function AuthProvider({ children }) {
   const canViewWhatsApp   = isAdmin || (userPerms?.canViewWhatsApp   !== false)
   const canViewEmail      = isAdmin || (userPerms?.canViewEmail      !== false)
   const dataMasked = !isAdmin && (userPerms?.dataMasked !== false)
+  /** null = all BUs; string[] = restricted; undefined = perms still loading (do not enforce yet). */
+  const allowedBuWorkspaces =
+    isAdmin || !user ? null : userPermsLoading ? undefined : normalizeAllowedBuWorkspaces(userPerms?.allowedBuWorkspaces)
 
   return (
     <AuthContext.Provider value={{
-      user, checkingAuth, userPerms, isAdmin,
+      user, checkingAuth, userPerms, userPermsLoading, isAdmin,
       canViewCallReview, canViewWhatsApp, canViewEmail,
-      dataMasked, handleLogout,
+      dataMasked, allowedBuWorkspaces, handleLogout,
     }}>
       {children}
     </AuthContext.Provider>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { auth, db } from '../firebase'
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
+import { deleteField } from 'firebase/firestore'
 import {
   createAppUser,
   listAppUsers,
@@ -11,6 +12,12 @@ import {
   updateUserPermissions,
   DEFAULT_PERMISSIONS,
 } from '../lib/userManagement'
+import {
+  ALL_BU_WORKSPACE_SLUGS,
+  ANALYTICS_WA_DEFINITIONS,
+  buWorkspaceLabel,
+  normalizeAllowedBuWorkspaces,
+} from '../lib/waWorkspace'
 
 export const ADMIN_EMAIL = 'server@letsupgrade.in'
 
@@ -47,9 +54,8 @@ function ToggleRow({ label, description, checked, onChange, isDark }) {
 /* ─── Permission toggle row ───────────────────────────────────────── */
 function PermToggle({ label, description, checked, onChange, isDark, color = 'brand' }) {
   const trackColor = {
-    brand:  checked ? 'bg-brand-600'  : isDark ? 'bg-slate-600' : 'bg-slate-300',
     brand: checked ? 'bg-brand-600' : isDark ? 'bg-slate-600' : 'bg-slate-300',
-    amber:   checked ? 'bg-amber-500'   : isDark ? 'bg-slate-600' : 'bg-slate-300',
+    amber: checked ? 'bg-amber-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
   }[color]
 
   return (
@@ -74,12 +80,34 @@ function PermToggle({ label, description, checked, onChange, isDark, color = 'br
 }
 
 /* ─── Per-user card with permissions ─────────────────────────────── */
-function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, onPermissionChange }) {
+function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, onPermissionChange, onBuWorkspacesUpdate }) {
   const [expanded, setExpanded] = useState(false)
   const canViewCallReview = u.canViewCallReview ?? DEFAULT_PERMISSIONS.canViewCallReview
   const canViewWhatsApp   = u.canViewWhatsApp   ?? DEFAULT_PERMISSIONS.canViewWhatsApp
   const canViewEmail      = u.canViewEmail      ?? DEFAULT_PERMISSIONS.canViewEmail
   const dataMasked        = u.dataMasked        ?? DEFAULT_PERMISSIONS.dataMasked
+
+  const buAccessSet = (() => {
+    const n = normalizeAllowedBuWorkspaces(u.allowedBuWorkspaces)
+    if (n == null) return new Set(ALL_BU_WORKSPACE_SLUGS)
+    return new Set(n)
+  })()
+  const buUnrestricted = normalizeAllowedBuWorkspaces(u.allowedBuWorkspaces) == null
+
+  const handleBuToggle = async (slug, checked) => {
+    const next = new Set(buAccessSet)
+    if (checked) next.add(slug)
+    else {
+      if (next.size <= 1) return
+      next.delete(slug)
+    }
+    const arr = [...next]
+    if (arr.length >= ALL_BU_WORKSPACE_SLUGS.length) {
+      await onBuWorkspacesUpdate(null)
+    } else {
+      await onBuWorkspacesUpdate(arr)
+    }
+  }
 
   return (
     <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-700/40 border-slate-600' : 'bg-white border-slate-200'}`}>
@@ -161,6 +189,38 @@ function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, on
                   color="brand"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* WhatsApp BU workspaces (restrict which verticals appear in the header switcher) */}
+          <div className="px-4 pt-2 pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className={`w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>WhatsApp BU access</p>
+            </div>
+            <p className={`text-[10px] mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              All on = every workspace. Turn off BUs this user must not open. At least one BU must stay on.
+              {buUnrestricted ? ' Currently: unrestricted.' : ' Currently: restricted list.'}
+            </p>
+            <div className={`divide-y rounded-xl border overflow-hidden ${isDark ? 'divide-slate-700 border-slate-700 bg-slate-800/60' : 'divide-slate-100 border-slate-200 bg-white'}`}>
+              {ALL_BU_WORKSPACE_SLUGS.map((slug) => (
+                <div key={slug} className="px-3">
+                  <PermToggle
+                    label={buWorkspaceLabel(slug)}
+                    description={
+                      slug === 'mba'
+                        ? 'itm.marketingwa'
+                        : `analytics.${ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === slug)?.collection ?? ''}`
+                    }
+                    checked={buAccessSet.has(slug)}
+                    onChange={(v) => { void handleBuToggle(slug, v) }}
+                    isDark={isDark}
+                    color="brand"
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
@@ -334,13 +394,35 @@ function UserManagement({ isDark }) {
                   setActionStatus((s) => ({ ...s, [u.id]: `Error: ${err.message}` }))
                 }
               }}
+              onBuWorkspacesUpdate={async (allowedArr) => {
+                try {
+                  if (allowedArr == null) {
+                    await updateUserPermissions(db, u.id, { allowedBuWorkspaces: deleteField() })
+                    setUsers((prev) =>
+                      prev.map((p) => {
+                        if (p.id !== u.id) return p
+                        const next = { ...p }
+                        delete next.allowedBuWorkspaces
+                        return next
+                      }),
+                    )
+                  } else {
+                    await updateUserPermissions(db, u.id, { allowedBuWorkspaces: allowedArr })
+                    setUsers((prev) =>
+                      prev.map((p) => (p.id === u.id ? { ...p, allowedBuWorkspaces: allowedArr } : p)),
+                    )
+                  }
+                } catch (err) {
+                  setActionStatus((s) => ({ ...s, [u.id]: `Error: ${err.message}` }))
+                }
+              }}
             />
           ))}
         </div>
       )}
 
       <p className={`text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-        * "Reset password" sends a reset link to the user's email. "Remove" revokes dashboard access. Permission changes take effect on next login.
+        * "Reset password" sends a reset link to the user's email. "Remove" revokes dashboard access. Tab permissions refresh on next login; WhatsApp BU access updates on the next page load or immediately when the user changes workspace.
       </p>
     </div>
   )

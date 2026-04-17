@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -8,8 +8,8 @@ import { useAuth, useTheme } from '../providers'
 import { BuWorkspaceProvider, useBuWorkspace } from '../../src/context/BuWorkspaceProvider'
 import { cn } from '../../src/lib/utils'
 import {
-  WA_WORKSPACE_IDM,
-  WA_WORKSPACE_IHM,
+  ALL_BU_WORKSPACE_SLUGS,
+  ANALYTICS_WA_DEFINITIONS,
   WA_WORKSPACE_MBA,
   isNonMbaWaWorkspace,
   withWorkspaceQuery,
@@ -90,8 +90,23 @@ const NAV_SECTIONS = [
 
 function WorkspaceDropdown({ isDark }) {
   const { workspace, setWorkspace } = useBuWorkspace()
+  const { allowedBuWorkspaces } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+
+  const buSwitcherOptions = useMemo(() => {
+    if (allowedBuWorkspaces === undefined) {
+      return [{ workspace: WA_WORKSPACE_MBA, label: 'MBA' }, ...ANALYTICS_WA_DEFINITIONS]
+    }
+    if (allowedBuWorkspaces == null) {
+      return [{ workspace: WA_WORKSPACE_MBA, label: 'MBA' }, ...ANALYTICS_WA_DEFINITIONS]
+    }
+    return ALL_BU_WORKSPACE_SLUGS.filter((slug) => allowedBuWorkspaces.includes(slug)).map((slug) => {
+      if (slug === WA_WORKSPACE_MBA) return { workspace: slug, label: 'MBA' }
+      const d = ANALYTICS_WA_DEFINITIONS.find((x) => x.workspace === slug)
+      return { workspace: slug, label: d?.label ?? slug.toUpperCase() }
+    })
+  }, [allowedBuWorkspaces])
 
   useEffect(() => {
     if (!open) return
@@ -152,73 +167,33 @@ function WorkspaceDropdown({ isDark }) {
         <ul
           role="listbox"
           className={cn(
-            'absolute right-0 top-[calc(100%+4px)] py-1 min-w-[9.5rem] rounded-xl border shadow-lg z-50',
+            'absolute right-0 top-[calc(100%+4px)] py-1 min-w-[10.5rem] max-h-[min(70vh,22rem)] overflow-y-auto rounded-xl border shadow-lg z-50',
             isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200',
           )}
         >
-          <li role="option" aria-selected={workspace === WA_WORKSPACE_MBA}>
-            <button
-              type="button"
-              onClick={() => {
-                setWorkspace(WA_WORKSPACE_MBA)
-                setOpen(false)
-              }}
-              className={cn(
-                'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
-                workspace === WA_WORKSPACE_MBA
-                  ? isDark
-                    ? 'bg-brand-700/25 text-brand-300'
-                    : 'bg-brand-50 text-brand-800'
-                  : isDark
-                    ? 'text-slate-300 hover:bg-slate-700/80'
-                    : 'text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              MBA
-            </button>
-          </li>
-          <li role="option" aria-selected={workspace === WA_WORKSPACE_IHM}>
-            <button
-              type="button"
-              onClick={() => {
-                setWorkspace(WA_WORKSPACE_IHM)
-                setOpen(false)
-              }}
-              className={cn(
-                'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
-                workspace === WA_WORKSPACE_IHM
-                  ? isDark
-                    ? 'bg-brand-700/25 text-brand-300'
-                    : 'bg-brand-50 text-brand-800'
-                  : isDark
-                    ? 'text-slate-300 hover:bg-slate-700/80'
-                    : 'text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              IHM
-            </button>
-          </li>
-          <li role="option" aria-selected={workspace === WA_WORKSPACE_IDM}>
-            <button
-              type="button"
-              onClick={() => {
-                setWorkspace(WA_WORKSPACE_IDM)
-                setOpen(false)
-              }}
-              className={cn(
-                'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
-                workspace === WA_WORKSPACE_IDM
-                  ? isDark
-                    ? 'bg-brand-700/25 text-brand-300'
-                    : 'bg-brand-50 text-brand-800'
-                  : isDark
-                    ? 'text-slate-300 hover:bg-slate-700/80'
-                    : 'text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              IDM
-            </button>
-          </li>
+          {buSwitcherOptions.map((def) => (
+            <li key={def.workspace} role="option" aria-selected={workspace === def.workspace}>
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspace(def.workspace)
+                  setOpen(false)
+                }}
+                className={cn(
+                  'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
+                  workspace === def.workspace
+                    ? isDark
+                      ? 'bg-brand-700/25 text-brand-300'
+                      : 'bg-brand-50 text-brand-800'
+                    : isDark
+                      ? 'text-slate-300 hover:bg-slate-700/80'
+                      : 'text-slate-700 hover:bg-slate-50',
+                )}
+              >
+                {def.label}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>

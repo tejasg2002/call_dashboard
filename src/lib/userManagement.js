@@ -17,6 +17,7 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore'
+import { normalizeAllowedBuWorkspaces } from './waWorkspace'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -58,6 +59,8 @@ export async function createAppUser({ email, password, displayName, role = 'view
 
   await signOut(secondaryAuth)
 
+  const allowedBu = normalizeAllowedBuWorkspaces(permissions.allowedBuWorkspaces)
+
   await setDoc(doc(adminDb, APP_USERS_COLLECTION, uid), {
     uid,
     email,
@@ -67,6 +70,7 @@ export async function createAppUser({ email, password, displayName, role = 'view
     canViewWhatsApp:   permissions.canViewWhatsApp   ?? DEFAULT_PERMISSIONS.canViewWhatsApp,
     canViewEmail:      permissions.canViewEmail      ?? DEFAULT_PERMISSIONS.canViewEmail,
     dataMasked:        permissions.dataMasked        ?? DEFAULT_PERMISSIONS.dataMasked,
+    ...(allowedBu ? { allowedBuWorkspaces: allowedBu } : {}),
     createdAt: serverTimestamp(),
   })
 

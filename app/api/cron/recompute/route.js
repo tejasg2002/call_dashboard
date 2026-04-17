@@ -8,6 +8,7 @@ import { computeEmailDashboard } from '../../email-dashboard/compute'
 import { computeSourceStats } from '../../sourceStats/compute'
 import { computeSmsDashboard } from '../../smsDashboard/compute'
 import { computeCallDashboard } from '../../call-dashboard/compute'
+import { ANALYTICS_WA_DEFINITIONS } from '../../../src/lib/waWorkspace'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -23,36 +24,44 @@ export async function GET(request) {
 
   const start = Date.now()
   try {
-    const [waMba, waIhm, waIdm, emailResult, sourceStatsResult, smsResult, callResult] = await Promise.all([
+    const waJobs = [
       computeWADashboard({ mode: 'full', workspace: 'mba' }),
-      computeWADashboard({ mode: 'full', workspace: 'ihm' }),
-      computeWADashboard({ mode: 'full', workspace: 'idm' }),
+      ...ANALYTICS_WA_DEFINITIONS.map((d) =>
+        computeWADashboard({ mode: 'full', workspace: d.workspace }),
+      ),
       computeEmailDashboard({ mode: 'full' }),
       computeSourceStats({ mode: 'full' }),
       computeSmsDashboard({ mode: 'full' }),
       computeCallDashboard({ mode: 'full' }),
-    ])
+    ]
+    const results = await Promise.all(waJobs)
+    const waMba = results[0]
+    const analyticsResults = results.slice(1, 1 + ANALYTICS_WA_DEFINITIONS.length)
+    const emailResult = results[1 + ANALYTICS_WA_DEFINITIONS.length]
+    const sourceStatsResult = results[2 + ANALYTICS_WA_DEFINITIONS.length]
+    const smsResult = results[3 + ANALYTICS_WA_DEFINITIONS.length]
+    const callResult = results[4 + ANALYTICS_WA_DEFINITIONS.length]
+
+    const wa = {
+      mba: {
+        rawDocCount: waMba.rawDocCount,
+        templateRows: waMba.templateRows?.length,
+        formSubmitted: waMba.formSubmittedCount,
+        computeTime: waMba.elapsed,
+      },
+    }
+    ANALYTICS_WA_DEFINITIONS.forEach((d, i) => {
+      const r = analyticsResults[i]
+      wa[d.workspace] = {
+        rawDocCount: r.rawDocCount,
+        templateRows: r.templateRows?.length,
+        computeTime: r.elapsed,
+      }
+    })
 
     return Response.json({
       ok: true,
-      wa: {
-        mba: {
-          rawDocCount: waMba.rawDocCount,
-          templateRows: waMba.templateRows?.length,
-          formSubmitted: waMba.formSubmittedCount,
-          computeTime: waMba.elapsed,
-        },
-        ihm: {
-          rawDocCount: waIhm.rawDocCount,
-          templateRows: waIhm.templateRows?.length,
-          computeTime: waIhm.elapsed,
-        },
-        idm: {
-          rawDocCount: waIdm.rawDocCount,
-          templateRows: waIdm.templateRows?.length,
-          computeTime: waIdm.elapsed,
-        },
-      },
+      wa,
       email: {
         rawDocCount: emailResult.rawDocCount,
         templateRows: emailResult.templateRows?.length,
