@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useBuWorkspace } from '../context/BuWorkspaceProvider'
 import { fetchCalls } from '../firebase'
+import { buildCallDashboardSnapshotFromCalls } from '../lib/buildCallDashboardSnapshot'
+import { fetchCallLogsIsu } from '../lib/callLogsIsuApi'
 import { fetchCallDashboard } from '../lib/callDashboardApi'
 import { cn } from '../lib/utils'
+import { workspaceUsesIsuCallLogs } from '../lib/waWorkspace'
 import MetricsCards from './MetricsCards'
 import PerformanceCards from './PerformanceCards'
 import PerformanceCharts from './PerformanceCharts'
@@ -20,6 +24,7 @@ const RANGE_OPTIONS = [
 ]
 
 const Dashboard = () => {
+  const { workspace } = useBuWorkspace()
   const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -31,6 +36,18 @@ const Dashboard = () => {
   const loadDashboard = useCallback(async ({ mode = 'cached', sd, ed } = {}) => {
     try {
       setLoading(true)
+
+      if (workspaceUsesIsuCallLogs(workspace)) {
+        const calls = await fetchCallLogsIsu(workspace, {
+          startDate: sd || undefined,
+          endDate: ed || undefined,
+        })
+        setSnapshot(buildCallDashboardSnapshotFromCalls(calls, { fallback: false }))
+        setLastUpdated(new Date())
+        setError(null)
+        return
+      }
+
       const data = await fetchCallDashboard({
         mode,
         startDate: sd || undefined,
@@ -45,78 +62,10 @@ const Dashboard = () => {
 
       // Keep a safe fallback for environments where Firebase Admin credentials
       // are not configured yet. This preserves the old behavior if needed.
-      if (!sd && !ed) {
+      if (!workspaceUsesIsuCallLogs(workspace) && !sd && !ed) {
         try {
           const calls = await fetchCalls()
-          const totalCalls = calls.length
-          const totalScore = calls.reduce((sum, call) => sum + (call.scores?.overall || 0), 0)
-          const averageScore = totalCalls > 0 ? Math.round(totalScore / totalCalls) : 0
-          const interestedCount = calls.filter(
-            (call) => call.Disposition?.counselor === 'interested' || call.lead_stage === 'Interested'
-          ).length
-          const notInterestedCount = calls.filter(
-            (call) => call.Disposition?.counselor === 'not_interested' || call.lead_stage === 'Not Interested'
-          ).length
-
-          const buildOwnerStats = (sourceCalls) => {
-            const ownerMap = {}
-            sourceCalls.forEach((call) => {
-              const owner = call.Lead_owner || 'Unassigned'
-              if (!ownerMap[owner]) ownerMap[owner] = { owner, totalCalls: 0, totalScore: 0, maxScore: 0 }
-              const score = call.scores?.overall || 0
-              ownerMap[owner].totalCalls += 1
-              ownerMap[owner].totalScore += score
-              ownerMap[owner].maxScore = Math.max(ownerMap[owner].maxScore, score)
-            })
-
-            return Object.values(ownerMap)
-              .map((item) => ({
-                owner: item.owner,
-                totalCalls: item.totalCalls,
-                avgScore: item.totalCalls > 0 ? Math.round(item.totalScore / item.totalCalls) : 0,
-                maxScore: item.maxScore,
-              }))
-              .sort((a, b) => b.totalCalls - a.totalCalls)
-          }
-
-          const startOfToday = new Date()
-          startOfToday.setHours(0, 0, 0, 0)
-
-          const monthStart = new Date()
-          monthStart.setDate(1)
-          monthStart.setHours(0, 0, 0, 0)
-
-          const getCallDate = (call) => {
-            const raw = call.Date || call.call_timestamp || call.created_at || call.createdAt || call.call_date || call.callDate || null
-            if (!raw) return null
-            if (typeof raw.toDate === 'function') return raw.toDate()
-            const parsed = new Date(raw)
-            return Number.isNaN(parsed.getTime()) ? null : parsed
-          }
-
-          setSnapshot({
-            kpi: {
-              totalCalls,
-              averageScore,
-              interestedCount,
-              notInterestedCount,
-              interestedPct: totalCalls > 0 ? Math.round((interestedCount / totalCalls) * 100) : 0,
-              notInterestedPct: totalCalls > 0 ? Math.round((notInterestedCount / totalCalls) * 100) : 0,
-            },
-            ownerStatsToday: buildOwnerStats(calls.filter((call) => {
-              const callDate = getCallDate(call)
-              return callDate && callDate >= startOfToday
-            })),
-            ownerStatsMonth: buildOwnerStats(calls.filter((call) => {
-              const callDate = getCallDate(call)
-              return callDate && callDate >= monthStart
-            })),
-            ownerStatsOverall: buildOwnerStats(calls),
-            rawDocCount: totalCalls,
-            filteredDocCount: totalCalls,
-            fromCache: false,
-            fallback: true,
-          })
+          setSnapshot(buildCallDashboardSnapshotFromCalls(calls, { fallback: true }))
           setLastUpdated(new Date())
           setError(null)
           return
@@ -133,7 +82,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [workspace])
 
   useEffect(() => {
     loadDashboard({

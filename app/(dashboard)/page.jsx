@@ -4,11 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../providers'
 import { useTheme } from '../providers'
+import { useBuWorkspace } from '../../src/context/BuWorkspaceProvider'
 import Dashboard from '../../src/components/Dashboard'
 import { cn } from '../../src/lib/utils'
+import { withWorkspaceQuery } from '../../src/lib/waWorkspace'
 
 export default function CallAnalyticsPage() {
   const pathname = usePathname()
+  const { workspace } = useBuWorkspace()
   const { canViewCallReview } = useAuth()
   const { isDark } = useTheme()
 
@@ -21,7 +24,7 @@ export default function CallAnalyticsPage() {
       )}>
         <div className="max-w-[1600px] mx-auto flex items-center gap-1">
           <Link
-            href="/"
+            href={withWorkspaceQuery('/', workspace)}
             className={cn(
               "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
               pathname === '/'
@@ -38,7 +41,7 @@ export default function CallAnalyticsPage() {
           </Link>
           {canViewCallReview && (
             <Link
-              href="/call-review"
+              href={withWorkspaceQuery('/call-review', workspace)}
               className={cn(
                 "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 pathname === '/call-review'
@@ -55,7 +58,7 @@ export default function CallAnalyticsPage() {
             </Link>
           )}
           <Link
-            href="/sourceStats"
+            href={withWorkspaceQuery('/sourceStats', workspace)}
             className={cn(
               "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
               pathname === '/sourceStats'

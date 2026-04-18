@@ -22,6 +22,302 @@ function normaliseMobile(raw) {
   return n
 }
 
+const IHM_PAYMENT_STATUS_HINTS = ['complete', 'success', 'paid', 'captured', 'successful']
+
+function ihmWebhookStatusLower(doc) {
+  return String(doc.paymentStatus ?? doc.status ?? doc.payment_status ?? doc.eventType ?? doc.event_type ?? '').toLowerCase()
+}
+
+function ihmWebhookIsCompleted(doc) {
+  const s = ihmWebhookStatusLower(doc)
+  if (!s) return false
+  return IHM_PAYMENT_STATUS_HINTS.some((h) => s.includes(h))
+}
+
+function ihmWebhookMobileRaw(doc) {
+  if (!doc || typeof doc !== 'object') return ''
+  return (
+    doc.mobile_number ??
+    doc.mobile ??
+    doc.phone_number ??
+    doc.phone ??
+    doc.mobileno ??
+    doc?.personal_details?.mobile_number ??
+    doc?.personal_details?.mobile ??
+    doc?.data?.mobile ??
+    ''
+  )
+}
+
+function ihmWebhookPaidAt(doc) {
+  return parseOptDate(
+    doc.event_timestamp ??
+      doc.payment_completed_at ??
+      doc.paid_at ??
+      doc.paidAt ??
+      doc.createdAt ??
+      doc.updatedAt ??
+      doc.timestamp,
+  )
+}
+
+function ihmWebhookLeadId(doc) {
+  const v = doc.lead_id ?? doc.leadId ?? doc.leadID ?? doc.npf_lead_id ?? doc?.data?.lead_id
+  if (v == null || v === '') return null
+  const s = String(v).trim()
+  return s === '' ? null : s
+}
+
+/**
+ * IHM: clicked users with a completed payment in itm.npfPaymentWebhookEvents after first outbound
+ * and on/after last WA click (same ordering rules as MBA form conversion).
+ */
+async function buildIhmPaymentConversion({
+  client,
+  clickedPhones,
+  clickedPhoneDedup,
+  normalisedClickedMobiles,
+  waCol,
+}) {
+  const itmDb = client.db(ITM_DB)
+  const ihmCol = itmDb.collection('npfPaymentWebhookEvents')
+
+  const firstOutboundResult = clickedPhoneDedup.length > 0
+    ? await waCol
+        .aggregate([
+          {
+            $match: {
+              phone_number: { $in: clickedPhoneDedup },
+              stage: { $in: ['sent', 'delivered'] },
+            },
+          },
+          {
+            $group: {
+              _id: '$phone_number',
+              firstOutbound: { $min: '$event_timestamp' },
+            },
+          },
+        ])
+        .toArray()
+    : []
+
+  const firstOutboundByNorm = new Map()
+  for (const row of firstOutboundResult) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const anchor = parseOptDate(row.firstOutbound)
+    if (!anchor) continue
+    const prev = firstOutboundByNorm.get(norm)
+    if (!prev || anchor.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, anchor)
+  }
+
+  const lastClickResult = clickedPhoneDedup.length > 0
+    ? await waCol
+        .aggregate([
+          { $match: { phone_number: { $in: clickedPhoneDedup }, stage: 'clicked' } },
+          {
+            $addFields: {
+              _clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+            },
+          },
+          {
+            $group: {
+              _id: '$phone_number',
+              lastClickAt: { $max: '$_clickAt' },
+            },
+          },
+        ])
+        .toArray()
+    : []
+
+  const lastClickByNorm = new Map()
+  for (const row of lastClickResult) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const t = parseOptDate(row.lastClickAt)
+    if (!t) continue
+    const prev = lastClickByNorm.get(norm)
+    if (!prev || t.getTime() > prev.getTime()) lastClickByNorm.set(norm, t)
+  }
+
+  const phoneVariantSet = new Set()
+  for (const raw of clickedPhoneDedup) {
+    const n = normaliseMobile(raw)
+    if (!n) continue
+    phoneVariantSet.add(n)
+    if (n.length === 10) phoneVariantSet.add(`91${n}`)
+  }
+  const variants = [...phoneVariantSet]
+
+  const completedByNorm = new Map()
+  const MOBILE_KEYS = ['mobile_number', 'mobile', 'phone_number', 'phone']
+  const CHUNK = 400
+  for (let i = 0; i < variants.length; i += CHUNK) {
+    const chunk = variants.slice(i, i + CHUNK)
+    const orConds = MOBILE_KEYS.map((k) => ({ [k]: { $in: chunk } }))
+    const chunkDocs = await ihmCol.find({ $or: orConds }).maxTimeMS(120000).toArray()
+    for (const doc of chunkDocs) {
+      if (!ihmWebhookIsCompleted(doc)) continue
+      const norm = normaliseMobile(ihmWebhookMobileRaw(doc))
+      if (!norm) continue
+      const paidAt = ihmWebhookPaidAt(doc)
+      if (!paidAt) continue
+      const prev = completedByNorm.get(norm)
+      const lead = ihmWebhookLeadId(doc)
+      if (!prev || paidAt.getTime() > prev.paidAt.getTime()) {
+        completedByNorm.set(norm, {
+          paidAt,
+          leadId: lead || prev?.leadId || null,
+        })
+      }
+    }
+  }
+
+  const normToRawPhone = new Map()
+  for (const raw of clickedPhones) {
+    const n = normaliseMobile(raw)
+    if (!n || normToRawPhone.has(n)) continue
+    normToRawPhone.set(n, raw)
+  }
+
+  const ihmRows = []
+  for (const norm of normalisedClickedMobiles) {
+    const pay = completedByNorm.get(norm)
+    if (!pay) continue
+    const outboundAnchor = firstOutboundByNorm.get(norm)
+    const lastClick = lastClickByNorm.get(norm)
+    if (!outboundAnchor || !lastClick) continue
+    if (!isOnOrAfter(pay.paidAt, outboundAnchor)) continue
+    if (!isOnOrAfter(pay.paidAt, lastClick)) continue
+    ihmRows.push({
+      norm,
+      mobile: normToRawPhone.get(norm) || norm,
+      paidAt: pay.paidAt,
+      leadId: pay.leadId,
+    })
+  }
+
+  const formSubmittedMobiles = ihmRows.map((r) => r.mobile)
+  const convertedMobiles = [...new Set(formSubmittedMobiles)]
+
+  const clickAttrResult = convertedMobiles.length > 0
+    ? await waCol
+        .aggregate([
+          { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+          {
+            $group: {
+              _id: '$phone_number',
+              templates: { $addToSet: '$template_name' },
+              buttons: { $addToSet: '$button_text' },
+            },
+          },
+        ])
+        .toArray()
+    : []
+
+  const clickAttrMap = new Map()
+  for (const r of clickAttrResult) {
+    clickAttrMap.set(normaliseMobile(r._id), {
+      templates: (r.templates || []).filter(Boolean),
+      buttons: (r.buttons || []).filter(Boolean),
+    })
+  }
+
+  const clickBreakdownResult =
+    convertedMobiles.length > 0
+      ? await waCol
+          .aggregate([
+            { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+            { $sort: { event_timestamp: 1 } },
+            {
+              $group: {
+                _id: '$phone_number',
+                events: {
+                  $push: {
+                    template: '$template_name',
+                    button: '$button_text',
+                    clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+                  },
+                },
+              },
+            },
+          ])
+          .toArray()
+      : []
+
+  const MAX_TIMELINE_EVENTS = 40
+  const clickTimelineByNorm = new Map()
+  for (const row of clickBreakdownResult) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const rawEvents = row.events || []
+    const slice = rawEvents.length > MAX_TIMELINE_EVENTS ? rawEvents.slice(-MAX_TIMELINE_EVENTS) : rawEvents
+    const events = slice.map((e) => {
+      const dt = parseOptDate(e.clickAt)
+      return {
+        template: e.template || '',
+        button: e.button || '',
+        clickAtIso: dt ? dt.toISOString() : null,
+        clickAtDisplay: dt
+          ? dt.toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Kolkata',
+            })
+          : '—',
+      }
+    })
+    clickTimelineByNorm.set(norm, events)
+  }
+
+  const formMetaByNorm = new Map()
+  for (const row of ihmRows) {
+    const dt = row.paidAt
+    formMetaByNorm.set(row.norm, {
+      formSubmittedAtIso: dt ? dt.toISOString() : null,
+      formSubmittedAtDisplay: dt
+        ? dt.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Kolkata',
+          })
+        : '—',
+      leadIdFromNpf: row.leadId,
+    })
+  }
+
+  const n = ihmRows.length
+  const rate = clickedPhones.length > 0 ? parseFloat(((n / clickedPhones.length) * 100).toFixed(2)) : 0
+
+  return {
+    conversionKind: 'ihm_payment_webhook',
+    totalClicked: clickedPhones.length,
+    formSubmitted: n,
+    conversionRate: rate,
+    formSubmittedMobiles,
+    formSubmittedDetails: formSubmittedMobiles.map((m) => {
+      const norm = normaliseMobile(m)
+      const attr = clickAttrMap.get(norm)
+      const meta = formMetaByNorm.get(norm)
+      return {
+        mobile: m,
+        leadId: meta?.leadIdFromNpf || null,
+        formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
+        formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
+        clickedTemplates: attr?.templates || [],
+        clickedButtons: attr?.buttons || [],
+        clickTimeline: clickTimelineByNorm.get(norm) || [],
+      }
+    }),
+  }
+}
+
 export async function computeWADashboard({ mode = 'cached', startDate, endDate, workspace } = {}) {
   const start = Date.now()
   const cfg = waWorkspaceConfig(workspace)
@@ -277,12 +573,23 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       }))
       .sort((a, b) => b.totalClicks - a.totalClicks)
 
-    paymentConversion = {
-      totalClicked: clickedPhones.length,
-      formSubmitted: 0,
-      conversionRate: 0,
-      formSubmittedMobiles: [],
-      formSubmittedDetails: [],
+    if (cfg.ihmPaymentWebhookCollection) {
+      paymentConversion = await buildIhmPaymentConversion({
+        client,
+        clickedPhones,
+        clickedPhoneDedup,
+        normalisedClickedMobiles,
+        waCol,
+      })
+      formSubmittedCount = paymentConversion.formSubmitted
+    } else {
+      paymentConversion = {
+        totalClicked: clickedPhones.length,
+        formSubmitted: 0,
+        conversionRate: 0,
+        formSubmittedMobiles: [],
+        formSubmittedDetails: [],
+      }
     }
   } else {
   /** Earliest outbound (sent/delivered) per normalised mobile — full history, not date-filtered */
@@ -577,6 +884,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   }
 
   paymentConversion = {
+    conversionKind: 'mba_form',
     totalClicked: clickedPhones.length,
     formSubmitted: formSubmittedCount,
     conversionRate: formConversionRate,

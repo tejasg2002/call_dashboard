@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { fetchWADashboard } from '../../../src/lib/waDashboardApi'
 import {
+  WA_WORKSPACE_IHM,
   WA_WORKSPACE_MBA,
   normalizeWAWorkspace,
   workspacePayloadMatchesExpected,
@@ -420,9 +421,17 @@ export default function WAApiPage() {
           )}
 
           {/* ── Payment Conversion ────────────────────────────────────────── */}
-          {workspace === WA_WORKSPACE_MBA && snapshot?.paymentConversion && (
+          {(workspace === WA_WORKSPACE_MBA || workspace === WA_WORKSPACE_IHM) && snapshot?.paymentConversion && (
             <div className="space-y-4">
-              <SectionHeader title="Form conversion" description="Clicked users who submitted an MBA application after template send" isDark={isDark} />
+              <SectionHeader
+                title={workspace === WA_WORKSPACE_IHM ? 'Payment conversion (IHM)' : 'Form conversion'}
+                description={
+                  workspace === WA_WORKSPACE_IHM
+                    ? 'Clicked users with a completed IHM payment (Mongo itm.npfPaymentWebhookEvents) after template send and last click'
+                    : 'Clicked users who submitted an MBA application after template send'
+                }
+                isDark={isDark}
+              />
               <LazySection height="280px">
                 <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} dataMasked={dataMasked} />
               </LazySection>

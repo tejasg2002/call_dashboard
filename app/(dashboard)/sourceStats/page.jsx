@@ -4,18 +4,23 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../../providers'
 import { useTheme } from '../../providers'
+import { useBuWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import SourceStatsDashboard from '../../../src/components/sourceStats/SourceStatsDashboard'
 import { cn } from '../../../src/lib/utils'
+import { withWorkspaceQuery } from '../../../src/lib/waWorkspace'
 
 export default function SourceStatsPage() {
   const pathname = usePathname()
+  const { workspace } = useBuWorkspace()
   const { canViewCallReview } = useAuth()
   const { isDark } = useTheme()
 
   const tabs = [
-    { href: '/', label: 'Analytics', match: pathname === '/' },
-    ...(canViewCallReview ? [{ href: '/call-review', label: 'Call Review', match: pathname === '/call-review' }] : []),
-    { href: '/sourceStats', label: 'Source Stats', match: pathname === '/sourceStats' },
+    { href: withWorkspaceQuery('/', workspace), label: 'Analytics', match: pathname === '/' },
+    ...(canViewCallReview
+      ? [{ href: withWorkspaceQuery('/call-review', workspace), label: 'Call Review', match: pathname === '/call-review' }]
+      : []),
+    { href: withWorkspaceQuery('/sourceStats', workspace), label: 'Source Stats', match: pathname === '/sourceStats' },
   ]
 
   return (

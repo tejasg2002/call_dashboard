@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useBuWorkspace } from '../context/BuWorkspaceProvider'
 import { fetchCalls } from '../firebase'
+import { fetchCallLogsIsu } from '../lib/callLogsIsuApi'
+import { workspaceUsesIsuCallLogs } from '../lib/waWorkspace'
 import CallsTable from './CallsTable'
 import LeadDetail from './LeadDetail'
 
@@ -25,6 +28,7 @@ const initialFilters = {
 }
 
 const Analysis = () => {
+  const { workspace } = useBuWorkspace()
   const [calls, setCalls] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -34,10 +38,12 @@ const Analysis = () => {
   const [rangePreset, setRangePreset] = useState('all')
   const [showPresetMenu, setShowPresetMenu] = useState(false)
 
-  const loadCalls = async () => {
+  const loadCalls = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await fetchCalls()
+      const data = workspaceUsesIsuCallLogs(workspace)
+        ? await fetchCallLogsIsu(workspace)
+        : await fetchCalls()
       setCalls(data)
       setLastUpdated(new Date())
       setError(null)
@@ -51,7 +57,7 @@ const Analysis = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [workspace])
 
   useEffect(() => {
     loadCalls()
@@ -61,7 +67,7 @@ const Analysis = () => {
     }, POLLING_INTERVAL)
 
     return () => clearInterval(intervalId)
-  }, [])
+  }, [loadCalls])
 
   const getCallDate = (call) => {
     const raw =

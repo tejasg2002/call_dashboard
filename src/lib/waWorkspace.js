@@ -96,23 +96,50 @@ export function workspacePayloadMatchesExpected(payload, expectedWorkspace) {
   return normalizeWAWorkspace(gotRaw) === exp
 }
 
+/** True for any analytics DB WhatsApp workspace (not MBA). */
+export function isNonMbaWaWorkspace(workspace) {
+  return ANALYTICS_WORKSPACE_SLUGS.has(normalizeWAWorkspace(workspace))
+}
+
+/** BBA / BTECH: call analytics + call review use Mongo analytics.call_logs_isu (not Firestore Call_logs). */
+export function workspaceUsesIsuCallLogs(workspace) {
+  const w = normalizeWAWorkspace(workspace)
+  return w === WA_WORKSPACE_BBA || w === WA_WORKSPACE_BTECH
+}
+
+/**
+ * Hide Calls / Email / SMS for IHM & IDM (WhatsApp-only). BBA/BTECH keep Calls for ISU Mongo logs.
+ * Use with nav items that set hideForIhm.
+ */
+export function hideGlobalNavExceptWhatsApp(workspace) {
+  const w = normalizeWAWorkspace(workspace)
+  if (w === WA_WORKSPACE_MBA) return false
+  if (workspaceUsesIsuCallLogs(workspace)) return false
+  return true
+}
+
+/** Sidebar: hide Email & SMS for IHM/IDM (WA-only) and temporarily for BBA/BTECH. */
+export function hideEmailSmsInSidebar(workspace) {
+  return hideGlobalNavExceptWhatsApp(workspace) || workspaceUsesIsuCallLogs(workspace)
+}
+
 /**
  * Analytics-only workspaces: hide MBA-only nav; WhatsApp API Messages + template drill-downs stay.
  * /settings remains reachable (sidebar still enforces admin).
  */
 export function isRouteAllowedForBuWorkspace(pathname, workspace) {
-  if (normalizeWAWorkspace(workspace) === WA_WORKSPACE_MBA) return true
+  const w = normalizeWAWorkspace(workspace)
+  if (w === WA_WORKSPACE_MBA) return true
   let p = (pathname || '/').split('?')[0]
   if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1) || '/'
   if (p === '/settings') return true
   if (p === '/wa') return true
   if (p.startsWith('/wa/templates/')) return true
+  if (workspaceUsesIsuCallLogs(w)) {
+    if (p === '/' || p === '/call-review' || p === '/sourceStats') return true
+    return false
+  }
   return false
-}
-
-/** True for any analytics DB WhatsApp workspace (not MBA). */
-export function isNonMbaWaWorkspace(workspace) {
-  return ANALYTICS_WORKSPACE_SLUGS.has(normalizeWAWorkspace(workspace))
 }
 
 /** Main WA URL when redirecting off a disallowed route for the current analytics workspace. */
@@ -154,6 +181,9 @@ export function waWorkspaceConfig(workspace) {
       waCollection: def.collection,
       cacheKey: def.cacheKey,
       includeMbaConversion: false,
+      /** IHM: completed payments in itm.npfPaymentWebhookEvents → same conversion card as MBA (payment-based). */
+      ihmPaymentWebhookCollection:
+        def.workspace === WA_WORKSPACE_IHM ? 'npfPaymentWebhookEvents' : null,
     }
   }
   return {

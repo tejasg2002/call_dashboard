@@ -4,10 +4,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../../providers'
 import { useTheme } from '../../providers'
+import { useBuWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import Analysis from '../../../src/components/Analysis'
+import { withWorkspaceQuery } from '../../../src/lib/waWorkspace'
 
 export default function CallReviewPage() {
   const pathname = usePathname()
+  const { workspace } = useBuWorkspace()
   const { canViewCallReview } = useAuth()
   const { isDark } = useTheme()
 
@@ -17,7 +20,7 @@ export default function CallReviewPage() {
       <div className={`border-b px-4 lg:px-8 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-white/60 border-slate-200/80'}`}>
         <div className="max-w-[1600px] mx-auto flex items-center gap-1">
           <Link
-            href="/"
+            href={withWorkspaceQuery('/', workspace)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <span className="flex items-center gap-1.5">
@@ -29,7 +32,7 @@ export default function CallReviewPage() {
           </Link>
           {canViewCallReview && (
             <Link
-              href="/call-review"
+              href={withWorkspaceQuery('/call-review', workspace)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 pathname === '/call-review'
                   ? 'border-brand-700 text-brand-700 dark:text-brand-400 dark:border-brand-400'
@@ -45,7 +48,7 @@ export default function CallReviewPage() {
             </Link>
           )}
           <Link
-            href="/sourceStats"
+            href={withWorkspaceQuery('/sourceStats', workspace)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <span className="flex items-center gap-1.5">

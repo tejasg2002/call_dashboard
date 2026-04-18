@@ -76,19 +76,27 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
     totalClicked = 0,
     formSubmitted = 0,
     conversionRate = 0,
+    conversionKind = 'mba_form',
   } = data
+
+  const isIhmPayment = conversionKind === 'ihm_payment_webhook'
+  const secondLabel = isIhmPayment ? 'Payment completed' : 'Form Submitted'
+  const title = isIhmPayment ? 'Payment conversion (IHM)' : 'Form conversion'
+  const subtitle = isIhmPayment
+    ? 'Clicked users with a completed payment in itm.npfPaymentWebhookEvents, after first template send/deliver and on or after their last WhatsApp click. Lead ID from the webhook when present. Click timeline is IST.'
+    : 'Clicked users with an MBA application (application no.) after first template send/deliver. Lead ID is always shown in full. Click timeline lists date and time only (IST), using the selected date range when filtered.'
 
   const funnelSteps = [
     { label: 'Clicked', value: totalClicked, color: 'text-amber-500' },
-    { label: 'Form Submitted', value: formSubmitted, color: 'text-blue-500' },
+    { label: secondLabel, value: formSubmitted, color: 'text-blue-500' },
   ]
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white border-slate-200'}`}>
       <div className="px-6 py-5">
-        <h3 className={`text-sm font-semibold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Form conversion</h3>
+        <h3 className={`text-sm font-semibold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</h3>
         <p className={`text-[11px] mb-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Clicked users with an MBA application (application no.) after first template send/deliver. Lead ID is always shown in full. Click timeline lists date and time only (IST), using the selected date range when filtered.
+          {subtitle}
         </p>
 
         <div className="grid grid-cols-2 gap-8 mb-6">
@@ -116,7 +124,8 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
 
         {conversionRate > 0 && (
           <p className={`text-center text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Click → Form rate: <span className="font-bold text-blue-500">{conversionRate}%</span>
+            {isIhmPayment ? 'Click → payment rate' : 'Click → Form rate'}:{' '}
+            <span className="font-bold text-blue-500">{conversionRate}%</span>
           </p>
         )}
       </div>
@@ -125,7 +134,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
         <div className={`border-t ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
           <div className="px-6 pt-4 pb-2">
             <p className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-              Form submitted ({formSubmittedDetails.length})
+              {isIhmPayment ? 'Payment completed' : 'Form submitted'} ({formSubmittedDetails.length})
             </p>
           </div>
           <div className="px-6 pb-4">
@@ -137,7 +146,9 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Lead ID</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Mobile</th>
-                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Form submitted</th>
+                      <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {isIhmPayment ? 'Payment completed' : 'Form submitted'}
+                      </th>
                       <th className={`px-3 py-2 text-left font-medium min-w-[200px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click timeline</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Template Clicked</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button Clicked</th>
@@ -190,7 +201,15 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
       )}
 
       <div className={`px-6 py-3 border-t text-[10px] ${isDark ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-        Form counts only include applications with timestamps on or after the first sent/delivered WhatsApp for that number. npfMbaApplications + marketingwa. Lead ID from NPF (<code className="font-mono">other_info.lead_id</code>) or CRM snapshot when missing.
+        {isIhmPayment ? (
+          <>
+            Counts use <code className="font-mono">itm.npfPaymentWebhookEvents</code> (completed payment statuses) matched by mobile to IHM WhatsApp clicks, with payment time on or after first send/deliver and last click.
+          </>
+        ) : (
+          <>
+            Form counts only include applications with timestamps on or after the first sent/delivered WhatsApp for that number. npfMbaApplications + marketingwa. Lead ID from NPF (<code className="font-mono">other_info.lead_id</code>) or CRM snapshot when missing.
+          </>
+        )}
       </div>
     </div>
   )
