@@ -14,6 +14,7 @@ import {
   hideEmailSmsInSidebar,
   hideGlobalNavExceptWhatsApp,
   isNonMbaWaWorkspace,
+  workspaceUsesIsuCallLogs,
   withWorkspaceQuery,
   workspaceDisplayLabel,
 } from '../../src/lib/waWorkspace'
@@ -24,7 +25,12 @@ const NAV_SECTIONS = [
     items: [
       {
         href: '/',
-        match: (p) => p === '/' || p === '/call-review' || p === '/sourceStats',
+        match: (p, w) => {
+          let x = (p || '/').split('?')[0]
+          if (x.length > 1 && x.endsWith('/')) x = x.slice(0, -1) || '/'
+          if (workspaceUsesIsuCallLogs(w)) return x === '/' || x === '/call-review'
+          return x === '/' || x === '/call-review' || x === '/sourceStats'
+        },
         label: 'Calls',
         perm: 'always',
         hideForIhm: true,
@@ -284,7 +290,7 @@ function DashboardLayoutInner({ children }) {
               )}
               <ul className="space-y-0.5">
                 {visibleItems.map((item) => {
-                  const isActive = item.match(pathname)
+                  const isActive = item.match(pathname, workspace)
                   return (
                     <li key={item.href}>
                       <Link

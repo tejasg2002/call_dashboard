@@ -6,7 +6,7 @@ import { useAuth } from '../../providers'
 import { useTheme } from '../../providers'
 import { useBuWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import Analysis from '../../../src/components/Analysis'
-import { withWorkspaceQuery } from '../../../src/lib/waWorkspace'
+import { withWorkspaceQuery, workspaceUsesIsuCallLogs } from '../../../src/lib/waWorkspace'
 
 export default function CallReviewPage() {
   const pathname = usePathname()
@@ -47,17 +47,19 @@ export default function CallReviewPage() {
               </span>
             </Link>
           )}
-          <Link
-            href={withWorkspaceQuery('/sourceStats', workspace)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
-          >
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-              </svg>
-              Source Stats
-            </span>
-          </Link>
+          {!workspaceUsesIsuCallLogs(workspace) && (
+            <Link
+              href={withWorkspaceQuery('/sourceStats', workspace)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
+                </svg>
+                Source Stats
+              </span>
+            </Link>
+          )}
         </div>
       </div>
       <Analysis />

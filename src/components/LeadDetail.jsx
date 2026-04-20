@@ -1,6 +1,14 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 const LeadDetail = ({ call, onClose }) => {
+  const [recordingLoadErr, setRecordingLoadErr] = useState(false)
+
+  useEffect(() => {
+    setRecordingLoadErr(false)
+  }, [call?.id, call?.Recording_Url])
+
   if (!call) return null
 
   const getScoreColor = (score) => {
@@ -160,7 +168,9 @@ const LeadDetail = ({ call, onClose }) => {
         <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
           <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Summary</h4>
           <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
-            {call.summary?.one_line || 'No summary available'}
+            {call.summary?.one_line ||
+              (typeof call.summary === 'string' ? call.summary : null) ||
+              'No summary available'}
           </p>
 
           {call.summary && (
@@ -206,16 +216,36 @@ const LeadDetail = ({ call, onClose }) => {
           <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Transcript</h4>
           <div className="max-h-64 overflow-y-auto">
             <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
-              {call.Transcript || 'No transcript available'}
+              {call.Transcript || call.transcript || 'No transcript available'}
             </p>
           </div>
         </div>
 
         {/* Recording */}
         {call.Recording_Url && (
-          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-2">
             <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Recording</h4>
-            <audio controls src={call.Recording_Url} className="w-full" />
+            <audio
+              controls
+              src={call.Recording_Url}
+              className="w-full"
+              preload="metadata"
+              onLoadedData={() => setRecordingLoadErr(false)}
+              onError={() => setRecordingLoadErr(true)}
+            />
+            {recordingLoadErr && (
+              <p className="text-xs text-amber-800 dark:text-amber-200/90 leading-relaxed">
+                This URL did not load as playable audio (404, CORS, expired signed link, or non-audio file).{' '}
+                <a
+                  href={call.Recording_Url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-brand-700 dark:text-brand-400 underline underline-offset-2"
+                >
+                  Open link in new tab
+                </a>
+              </p>
+            )}
           </div>
         )}
       </div>

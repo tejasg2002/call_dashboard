@@ -7,7 +7,7 @@ import { useTheme } from '../../providers'
 import { useBuWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import SourceStatsDashboard from '../../../src/components/sourceStats/SourceStatsDashboard'
 import { cn } from '../../../src/lib/utils'
-import { withWorkspaceQuery } from '../../../src/lib/waWorkspace'
+import { withWorkspaceQuery, workspaceUsesIsuCallLogs } from '../../../src/lib/waWorkspace'
 
 export default function SourceStatsPage() {
   const pathname = usePathname()
@@ -20,7 +20,9 @@ export default function SourceStatsPage() {
     ...(canViewCallReview
       ? [{ href: withWorkspaceQuery('/call-review', workspace), label: 'Call Review', match: pathname === '/call-review' }]
       : []),
-    { href: withWorkspaceQuery('/sourceStats', workspace), label: 'Source Stats', match: pathname === '/sourceStats' },
+    ...(workspaceUsesIsuCallLogs(workspace)
+      ? []
+      : [{ href: withWorkspaceQuery('/sourceStats', workspace), label: 'Source Stats', match: pathname === '/sourceStats' }]),
   ]
 
   return (
