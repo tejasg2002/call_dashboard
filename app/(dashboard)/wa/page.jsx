@@ -183,50 +183,16 @@ export default function WAApiPage() {
     [snapshot]
   )
 
-  const apiKpi = useMemo(() => {
-    const rows = apiTemplateRows
-    const k = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
-    rows.forEach((r) => {
-      k.sent += r.sent
-      k.delivered += r.delivered
-      k.read += r.read
-      k.clicked += r.clicked
-      k.failed += r.failed
-      k.cost += r.total_cost || 0
-    })
-    const p = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
-    k.ctr = p(k.clicked, k.delivered)
-    k.readRate = p(k.read, k.delivered)
-    k.sdr = p(k.delivered, k.sent)
-    k.str = p(k.read, k.sent)
-    return k
-  }, [apiTemplateRows])
-
-  const baseKpi = apiKpi
-  const totalCost = useMemo(
-    () => apiTemplateRows.reduce((s, r) => s + (r.total_cost || 0), 0),
-    [apiTemplateRows]
-  )
-  const totalClicked = useMemo(
-    () => apiTemplateRows.reduce((s, r) => s + (r.clicked || 0), 0),
-    [apiTemplateRows]
-  )
-  const costPerClick = totalClicked > 0 ? totalCost / totalClicked : 0
+  const baseKpi = snapshot?.kpi || { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0, ctr: 0, readRate: 0, sdr: 0, str: 0 }
+  const totalCost = Number(snapshot?.totalCost || baseKpi.cost || 0)
+  const totalClicked = Number(baseKpi.clicked || 0)
+  const costPerClick = Number(snapshot?.costPerClick || (totalClicked > 0 ? totalCost / totalClicked : 0))
   const formSubmitted = snapshot?.formSubmittedCount || 0
   const failureRate =
     baseKpi.sent > 0 ? Math.min(((baseKpi.failed || 0) / baseKpi.sent) * 100, 100) : 0
   const kpi = { ...baseKpi, failureRate, costPerClick, formSubmitted }
 
-  const funnel = useMemo(() => {
-    const f = { sent: 0, delivered: 0, read: 0, clicked: 0 }
-    apiTemplateRows.forEach((r) => {
-      f.sent += r.sent
-      f.delivered += r.delivered
-      f.read += r.read
-      f.clicked += r.clicked
-    })
-    return f
-  }, [apiTemplateRows])
+  const funnel = snapshot?.funnel || { sent: 0, delivered: 0, read: 0, clicked: 0 }
 
   const engagementSummary = snapshot?.engagementSummary || {}
 

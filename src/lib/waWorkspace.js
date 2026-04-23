@@ -1,4 +1,4 @@
-/** WhatsApp analytics: MBA → itm.marketingwa; other verticals → analytics.<Name>marketingwa */
+/** WhatsApp analytics: MBA/IDM now use Interakt webhook collections; other verticals keep marketingwa-style collections. */
 
 /** `itm.wa_dashboard_cache` document _id per workspace. */
 export const WA_DASHBOARD_CACHE_ID_MBA = 'wa_latest_mba'
@@ -6,6 +6,8 @@ export const WA_DASHBOARD_CACHE_ID_MBA_LEGACY = 'wa_latest'
 
 const ITM_DB = 'itm'
 const ANALYTICS_DB = 'analytics'
+const ITM_BS_DB = 'ITM_BS'
+const ITM_IDM_DB = 'ITM_IDM'
 
 /**
  * Non-MBA workspaces: same UX (WA-only subset, no MBA form conversion), separate cache + collection.
@@ -13,7 +15,8 @@ const ANALYTICS_DB = 'analytics'
  */
 export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
   { workspace: 'ihm', collection: 'IHMmarketingwa', cacheKey: 'wa_latest_ihm', label: 'IHM' },
-  { workspace: 'idm', collection: 'IDMmarketingwa', cacheKey: 'wa_latest_idm', label: 'IDM' },
+  // IDM moved to ITM_IDM.interaktWhatsappWebhookEvents (new Interakt JSON shape)
+  { workspace: 'idm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_idm', label: 'IDM', dataDb: ITM_IDM_DB },
   { workspace: 'bba', collection: 'BBAmarketingwa', cacheKey: 'wa_latest_bba', label: 'BBA' },
   { workspace: 'btech', collection: 'BTECHmarketingwa', cacheKey: 'wa_latest_btech', label: 'BTECH' },
 ])
@@ -177,7 +180,7 @@ export function waWorkspaceConfig(workspace) {
   if (def) {
     return {
       workspace: def.workspace,
-      dataDb: ANALYTICS_DB,
+      dataDb: def.dataDb || ANALYTICS_DB,
       waCollection: def.collection,
       cacheKey: def.cacheKey,
       includeMbaConversion: false,
@@ -188,8 +191,9 @@ export function waWorkspaceConfig(workspace) {
   }
   return {
     workspace: WA_WORKSPACE_MBA,
-    dataDb: ITM_DB,
-    waCollection: 'marketingwa',
+    // MBA (Business School) moved to ITM_BS.interaktWhatsappWebhookEvents
+    dataDb: ITM_BS_DB,
+    waCollection: 'interaktWhatsappWebhookEvents',
     cacheKey: WA_DASHBOARD_CACHE_ID_MBA,
     includeMbaConversion: true,
   }

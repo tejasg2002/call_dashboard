@@ -14,6 +14,177 @@ const CACHE_COL = 'wa_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
 
+function waMessageStatusExpr() {
+  return { $ifNull: ['$message_status', '$data.message.message_status'] }
+}
+
+function waStageExpr() {
+  return {
+    $let: {
+      vars: {
+        et: { $toLower: { $ifNull: ['$type', '$event_type'] } },
+        ms: { $toLower: waMessageStatusExpr() },
+      },
+      in: {
+        $switch: {
+          branches: [
+            { case: { $regexMatch: { input: '$$et', regex: 'click' } }, then: 'clicked' },
+            {
+              case: {
+                $or: [
+                  { $regexMatch: { input: '$$et', regex: 'read' } },
+                  { $eq: ['$$ms', 'read'] },
+                ],
+              },
+              then: 'read',
+            },
+            {
+              case: {
+                $or: [
+                  { $regexMatch: { input: '$$et', regex: 'deliver' } },
+                  { $eq: ['$$ms', 'delivered'] },
+                ],
+              },
+              then: 'delivered',
+            },
+            {
+              case: {
+                $or: [
+                  { $regexMatch: { input: '$$et', regex: 'sent' } },
+                  { $eq: ['$$ms', 'sent'] },
+                ],
+              },
+              then: 'sent',
+            },
+            {
+              case: {
+                $or: [
+                  { $regexMatch: { input: '$$et', regex: 'fail' } },
+                  { $eq: ['$$ms', 'failed'] },
+                ],
+              },
+              then: 'failed',
+            },
+          ],
+          default: null,
+        },
+      },
+    },
+  }
+}
+
+function waResolvedFieldsExpr() {
+  const resolvedEventTs = {
+    $let: {
+      vars: { et: '$event_timestamp' },
+      in: {
+        $switch: {
+          branches: [
+            { case: { $eq: [{ $type: '$$et' }, 'date'] }, then: '$$et' },
+            {
+              case: { $eq: [{ $type: '$$et' }, 'string'] },
+              then: { $dateFromString: { dateString: '$$et', onError: '$createdAt', onNull: '$createdAt' } },
+            },
+          ],
+          default: {
+            $ifNull: [
+              '$createdAt',
+              { $dateFromString: { dateString: '$timestamp', onError: null, onNull: null } },
+            ],
+          },
+        },
+      },
+    },
+  }
+  return {
+    _waPhone: { $ifNull: ['$phone_number', '$data.customer.phone_number'] },
+    _waTemplate: {
+      $ifNull: [
+        '$template_name',
+        {
+          $let: {
+            vars: {
+              m: {
+                $regexFind: {
+                  input: { $ifNull: ['$data.message.raw_template', ''] },
+                  regex: '"name"\\s*:\\s*"([^"]+)"',
+                },
+              },
+            },
+            in: { $arrayElemAt: ['$$m.captures', 0] },
+          },
+        },
+      ],
+    },
+    _waSource: {
+      $ifNull: [
+        '$source',
+        {
+          $cond: [
+            {
+              $regexMatch: {
+                input: { $toLower: { $ifNull: ['$type', '$event_type'] } },
+                regex: '^message_campaign_',
+              },
+            },
+            'campaign',
+            'api',
+          ],
+        },
+      ],
+    },
+    _waMessageStatus: waMessageStatusExpr(),
+    _waStage: { $ifNull: ['$stage', waStageExpr()] },
+    _waEventTs: resolvedEventTs,
+    _waClickTs: {
+      $let: {
+        vars: { ct: '$click_timestamp' },
+        in: {
+          $switch: {
+            branches: [
+              { case: { $eq: [{ $type: '$$ct' }, 'date'] }, then: '$$ct' },
+              {
+                case: { $eq: [{ $type: '$$ct' }, 'string'] },
+                then: { $dateFromString: { dateString: '$$ct', onError: resolvedEventTs, onNull: resolvedEventTs } },
+              },
+            ],
+            default: {
+              $ifNull: [
+                {
+                  $dateFromString: {
+                    dateString: '$data.message.meta_data.cta_click_info.link.clicked_at_utc',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                resolvedEventTs,
+              ],
+            },
+          },
+        },
+      },
+    },
+    _waButtonText: { $ifNull: ['$button_text', '$data.message.button_text'] },
+    _waFailureReason: { $ifNull: ['$failure_reason', '$data.message.channel_failure_reason'] },
+    _waCost: {
+      $ifNull: [
+        '$cost',
+        {
+          $convert: {
+            input: '$data.message.meta_data.message_cost.actual_message_cost',
+            to: 'double',
+            onError: 0,
+            onNull: 0,
+          },
+        },
+      ],
+    },
+    _waCampaignName: { $ifNull: ['$campaign_name', '$data.message.campaign_name'] },
+    _waCampaignId: { $ifNull: ['$campaign_id', '$data.message.campaign_id'] },
+    _waTemplateCategory: { $ifNull: ['$template_category', null] },
+  }
+}
+
 function normaliseMobile(raw) {
   if (!raw) return ''
   let n = String(raw).trim().replace(/\s+/g, '').replace(/^00/, '')
@@ -349,6 +520,14 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       matchFilter.event_timestamp.$lt = end
     }
   }
+  const waResolvedFields = waResolvedFieldsExpr()
+  const waRangeMatch = {}
+  if (startDate) waRangeMatch._waEventTs = { ...(waRangeMatch._waEventTs || {}), $gte: new Date(startDate) }
+  if (endDate) {
+    const end = new Date(endDate)
+    end.setDate(end.getDate() + 1)
+    waRangeMatch._waEventTs = { ...(waRangeMatch._waEventTs || {}), $lt: end }
+  }
 
   const [
     kpiResult, templateResult, ctaResult,
@@ -403,8 +582,9 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     ]).toArray(),
 
     waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked' } },
-      { $group: { _id: '$phone_number' } },
+      { $addFields: waResolvedFields },
+      { $match: { ...waRangeMatch, _waStage: 'clicked', _waPhone: { $nin: [null, ''] } } },
+      { $group: { _id: '$_waPhone' } },
     ]).toArray(),
 
     Object.keys(matchFilter).length === 0
@@ -595,16 +775,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   /** Earliest outbound (sent/delivered) per normalised mobile — full history, not date-filtered */
   const firstOutboundResult = clickedPhoneDedup.length > 0
     ? await waCol.aggregate([
+        { $addFields: waResolvedFields },
         {
           $match: {
-            phone_number: { $in: clickedPhoneDedup },
-            stage: { $in: ['sent', 'delivered'] },
+            _waPhone: { $in: clickedPhoneDedup },
+            _waStage: { $in: ['sent', 'delivered'] },
           },
         },
         {
           $group: {
-            _id: '$phone_number',
-            firstOutbound: { $min: '$event_timestamp' },
+            _id: '$_waPhone',
+            firstOutbound: { $min: '$_waEventTs' },
           },
         },
       ]).toArray()
@@ -623,20 +804,21 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   /** Latest WA click per phone (full history, not date-filtered) — form must be on/after this so post-form clicks do not count. */
   const lastClickResult = clickedPhoneDedup.length > 0
     ? await waCol.aggregate([
+        { $addFields: waResolvedFields },
         {
           $match: {
-            phone_number: { $in: clickedPhoneDedup },
-            stage: 'clicked',
+            _waPhone: { $in: clickedPhoneDedup },
+            _waStage: 'clicked',
           },
         },
         {
           $addFields: {
-            _clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+            _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
           },
         },
         {
           $group: {
-            _id: '$phone_number',
+            _id: '$_waPhone',
             lastClickAt: { $max: '$_clickAt' },
           },
         },
@@ -700,12 +882,13 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol.aggregate([
-        { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+        { $addFields: waResolvedFields },
+        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedMobiles } } },
         {
           $group: {
-            _id: '$phone_number',
-            templates: { $addToSet: '$template_name' },
-            buttons: { $addToSet: '$button_text' },
+            _id: '$_waPhone',
+            templates: { $addToSet: '$_waTemplate' },
+            buttons: { $addToSet: '$_waButtonText' },
           },
         },
       ]).toArray()
