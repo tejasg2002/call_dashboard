@@ -64,7 +64,7 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
     return result
   }, [data, search, filterTemplate, filterButton])
 
-  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(filtered, 25)
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(filtered, 10)
 
   if (!data || data.length === 0) return null
 

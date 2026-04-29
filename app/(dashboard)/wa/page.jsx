@@ -12,14 +12,11 @@ import { useAuth, useTheme } from '../../providers'
 import { useWAWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import WAKpiCards from '../../../src/components/wa/WAKpiCards'
 import WATemplatePerformanceTable from '../../../src/components/wa/WATemplatePerformanceTable'
-import WATemplatePerformanceChart from '../../../src/components/wa/WATemplatePerformanceChart'
 import WAMessageFunnelChart from '../../../src/components/wa/WAMessageFunnelChart'
 import WACTAPerformanceTable from '../../../src/components/wa/WACTAPerformanceTable'
-import WACostAnalytics from '../../../src/components/wa/WACostAnalytics'
 import WAFilters from '../../../src/components/wa/WAFilters'
 import WACampaignManager from '../../../src/components/wa/WACampaignManager'
 import WACampaignAnalytics from '../../../src/components/wa/WACampaignAnalytics'
-import WAEngagementSection from '../../../src/components/wa/WAEngagementSection'
 import WAPaymentConversionServer from '../../../src/components/wa/WAPaymentConversionServer'
 import WAClickBreakdown from '../../../src/components/wa/WAClickBreakdown'
 import LazySection from '../../../src/components/LazySection'
@@ -342,33 +339,22 @@ export default function WAApiPage() {
             </LazySection>
 
             <LazySection height="300px">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <WATemplatePerformanceChart rows={filteredTemplateRows} theme={theme} />
-                <WAMessageFunnelChart funnel={funnel} theme={theme} />
-              </div>
+              <WAMessageFunnelChart funnel={funnel} theme={theme} />
             </LazySection>
           </div>
 
-          {/* ── CTA & Engagement ──────────────────────────────────────────── */}
+          {/* ── CTA Performance ───────────────────────────────────────────── */}
           <div className="space-y-4">
-            <SectionHeader title="Click & Engagement Analysis" description="Button performance and user engagement depth" isDark={isDark} />
+            <SectionHeader title="Button / CTA Performance" description="Click performance per button across all templates" isDark={isDark} />
 
             <LazySection height="200px">
               <WACTAPerformanceTable rows={apiCtaRows} theme={theme} />
             </LazySection>
-
-            <LazySection height="240px">
-              <WAEngagementSection engagementSummary={engagementSummary} theme={theme} dataMasked={dataMasked} />
-            </LazySection>
           </div>
 
-          {/* ── Cost & Campaigns ──────────────────────────────────────────── */}
+          {/* ── Campaign Management ───────────────────────────────────────── */}
           <div className="space-y-4">
-            <SectionHeader title="Cost & Campaign Management" description="Spending breakdown and campaign configuration" isDark={isDark} />
-
-            <LazySection height="200px">
-              <WACostAnalytics templateRows={filteredTemplateRows} totalCost={totalCost} costPerClick={costPerClick} clicked={kpi.clicked} theme={theme} />
-            </LazySection>
+            <SectionHeader title="Campaign Management" description="Campaign configuration and analytics" isDark={isDark} />
 
             <LazySection height="260px">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

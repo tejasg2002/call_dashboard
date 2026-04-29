@@ -215,6 +215,88 @@ function isUsefulWaButtonText(b) {
   return Boolean(s && s !== '[]' && s !== '""' && s.toLowerCase() !== 'null')
 }
 
+/**
+ * Mongo expression that resolves the CTA bucket label for a clicked document.
+ * Tries `_waButtonText` first; falls back to the first non-"link" key in
+ * `data.message.meta_data.cta_click_info` (native Interakt stores button name
+ * as the object key); finally falls back to `'(Other clicks)'`.
+ *
+ * IMPORTANT: Use this only AFTER a `$match: { _waStage: 'clicked' }` stage so
+ * the expensive $objectToArray runs only on the small clicked subset.
+ */
+/**
+ * Mongo expression for the CTA bucket label on clicked documents.
+ * Priority: _waButtonText → cta_click_info[entry].button_text → '(Other clicks)'
+ *
+ * cta_click_info entries use UUID keys; the human-readable button name is in
+ * the entry VALUE as `button_text`. Migrated docs use key "link" (no button_text) — skipped.
+ */
+function ctaKeyExpr() {
+  return {
+    $let: {
+      vars: {
+        bt: '$_waButtonText',
+        ctaObj: { $ifNull: ['$data.message.meta_data.cta_click_info', null] },
+      },
+      in: {
+        $cond: [
+          {
+            $and: [
+              { $ne: [{ $ifNull: ['$$bt', ''] }, ''] },
+              { $ne: [{ $toString: { $ifNull: ['$$bt', ''] } }, '[]'] },
+            ],
+          },
+          '$$bt',
+          {
+            $cond: [
+              { $eq: [{ $type: '$$ctaObj' }, 'object'] },
+              {
+                $let: {
+                  vars: {
+                    // Filter out the "link" key (migrated docs), keep UUID entries
+                    entries: {
+                      $filter: {
+                        input: { $objectToArray: '$$ctaObj' },
+                        cond: { $ne: ['$$this.k', 'link'] },
+                      },
+                    },
+                  },
+                  in: {
+                    $let: {
+                      vars: {
+                        // Extract button_text from each entry's value
+                        btnTexts: {
+                          $filter: {
+                            input: {
+                              $map: {
+                                input: '$$entries',
+                                as: 'e',
+                                in: { $ifNull: ['$$e.v.button_text', ''] },
+                              },
+                            },
+                            cond: { $ne: ['$$this', ''] },
+                          },
+                        },
+                      },
+                      in: {
+                        $ifNull: [
+                          { $arrayElemAt: ['$$btnTexts', 0] },
+                          '(Other clicks)',
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              '(Other clicks)',
+            ],
+          },
+        ],
+      },
+    },
+  }
+}
+
 function decodeInteraktJwtPayload(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return null
   try {
@@ -229,41 +311,62 @@ function decodeInteraktJwtPayload(token) {
   }
 }
 
+// UUID pattern — cta_click_info keys are UUIDs, not button names
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 /**
  * Interakt click webhooks often omit `data.message.button_text` (or set it to "[]").
- * The CTA label is frequently inside JWT(s) in `data.message.message`.
+ * The CTA label may be inside JWT(s) in `data.message.message`, or inside
+ * `data.message.meta_data.cta_click_info` where each entry's VALUE has a `button_text`
+ * field (the key itself is a UUID). Migrated docs use the key "link" — those are skipped.
  */
 function extractInteraktClickButtonLabel(doc) {
   const direct = doc?.button_text ?? doc?.data?.message?.button_text
   if (isUsefulWaButtonText(direct)) return String(direct).trim()
 
   const msgStr = doc?.data?.message?.message
-  if (typeof msgStr !== 'string' || !msgStr.trim()) return null
-  try {
-    const parts = JSON.parse(msgStr)
-    if (!Array.isArray(parts)) return null
-    for (const part of parts) {
-      if (part?.type !== 'button' || !Array.isArray(part.parameters)) continue
-      for (const param of part.parameters) {
-        const text = param?.text
-        if (!text || typeof text !== 'string') continue
-        if (text.startsWith('eyJ')) {
-          const payload = decodeInteraktJwtPayload(text)
-          const bt =
-            payload?.button_text ||
-            payload?.buttonText ||
-            payload?.cta_button_text ||
-            payload?.button?.text ||
-            payload?.button?.title
-          if (isUsefulWaButtonText(bt)) return String(bt).trim()
-        } else if (isUsefulWaButtonText(text)) {
-          return text.trim()
+  if (typeof msgStr === 'string' && msgStr.trim()) {
+    try {
+      const parts = JSON.parse(msgStr)
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          if (part?.type !== 'button' || !Array.isArray(part.parameters)) continue
+          for (const param of part.parameters) {
+            const text = param?.text
+            if (!text || typeof text !== 'string') continue
+            if (text.startsWith('eyJ')) {
+              const payload = decodeInteraktJwtPayload(text)
+              const bt =
+                payload?.button_text ||
+                payload?.buttonText ||
+                payload?.cta_button_text ||
+                payload?.button?.text ||
+                payload?.button?.title
+              if (isUsefulWaButtonText(bt)) return String(bt).trim()
+            } else if (isUsefulWaButtonText(text)) {
+              return text.trim()
+            }
+          }
         }
       }
+    } catch {
+      // ignore parse errors
     }
-  } catch {
-    return null
   }
+
+  // Native Interakt format: cta_click_info keys are UUIDs; button text is in the value.
+  // Migrated/backfilled docs use "link" as the key (value has no button_text) — skip it.
+  const ctaInfo = doc?.data?.message?.meta_data?.cta_click_info
+  if (ctaInfo && typeof ctaInfo === 'object' && !Array.isArray(ctaInfo)) {
+    for (const [k, v] of Object.entries(ctaInfo)) {
+      if (k === 'link') continue
+      const vbt = v?.button_text || v?.buttonText || v?.cta_button_text
+      if (isUsefulWaButtonText(vbt)) return String(vbt).trim()
+      // Key fallback: only if it is NOT a UUID (some older webhooks use readable key names)
+      if (!UUID_RE.test(k) && isUsefulWaButtonText(k)) return k.trim()
+    }
+  }
+
   return null
 }
 
@@ -294,13 +397,39 @@ function pickEnrichedButtonForTimelineRow(row, enrichedEvents) {
 }
 
 /**
+ * Fallback: for click events that still have no button text after Interakt extraction,
+ * look up `itm.marketingwa` by `firestore_id` (the unique key linking both collections).
+ * Returns a Map<firestoreId, button_text> for all matched docs with a non-empty button_text.
+ */
+async function fetchMarketingwaButtonsByFirestoreId(mwaCol, firestoreIds) {
+  if (!firestoreIds?.length || !mwaCol) return new Map()
+  try {
+    const docs = await mwaCol
+      .find(
+        { firestore_id: { $in: firestoreIds }, button_text: { $nin: [null, '', '[]'] } },
+        { projection: { _id: 0, firestore_id: 1, button_text: 1, template_name: 1 } },
+      )
+      .toArray()
+    const map = new Map()
+    for (const d of docs) {
+      if (d.firestore_id && isUsefulWaButtonText(d.button_text)) {
+        map.set(String(d.firestore_id), { button_text: String(d.button_text).trim(), template_name: d.template_name || '' })
+      }
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+/**
  * Fills `clickAttrMap` button tags and `clickTimelineByNorm` from raw Interakt docs
  * (MBA form + IHM payment conversion tables; small bounded set of mobiles).
  *
  * Uses the same `_waStage` / `_waPhone` resolution as KPIs — not `type` regex alone,
  * so JWT-only button labels are found for the same rows that power the click timeline.
  */
-async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm) {
+async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, mwaCol = null) {
   const convertedNorms = new Set(
     formSubmittedMobiles.map((m) => normaliseMobile(m)).filter(Boolean),
   )
@@ -315,6 +444,7 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
         { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
         {
           $project: {
+            firestore_id: 1,
             phone_number: 1,
             button_text: 1,
             template_name: 1,
@@ -336,6 +466,9 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
     )
     .toArray()
 
+  // Track event objects that still need a button so we can patch them after the mwa fallback
+  const pendingMwaLookup = [] // [{ event: eventObj, fid: string }]
+
   const byNorm = new Map()
   for (const doc of docs) {
     const rawPhone =
@@ -349,7 +482,7 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
     if (!byNorm.has(norm)) byNorm.set(norm, { buttons: new Set(), events: [] })
     const row = byNorm.get(norm)
 
-    const btn = extractInteraktClickButtonLabel(doc)
+    let btn = extractInteraktClickButtonLabel(doc)
     if (btn) row.buttons.add(btn)
 
     let tpl = doc._waTemplate || doc.template_name || ''
@@ -380,7 +513,34 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
         ts = parseOptDate(isoish)
       }
     }
-    row.events.push({ template: tpl, button: btn || '', clickAt: ts })
+    const eventObj = { template: tpl, button: btn || '', clickAt: ts }
+    row.events.push(eventObj)
+
+    // Queue for marketingwa fallback if button is still missing and we have a firestore_id link
+    if (!btn && mwaCol) {
+      const fid =
+        doc.firestore_id ||
+        doc?.data?.message?.meta_data?.marketingwa_source?.firestore_id
+      if (fid) pendingMwaLookup.push({ event: eventObj, fid: String(fid), norm })
+    }
+  }
+
+  // --- marketingwa firestore_id fallback ---
+  // For click events that had no button text in Interakt, look them up by their
+  // unique firestore_id in itm.marketingwa which stores button_text as a flat field.
+  if (mwaCol && pendingMwaLookup.length > 0) {
+    const uniqueFids = [...new Set(pendingMwaLookup.map((p) => p.fid))]
+    const mwaButtonMap = await fetchMarketingwaButtonsByFirestoreId(mwaCol, uniqueFids)
+    if (mwaButtonMap.size > 0) {
+      for (const { event, fid, norm: entryNorm } of pendingMwaLookup) {
+        const mwa = mwaButtonMap.get(fid)
+        if (!mwa) continue
+        event.button = mwa.button_text
+        if (!event.template && mwa.template_name) event.template = mwa.template_name
+        // Also propagate to the per-norm buttons set
+        byNorm.get(entryNorm)?.buttons.add(mwa.button_text)
+      }
+    }
   }
 
   for (const norm of convertedNorms) {
@@ -461,6 +621,7 @@ async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
             button_text: 1,
             'data.message.button_text': 1,
             'data.message.message': 1,
+            'data.message.meta_data.cta_click_info': 1,
             click_timestamp: 1,
             event_timestamp: 1,
             createdAt: 1,
@@ -588,6 +749,7 @@ async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolved
         button_text: 1,
         'data.message.button_text': 1,
         'data.message.message': 1,
+        'data.message.meta_data.cta_click_info': 1,
       },
     },
   ]
@@ -847,7 +1009,7 @@ async function buildIhmPaymentConversion({
   }
 
   const clickTimelineByNorm = new Map()
-  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm)
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, itmDb.collection('marketingwa'))
 
   const formMetaByNorm = new Map()
   for (const row of ihmRows) {
@@ -1003,18 +1165,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       { $match: { _waStage: 'clicked' } },
       {
         $addFields: {
-          _ctaKey: {
-            $cond: [
-              {
-                $and: [
-                  { $ne: [{ $ifNull: ['$_waButtonText', ''] }, ''] },
-                  { $ne: [{ $toString: { $ifNull: ['$_waButtonText', ''] } }, '[]'] },
-                ],
-              },
-              '$_waButtonText',
-              '(Other clicks)',
-            ],
-          },
+          _ctaKey: ctaKeyExpr(),
         },
       },
       {
@@ -1042,18 +1193,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       { $match: { _waStage: 'clicked' } },
       {
         $addFields: {
-          _btn: {
-            $cond: [
-              {
-                $and: [
-                  { $ne: [{ $ifNull: ['$_waButtonText', ''] }, ''] },
-                  { $ne: [{ $toString: { $ifNull: ['$_waButtonText', ''] } }, '[]'] },
-                ],
-              },
-              '$_waButtonText',
-              '(Other clicks)',
-            ],
-          },
+          _btn: ctaKeyExpr(),
         },
       },
       {
@@ -1558,7 +1698,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
   }
 
-  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm)
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, db.collection('marketingwa'))
 
   paymentConversion = {
     conversionKind: 'mba_form',

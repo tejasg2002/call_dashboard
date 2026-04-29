@@ -18,6 +18,10 @@ function CTARow({ r, isDark, thClass, tdClass }) {
   const [expanded, setExpanded] = useState(false)
   const hasLinks = r.links && r.links.length > 0
 
+  const templates = r.template_used
+    ? r.template_used.split(', ').filter(Boolean)
+    : []
+
   return (
     <>
       <tr
@@ -44,7 +48,29 @@ function CTARow({ r, isDark, thClass, tdClass }) {
           <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.click_types}</span>
         </td>
         <td className={tdClass}>
-          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.template_used}</span>
+          {templates.length > 0 ? (
+            <span className="group relative inline-block cursor-default">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}>
+                {templates.length} template{templates.length > 1 ? 's' : ''}
+                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+              {/* Hover tooltip listing template names */}
+              <span className={`pointer-events-none absolute left-0 top-full mt-1 z-30 hidden group-hover:flex flex-col gap-1 min-w-[200px] max-w-[340px] rounded-xl px-3 py-2.5 shadow-lg text-[11px] ${
+                isDark ? 'bg-slate-700 border border-slate-600 text-slate-200' : 'bg-white border border-slate-200 text-slate-700 shadow-md'
+              }`}>
+                <span className={`font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Templates used</span>
+                {templates.map((t) => (
+                  <span key={t} className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>{t}</span>
+                ))}
+              </span>
+            </span>
+          ) : (
+            <span className={`text-xs ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</span>
+          )}
         </td>
       </tr>
       {expanded && hasLinks && (
@@ -65,7 +91,7 @@ function CTARow({ r, isDark, thClass, tdClass }) {
 
 export default function WACTAPerformanceTable({ rows, theme }) {
   const isDark = theme === 'dark'
-  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(rows, 25)
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(rows, 10)
   const thClass = `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-50'}`
   const tdClass = `px-4 py-3 text-sm ${isDark ? 'text-slate-200' : 'text-slate-700'}`
   const tableWrap = `rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200 shadow'}`
@@ -74,7 +100,7 @@ export default function WACTAPerformanceTable({ rows, theme }) {
     <div className={tableWrap}>
       <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
         <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Button / CTA performance</h3>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click a row to expand button links</p>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click a row to expand button links · hover the template badge to see template names</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
@@ -84,7 +110,7 @@ export default function WACTAPerformanceTable({ rows, theme }) {
               <th className={thClass}>Total clicks</th>
               <th className={thClass}>Unique users</th>
               <th className={thClass}>Click type</th>
-              <th className={thClass}>Template used</th>
+              <th className={thClass}>Templates</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>

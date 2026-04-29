@@ -65,7 +65,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
     return sorted
   }, [rows, sortKey, sortDir])
 
-  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(sortedRows, 25)
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(sortedRows, 10)
 
   const thBase = `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-50'}`
   const thSortable = `cursor-pointer hover:${isDark ? 'text-slate-200' : 'text-slate-800'} transition-colors`

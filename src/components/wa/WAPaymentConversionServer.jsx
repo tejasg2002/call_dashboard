@@ -68,7 +68,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
   const mp = (phone) => (dataMasked ? maskPhone(phone) : phone)
 
   const formSubmittedDetails = data?.formSubmittedDetails ?? []
-  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(formSubmittedDetails, 25)
+  const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(formSubmittedDetails, 10)
 
   if (!data) return null
 
