@@ -93,8 +93,8 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{c.name}</p>
               <div className="flex flex-wrap gap-1 mt-1">
-                {c.templates.map((t) => (
-                  <span key={t} className={`px-1.5 py-0.5 rounded text-[11px] font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{t}</span>
+                {c.templates.map((t, ti) => (
+                  <span key={`${c.id}-tpl-${ti}-${t}`} className={`px-1.5 py-0.5 rounded text-[11px] font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{t}</span>
                 ))}
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function WACampaignManager({ campaigns, setCampaigns, templateNam
                 <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>No templates found in data yet.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {templateNames.map((t) => {
+                  {[...new Set(templateNames || [])].map((t) => {
                     const selected = formTemplates.includes(t)
                     return (
                       <button

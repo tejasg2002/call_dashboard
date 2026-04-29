@@ -30,9 +30,9 @@ function TagList({ items, color, isDark }) {
   if (!items || items.length === 0) return <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>
   return (
     <div className="flex flex-wrap gap-1">
-      {items.map((item) => (
+      {items.map((item, i) => (
         <span
-          key={item}
+          key={`${i}-${String(item)}`}
           className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-medium max-w-[160px] truncate ${color}`}
           title={item}
         >

@@ -184,9 +184,8 @@ export function waWorkspaceConfig(workspace) {
       waCollection: def.collection,
       cacheKey: def.cacheKey,
       includeMbaConversion: false,
-      /** IHM: completed payments in itm.npfPaymentWebhookEvents → same conversion card as MBA (payment-based). */
-      ihmPaymentWebhookCollection:
-        def.workspace === WA_WORKSPACE_IHM ? 'npfPaymentWebhookEvents' : null,
+      /** IHM payment conversion (was itm.npfPaymentWebhookEvents): off until DB user has read on that collection. */
+      ihmPaymentWebhookCollection: null,
     }
   }
   return {

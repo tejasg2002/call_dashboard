@@ -239,8 +239,8 @@ function UserListPanel({ stage, users, isDark, dataMasked }) {
                         {u.reason}
                       </p>
                     )}
-                    {stage === 'clicked' && (u.allButtons?.length ? u.allButtons : u.buttonText ? [u.buttonText] : []).map((btn) => (
-                      <span key={btn} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                    {stage === 'clicked' && (u.allButtons?.length ? u.allButtons : u.buttonText ? [u.buttonText] : []).map((btn, bi) => (
+                      <span key={`btn-${bi}-${btn}`} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
                         🖱 {btn}
                       </span>
                     ))}

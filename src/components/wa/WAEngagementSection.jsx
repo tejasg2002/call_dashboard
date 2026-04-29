@@ -283,8 +283,8 @@ export default function WAEngagementSection({ engagementRows = [], engagementSum
                     {/* Templates */}
                     <td className="px-4 py-3 max-w-[200px]">
                       <div className="flex flex-wrap gap-1">
-                        {row.templates.slice(0, 2).map((t) => (
-                          <span key={t} className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
+                        {row.templates.slice(0, 2).map((t, ti) => (
+                          <span key={`tpl-${ti}-${t}`} className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
                             {t}
                           </span>
                         ))}
@@ -299,8 +299,8 @@ export default function WAEngagementSection({ engagementRows = [], engagementSum
                     {/* Buttons clicked */}
                     <td className="px-4 py-3 max-w-[160px]">
                       <div className="flex flex-wrap gap-1">
-                        {row.buttons.slice(0, 2).map((b) => (
-                          <span key={b} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                        {row.buttons.slice(0, 2).map((b, bi) => (
+                          <span key={`btn-${bi}-${b}`} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
                             {b}
                           </span>
                         ))}

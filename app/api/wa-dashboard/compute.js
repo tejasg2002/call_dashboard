@@ -193,6 +193,447 @@ function normaliseMobile(raw) {
   return n
 }
 
+/** Values to pass to Mongo `$in` for WA phone matching (raw + normalised + 91…). */
+function waPhoneVariantsForMatch(rawList) {
+  const out = new Set()
+  for (const raw of rawList || []) {
+    if (raw == null || raw === '') continue
+    const s = String(raw).trim()
+    if (!s) continue
+    out.add(s)
+    const n = normaliseMobile(s)
+    if (n) {
+      out.add(n)
+      if (n.length === 10) out.add(`91${n}`)
+    }
+  }
+  return [...out]
+}
+
+function isUsefulWaButtonText(b) {
+  const s = String(b ?? '').trim()
+  return Boolean(s && s !== '[]' && s !== '""' && s.toLowerCase() !== 'null')
+}
+
+function decodeInteraktJwtPayload(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4))
+    const json = Buffer.from(b64 + pad, 'base64').toString('utf8')
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Interakt click webhooks often omit `data.message.button_text` (or set it to "[]").
+ * The CTA label is frequently inside JWT(s) in `data.message.message`.
+ */
+function extractInteraktClickButtonLabel(doc) {
+  const direct = doc?.button_text ?? doc?.data?.message?.button_text
+  if (isUsefulWaButtonText(direct)) return String(direct).trim()
+
+  const msgStr = doc?.data?.message?.message
+  if (typeof msgStr !== 'string' || !msgStr.trim()) return null
+  try {
+    const parts = JSON.parse(msgStr)
+    if (!Array.isArray(parts)) return null
+    for (const part of parts) {
+      if (part?.type !== 'button' || !Array.isArray(part.parameters)) continue
+      for (const param of part.parameters) {
+        const text = param?.text
+        if (!text || typeof text !== 'string') continue
+        if (text.startsWith('eyJ')) {
+          const payload = decodeInteraktJwtPayload(text)
+          const bt =
+            payload?.button_text ||
+            payload?.buttonText ||
+            payload?.cta_button_text ||
+            payload?.button?.text ||
+            payload?.button?.title
+          if (isUsefulWaButtonText(bt)) return String(bt).trim()
+        } else if (isUsefulWaButtonText(text)) {
+          return text.trim()
+        }
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+/** Match timeline row to enriched click (template + time) to copy JWT-derived button label. */
+function pickEnrichedButtonForTimelineRow(row, enrichedEvents) {
+  if (!row || !enrichedEvents?.length) return ''
+  if (isUsefulWaButtonText(row.button)) return String(row.button).trim()
+  const rowMs = row.clickAtIso ? Date.parse(row.clickAtIso) : NaN
+  const rowTpl = (row.template || '').trim()
+  let best = ''
+  let bestDelta = Infinity
+  for (const ev of enrichedEvents) {
+    if (!ev?.button) continue
+    const evT = ev.clickAt?.getTime()
+    if (Number.isFinite(rowMs) && evT != null) {
+      const d = Math.abs(evT - rowMs)
+      if (d <= 180_000 && (!rowTpl || !ev.template || ev.template === rowTpl) && d < bestDelta) {
+        bestDelta = d
+        best = ev.button
+      }
+    }
+  }
+  if (best) return String(best).trim()
+  const sameTpl = enrichedEvents.find((ev) => ev.button && rowTpl && ev.template === rowTpl)
+  if (sameTpl?.button) return String(sameTpl.button).trim()
+  const any = enrichedEvents.find((ev) => ev.button)
+  return any?.button ? String(any.button).trim() : ''
+}
+
+/**
+ * Fills `clickAttrMap` button tags and `clickTimelineByNorm` from raw Interakt docs
+ * (MBA form + IHM payment conversion tables; small bounded set of mobiles).
+ *
+ * Uses the same `_waStage` / `_waPhone` resolution as KPIs — not `type` regex alone,
+ * so JWT-only button labels are found for the same rows that power the click timeline.
+ */
+async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm) {
+  const convertedNorms = new Set(
+    formSubmittedMobiles.map((m) => normaliseMobile(m)).filter(Boolean),
+  )
+  if (convertedNorms.size === 0) return
+
+  const variants = waPhoneVariantsForMatch(formSubmittedMobiles)
+  const waR = waResolvedFieldsExpr()
+  const docs = await waCol
+    .aggregate(
+      [
+        { $addFields: waR },
+        { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
+        {
+          $project: {
+            phone_number: 1,
+            button_text: 1,
+            template_name: 1,
+            click_timestamp: 1,
+            event_timestamp: 1,
+            createdAt: 1,
+            timestamp: 1,
+            'data.customer': 1,
+            'data.message': 1,
+            _waPhone: 1,
+            _waClickTs: 1,
+            _waEventTs: 1,
+            _waTemplate: 1,
+          },
+        },
+        { $limit: 250_000 },
+      ],
+      { maxTimeMS: 120_000 },
+    )
+    .toArray()
+
+  const byNorm = new Map()
+  for (const doc of docs) {
+    const rawPhone =
+      doc._waPhone ||
+      doc.phone_number ||
+      doc?.data?.customer?.phone_number ||
+      doc?.data?.customer?.channel_phone_number
+    const norm = normaliseMobile(rawPhone)
+    if (!norm || !convertedNorms.has(norm)) continue
+
+    if (!byNorm.has(norm)) byNorm.set(norm, { buttons: new Set(), events: [] })
+    const row = byNorm.get(norm)
+
+    const btn = extractInteraktClickButtonLabel(doc)
+    if (btn) row.buttons.add(btn)
+
+    let tpl = doc._waTemplate || doc.template_name || ''
+    if (!tpl && doc?.data?.message?.raw_template) {
+      try {
+        const rt =
+          typeof doc.data.message.raw_template === 'string'
+            ? JSON.parse(doc.data.message.raw_template)
+            : doc.data.message.raw_template
+        tpl = rt?.name || ''
+      } catch {
+        tpl = ''
+      }
+    }
+
+    let ts =
+      parseOptDate(doc._waClickTs) ||
+      parseOptDate(doc._waEventTs) ||
+      parseOptDate(doc.click_timestamp) ||
+      parseOptDate(doc.event_timestamp) ||
+      parseOptDate(doc.createdAt)
+    if (!ts && doc.timestamp != null) {
+      const rawTs = String(doc.timestamp).trim()
+      if (rawTs) {
+        const isoish = /^\d{4}-\d{2}-\d{2}[ T]\d/.test(rawTs) && !rawTs.endsWith('Z') && !rawTs.includes('+')
+          ? rawTs.replace(' ', 'T') + 'Z'
+          : rawTs
+        ts = parseOptDate(isoish)
+      }
+    }
+    row.events.push({ template: tpl, button: btn || '', clickAt: ts })
+  }
+
+  for (const norm of convertedNorms) {
+    const enriched = byNorm.get(norm)
+    const prev = clickAttrMap.get(norm) || { templates: [], buttons: [] }
+    const templates = new Set((prev.templates || []).filter(Boolean))
+    const buttons = new Set((prev.buttons || []).filter(isUsefulWaButtonText))
+    if (enriched) {
+      for (const b of enriched.buttons) buttons.add(b)
+      for (const ev of enriched.events) {
+        if (ev.template) templates.add(ev.template)
+      }
+    }
+    clickAttrMap.set(norm, {
+      templates: [...templates],
+      buttons: [...buttons].filter(isUsefulWaButtonText),
+    })
+
+    if (!enriched?.events?.length) continue
+
+    enriched.events.sort((a, b) => (a.clickAt?.getTime() || 0) - (b.clickAt?.getTime() || 0))
+    const slice = enriched.events.slice(-40)
+    const formatted = slice.map((e) => {
+      const dt = e.clickAt
+      const ok = dt && !Number.isNaN(dt.getTime())
+      return {
+        template: e.template || '',
+        button: e.button || '',
+        clickAtIso: ok ? dt.toISOString() : null,
+        clickAtDisplay: ok
+          ? dt.toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Kolkata',
+            })
+          : '—',
+      }
+    })
+
+    const existing = clickTimelineByNorm.get(norm)
+    if (existing?.length) {
+      const merged = existing.map((row) => {
+        const b = pickEnrichedButtonForTimelineRow(row, enriched.events)
+        return b ? { ...row, button: b } : row
+      })
+      clickTimelineByNorm.set(norm, merged)
+    } else {
+      clickTimelineByNorm.set(norm, formatted)
+    }
+  }
+}
+
+/**
+ * Fills `button` on each entry in `clickBreakdown[].clicks` when Interakt only stores it inside JWT payload.
+ * Matches by click time (not array index) so labels align with aggregation sort order.
+ */
+async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
+  if (!Array.isArray(clickBreakdownRows) || clickBreakdownRows.length === 0) return
+
+  const rawPhones = clickBreakdownRows.map((r) => r.phone).filter(Boolean)
+  const variants = waPhoneVariantsForMatch(rawPhones.slice(0, 600))
+  if (variants.length === 0) return
+
+  const waR = waResolvedFieldsExpr()
+  const docs = await waCol
+    .aggregate(
+      [
+        { $addFields: waR },
+        { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
+        {
+          $project: {
+            phone_number: 1,
+            'data.customer.phone_number': 1,
+            'data.customer.channel_phone_number': 1,
+            button_text: 1,
+            'data.message.button_text': 1,
+            'data.message.message': 1,
+            click_timestamp: 1,
+            event_timestamp: 1,
+            createdAt: 1,
+            timestamp: 1,
+            _waPhone: 1,
+            _waClickTs: 1,
+            _waEventTs: 1,
+          },
+        },
+        { $limit: 250_000 },
+      ],
+      { maxTimeMS: 120_000 },
+    )
+    .toArray()
+
+  const byNorm = new Map()
+  for (const doc of docs) {
+    const n = normaliseMobile(
+      doc._waPhone || doc.phone_number || doc?.data?.customer?.phone_number || doc?.data?.customer?.channel_phone_number,
+    )
+    if (!n) continue
+    const btn = extractInteraktClickButtonLabel(doc)
+    if (!btn) continue
+    let ts =
+      parseOptDate(doc._waClickTs) ||
+      parseOptDate(doc._waEventTs) ||
+      parseOptDate(doc.click_timestamp) ||
+      parseOptDate(doc.event_timestamp) ||
+      parseOptDate(doc.createdAt)
+    if (!ts && doc.timestamp != null) {
+      const rawTs = String(doc.timestamp).trim()
+      if (rawTs) {
+        const isoish = /^\d{4}-\d{2}-\d{2}[ T]\d/.test(rawTs) && !rawTs.endsWith('Z') && !rawTs.includes('+')
+          ? rawTs.replace(' ', 'T') + 'Z'
+          : rawTs
+        ts = parseOptDate(isoish)
+      }
+    }
+    if (!byNorm.has(n)) byNorm.set(n, [])
+    byNorm.get(n).push({ btn, ts: ts?.getTime() || 0 })
+  }
+  for (const arr of byNorm.values()) {
+    arr.sort((a, b) => b.ts - a.ts)
+  }
+
+  const WINDOW_MS = 180_000
+
+  for (const row of clickBreakdownRows) {
+    const n = normaliseMobile(row.phone)
+    const events = byNorm.get(n) || []
+    const clicks = row.clicks || []
+    const used = new Set()
+    for (let i = 0; i < clicks.length; i++) {
+      if (isUsefulWaButtonText(clicks[i].button)) continue
+      const ct = parseOptDate(clicks[i].time)
+      const clickMs = ct?.getTime()
+      let bestJ = -1
+      let bestDelta = Infinity
+      if (clickMs != null && !Number.isNaN(clickMs)) {
+        for (let j = 0; j < events.length; j++) {
+          if (used.has(j) || !events[j]?.btn) continue
+          const evTs = events[j].ts
+          if (evTs == null || evTs === 0) continue
+          const d = Math.abs(evTs - clickMs)
+          if (d <= WINDOW_MS && d < bestDelta) {
+            bestDelta = d
+            bestJ = j
+          }
+        }
+      }
+      if (bestJ >= 0) {
+        clicks[i].button = events[bestJ].btn
+        used.add(bestJ)
+        continue
+      }
+      const fallback = events.findIndex((ev, j) => !used.has(j) && ev.btn)
+      if (fallback >= 0) {
+        clicks[i].button = events[fallback].btn
+        used.add(fallback)
+      }
+    }
+  }
+}
+
+/**
+ * MBA: CTA + per-template button rows use Mongo `$_waButtonText`, which is usually empty on native Interakt
+ * (label lives in JWT inside `data.message.message`). Re-aggregate from raw click docs with JS extraction.
+ */
+async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages) {
+  const US = '\x1f'
+  const ctaMap = new Map()
+  const tplBtnMap = new Map()
+
+  function bumpCta(source, label, phone, templateName) {
+    const key = `${source || 'api'}${US}${label}`
+    if (!ctaMap.has(key)) {
+      ctaMap.set(key, { total: 0, users: new Set(), templates: new Set() })
+    }
+    const o = ctaMap.get(key)
+    o.total += 1
+    if (phone) o.users.add(String(phone))
+    if (templateName) o.templates.add(String(templateName))
+  }
+
+  function bumpTplBtn(templateName, label, phone) {
+    const tpl = templateName || ''
+    const key = `${tpl}${US}${label}`
+    if (!tplBtnMap.has(key)) {
+      tplBtnMap.set(key, { total: 0, users: new Set() })
+    }
+    const o = tplBtnMap.get(key)
+    o.total += 1
+    if (phone) o.users.add(String(phone))
+  }
+
+  const pipeline = [
+    { $addFields: waResolvedFields },
+    ...waDateStages,
+    { $match: { _waStage: 'clicked' } },
+    {
+      $project: {
+        _waSource: 1,
+        _waTemplate: 1,
+        _waPhone: 1,
+        button_text: 1,
+        'data.message.button_text': 1,
+        'data.message.message': 1,
+      },
+    },
+  ]
+
+  const cursor = waCol.aggregate(pipeline, { allowDiskUse: true, maxTimeMS: 180_000, batchSize: 800 })
+  for await (const doc of cursor) {
+    const phone = doc._waPhone
+    const raw = extractInteraktClickButtonLabel(doc)
+    const label = raw && isUsefulWaButtonText(raw) ? String(raw).trim() : '(Other clicks)'
+    const source = doc._waSource || 'api'
+    const tpl = doc._waTemplate ? String(doc._waTemplate).trim() : ''
+    bumpCta(source, label, phone, tpl)
+    bumpTplBtn(tpl, label, phone)
+  }
+
+  const ctaResult = [...ctaMap.entries()]
+    .map(([k, v]) => {
+      const sep = k.indexOf(US)
+      const source = sep >= 0 ? k.slice(0, sep) : 'api'
+      const button_text = sep >= 0 ? k.slice(sep + US.length) : k
+      return {
+        _id: { button_text, source },
+        total_clicks: v.total,
+        unique_users: [...v.users],
+        templates: [...v.templates],
+      }
+    })
+    .sort((a, b) => b.total_clicks - a.total_clicks)
+
+  const templateBtnResult = [...tplBtnMap.entries()]
+    .map(([k, v]) => {
+      const sep = k.indexOf(US)
+      const rawTpl = sep >= 0 ? k.slice(0, sep) : ''
+      const template_name = rawTpl ? rawTpl : null
+      const button_text = sep >= 0 ? k.slice(sep + US.length) : k
+      return {
+        _id: { template_name, button_text },
+        total_clicks: v.total,
+        unique_users: [...v.users],
+      }
+    })
+    .sort((a, b) => b.total_clicks - a.total_clicks)
+
+  return { ctaResult, templateBtnResult }
+}
+
 const IHM_PAYMENT_STATUS_HINTS = ['complete', 'success', 'paid', 'captured', 'successful']
 
 function ihmWebhookStatusLower(doc) {
@@ -252,20 +693,23 @@ async function buildIhmPaymentConversion({
 }) {
   const itmDb = client.db(ITM_DB)
   const ihmCol = itmDb.collection('npfPaymentWebhookEvents')
+  const waR = waResolvedFieldsExpr()
+  const clickedPhoneVariants = waPhoneVariantsForMatch(clickedPhoneDedup)
 
   const firstOutboundResult = clickedPhoneDedup.length > 0
     ? await waCol
         .aggregate([
+          { $addFields: waR },
           {
             $match: {
-              phone_number: { $in: clickedPhoneDedup },
-              stage: { $in: ['sent', 'delivered'] },
+              _waPhone: { $in: clickedPhoneVariants },
+              _waStage: { $in: ['sent', 'delivered'] },
             },
           },
           {
             $group: {
-              _id: '$phone_number',
-              firstOutbound: { $min: '$event_timestamp' },
+              _id: '$_waPhone',
+              firstOutbound: { $min: '$_waEventTs' },
             },
           },
         ])
@@ -285,15 +729,21 @@ async function buildIhmPaymentConversion({
   const lastClickResult = clickedPhoneDedup.length > 0
     ? await waCol
         .aggregate([
-          { $match: { phone_number: { $in: clickedPhoneDedup }, stage: 'clicked' } },
+          { $addFields: waR },
+          {
+            $match: {
+              _waPhone: { $in: clickedPhoneVariants },
+              _waStage: 'clicked',
+            },
+          },
           {
             $addFields: {
-              _clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+              _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
             },
           },
           {
             $group: {
-              _id: '$phone_number',
+              _id: '$_waPhone',
               lastClickAt: { $max: '$_clickAt' },
             },
           },
@@ -370,16 +820,18 @@ async function buildIhmPaymentConversion({
 
   const formSubmittedMobiles = ihmRows.map((r) => r.mobile)
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
+  const convertedPhoneVariants = waPhoneVariantsForMatch(convertedMobiles)
 
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol
         .aggregate([
-          { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
+          { $addFields: waR },
+          { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
           {
             $group: {
-              _id: '$phone_number',
-              templates: { $addToSet: '$template_name' },
-              buttons: { $addToSet: '$button_text' },
+              _id: '$_waPhone',
+              templates: { $addToSet: '$_waTemplate' },
+              buttons: { $addToSet: '$_waButtonText' },
             },
           },
         ])
@@ -390,59 +842,12 @@ async function buildIhmPaymentConversion({
   for (const r of clickAttrResult) {
     clickAttrMap.set(normaliseMobile(r._id), {
       templates: (r.templates || []).filter(Boolean),
-      buttons: (r.buttons || []).filter(Boolean),
+      buttons: (r.buttons || []).filter(isUsefulWaButtonText),
     })
   }
 
-  const clickBreakdownResult =
-    convertedMobiles.length > 0
-      ? await waCol
-          .aggregate([
-            { $match: { stage: 'clicked', phone_number: { $in: convertedMobiles } } },
-            { $sort: { event_timestamp: 1 } },
-            {
-              $group: {
-                _id: '$phone_number',
-                events: {
-                  $push: {
-                    template: '$template_name',
-                    button: '$button_text',
-                    clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
-                  },
-                },
-              },
-            },
-          ])
-          .toArray()
-      : []
-
-  const MAX_TIMELINE_EVENTS = 40
   const clickTimelineByNorm = new Map()
-  for (const row of clickBreakdownResult) {
-    const norm = normaliseMobile(row._id)
-    if (!norm) continue
-    const rawEvents = row.events || []
-    const slice = rawEvents.length > MAX_TIMELINE_EVENTS ? rawEvents.slice(-MAX_TIMELINE_EVENTS) : rawEvents
-    const events = slice.map((e) => {
-      const dt = parseOptDate(e.clickAt)
-      return {
-        template: e.template || '',
-        button: e.button || '',
-        clickAtIso: dt ? dt.toISOString() : null,
-        clickAtDisplay: dt
-          ? dt.toLocaleString('en-IN', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'Asia/Kolkata',
-            })
-          : '—',
-      }
-    })
-    clickTimelineByNorm.set(norm, events)
-  }
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm)
 
   const formMetaByNorm = new Map()
   for (const row of ihmRows) {
@@ -510,14 +915,15 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const waDb = client.db(cfg.dataDb)
   const waCol = waDb.collection(cfg.waCollection)
 
-  const matchFilter = {}
+  /** Interakt + flattened rows: filter on resolved event time. */
+  const waDocMatch = {}
   if (startDate || endDate) {
-    matchFilter.event_timestamp = {}
-    if (startDate) matchFilter.event_timestamp.$gte = new Date(startDate)
+    waDocMatch._waEventTs = {}
+    if (startDate) waDocMatch._waEventTs.$gte = new Date(startDate)
     if (endDate) {
       const end = new Date(endDate)
       end.setDate(end.getDate() + 1)
-      matchFilter.event_timestamp.$lt = end
+      waDocMatch._waEventTs.$lt = end
     }
   }
   const waResolvedFields = waResolvedFieldsExpr()
@@ -529,53 +935,94 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     waRangeMatch._waEventTs = { ...(waRangeMatch._waEventTs || {}), $lt: end }
   }
 
-  const [
+  const waBreakdownMatch = { _waStage: 'clicked' }
+  if (startDate || endDate) {
+    waBreakdownMatch._waEventTs = {}
+    if (startDate) waBreakdownMatch._waEventTs.$gte = new Date(startDate)
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setDate(end.getDate() + 1)
+      waBreakdownMatch._waEventTs.$lt = end
+    }
+  }
+
+  const waDateStages = Object.keys(waDocMatch).length ? [{ $match: waDocMatch }] : []
+
+  const totalDocsPromise =
+    Object.keys(waDocMatch).length === 0
+      ? waCol.estimatedDocumentCount()
+      : waCol
+          .aggregate([{ $addFields: waResolvedFields }, ...waDateStages, { $count: 'n' }])
+          .toArray()
+          .then((arr) => arr[0]?.n ?? 0)
+
+  let [
     kpiResult, templateResult, ctaResult,
     clickedPhonesResult, totalDocs,
     templateBtnResult, failureResult,
   ] = await Promise.all([
     waCol.aggregate([
-      { $match: matchFilter },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
       {
         $group: {
           _id: null,
-          sent: { $sum: { $cond: [{ $eq: ['$stage', 'sent'] }, 1, 0] } },
-          delivered: { $sum: { $cond: [{ $eq: ['$stage', 'delivered'] }, 1, 0] } },
-          read: { $sum: { $cond: [{ $eq: ['$stage', 'read'] }, 1, 0] } },
-          clicked: { $sum: { $cond: [{ $eq: ['$stage', 'clicked'] }, 1, 0] } },
-          failed: { $sum: { $cond: [{ $eq: ['$stage', 'failed'] }, 1, 0] } },
-          cost: { $sum: { $ifNull: ['$cost', 0] } },
+          sent: { $sum: { $cond: [{ $eq: ['$_waStage', 'sent'] }, 1, 0] } },
+          delivered: { $sum: { $cond: [{ $eq: ['$_waStage', 'delivered'] }, 1, 0] } },
+          read: { $sum: { $cond: [{ $eq: ['$_waStage', 'read'] }, 1, 0] } },
+          clicked: { $sum: { $cond: [{ $eq: ['$_waStage', 'clicked'] }, 1, 0] } },
+          failed: { $sum: { $cond: [{ $eq: ['$_waStage', 'failed'] }, 1, 0] } },
+          cost: { $sum: { $ifNull: ['$_waCost', 0] } },
         },
       },
     ]).toArray(),
 
     waCol.aggregate([
-      { $match: matchFilter },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
       {
         $group: {
-          _id: { template_name: '$template_name', source: '$source' },
-          sent: { $sum: { $cond: [{ $eq: ['$stage', 'sent'] }, 1, 0] } },
-          delivered: { $sum: { $cond: [{ $eq: ['$stage', 'delivered'] }, 1, 0] } },
-          read: { $sum: { $cond: [{ $eq: ['$stage', 'read'] }, 1, 0] } },
-          clicked: { $sum: { $cond: [{ $eq: ['$stage', 'clicked'] }, 1, 0] } },
-          failed: { $sum: { $cond: [{ $eq: ['$stage', 'failed'] }, 1, 0] } },
-          cost: { $sum: { $ifNull: ['$cost', 0] } },
-          category: { $first: '$template_category' },
-          firstSeen: { $min: '$event_timestamp' },
-          lastSeen: { $max: '$event_timestamp' },
+          _id: { template_name: '$_waTemplate', source: '$_waSource' },
+          sent: { $sum: { $cond: [{ $eq: ['$_waStage', 'sent'] }, 1, 0] } },
+          delivered: { $sum: { $cond: [{ $eq: ['$_waStage', 'delivered'] }, 1, 0] } },
+          read: { $sum: { $cond: [{ $eq: ['$_waStage', 'read'] }, 1, 0] } },
+          clicked: { $sum: { $cond: [{ $eq: ['$_waStage', 'clicked'] }, 1, 0] } },
+          failed: { $sum: { $cond: [{ $eq: ['$_waStage', 'failed'] }, 1, 0] } },
+          cost: { $sum: { $ifNull: ['$_waCost', 0] } },
+          category: { $first: '$_waTemplateCategory' },
+          firstSeen: { $min: '$_waEventTs' },
+          lastSeen: { $max: '$_waEventTs' },
         },
       },
       { $sort: { clicked: -1 } },
     ]).toArray(),
 
     waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked', button_text: { $nin: [null, ''] } } },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
+      { $match: { _waStage: 'clicked' } },
+      {
+        $addFields: {
+          _ctaKey: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: [{ $ifNull: ['$_waButtonText', ''] }, ''] },
+                  { $ne: [{ $toString: { $ifNull: ['$_waButtonText', ''] } }, '[]'] },
+                ],
+              },
+              '$_waButtonText',
+              '(Other clicks)',
+            ],
+          },
+        },
+      },
       {
         $group: {
-          _id: { button_text: '$button_text', source: '$source' },
+          _id: { button_text: '$_ctaKey', source: '$_waSource' },
           total_clicks: { $sum: 1 },
-          unique_users: { $addToSet: '$phone_number' },
-          templates: { $addToSet: '$template_name' },
+          unique_users: { $addToSet: '$_waPhone' },
+          templates: { $addToSet: '$_waTemplate' },
         },
       },
       { $sort: { total_clicks: -1 } },
@@ -587,18 +1034,23 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       { $group: { _id: '$_waPhone' } },
     ]).toArray(),
 
-    Object.keys(matchFilter).length === 0
-      ? waCol.estimatedDocumentCount()
-      : waCol.countDocuments(matchFilter),
+    totalDocsPromise,
 
     waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked' } },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
+      { $match: { _waStage: 'clicked' } },
       {
         $addFields: {
           _btn: {
             $cond: [
-              { $and: [{ $ne: ['$button_text', null] }, { $ne: ['$button_text', ''] }] },
-              '$button_text',
+              {
+                $and: [
+                  { $ne: [{ $ifNull: ['$_waButtonText', ''] }, ''] },
+                  { $ne: [{ $toString: { $ifNull: ['$_waButtonText', ''] } }, '[]'] },
+                ],
+              },
+              '$_waButtonText',
               '(Other clicks)',
             ],
           },
@@ -606,25 +1058,38 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       },
       {
         $group: {
-          _id: { template_name: '$template_name', button_text: '$_btn' },
+          _id: { template_name: '$_waTemplate', button_text: '$_btn' },
           total_clicks: { $sum: 1 },
-          unique_users: { $addToSet: '$phone_number' },
+          unique_users: { $addToSet: '$_waPhone' },
         },
       },
       { $sort: { total_clicks: -1 } },
     ]).toArray(),
 
     waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'failed', failure_reason: { $nin: [null, ''] } } },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
+      {
+        $match: {
+          _waStage: 'failed',
+          _waFailureReason: { $nin: [null, ''] },
+        },
+      },
       {
         $group: {
-          _id: { template_name: '$template_name', failure_reason: '$failure_reason' },
+          _id: { template_name: '$_waTemplate', failure_reason: '$_waFailureReason' },
           count: { $sum: 1 },
         },
       },
       { $sort: { count: -1 } },
     ]).toArray(),
   ])
+
+  if (cfg.includeMbaConversion) {
+    const rebuilt = await rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages)
+    ctaResult = rebuilt.ctaResult
+    templateBtnResult = rebuilt.templateBtnResult
+  }
 
   const rawKpi = kpiResult[0] || { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
   delete rawKpi._id
@@ -716,8 +1181,10 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   if (!cfg.includeMbaConversion) {
     const templatePhoneResultIhm = await waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked', template_name: { $nin: [null, ''] } } },
-      { $group: { _id: '$template_name', phones: { $addToSet: '$phone_number' } } },
+      { $addFields: waResolvedFields },
+      ...waDateStages,
+      { $match: { _waStage: 'clicked', _waTemplate: { $nin: [null, ''] } } },
+      { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
     ]).toArray()
 
     for (const r of templatePhoneResultIhm) {
@@ -725,18 +1192,19 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
 
     const clickBreakdownResultIhm = await waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked' } },
-      { $sort: { event_timestamp: -1 } },
+      { $addFields: waResolvedFields },
+      { $match: waBreakdownMatch },
+      { $sort: { _waEventTs: -1 } },
       {
         $group: {
-          _id: '$phone_number',
+          _id: '$_waPhone',
           clicks: {
             $push: {
-              template: '$template_name',
-              button: '$button_text',
+              template: '$_waTemplate',
+              button: '$_waButtonText',
               link: '$button_link',
               type: '$click_type',
-              time: '$click_timestamp',
+              time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
             },
           },
         },
@@ -752,6 +1220,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         clicks: r.clicks.slice(0, 20),
       }))
       .sort((a, b) => b.totalClicks - a.totalClicks)
+
+    await enrichClickBreakdownFromInterakt(waCol, clickBreakdown)
 
     if (cfg.ihmPaymentWebhookCollection) {
       paymentConversion = await buildIhmPaymentConversion({
@@ -880,10 +1350,11 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
 
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
+  const convertedPhoneVariants = waPhoneVariantsForMatch(convertedMobiles)
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol.aggregate([
         { $addFields: waResolvedFields },
-        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedMobiles } } },
+        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
         {
           $group: {
             _id: '$_waPhone',
@@ -898,7 +1369,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   for (const r of clickAttrResult) {
     clickAttrMap.set(normaliseMobile(r._id), {
       templates: (r.templates || []).filter(Boolean),
-      buttons: (r.buttons || []).filter(Boolean),
+      buttons: (r.buttons || []).filter(isUsefulWaButtonText),
     })
   }
 
@@ -907,8 +1378,10 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     : 0
 
   const templatePhoneResult = await waCol.aggregate([
-    { $match: { ...matchFilter, stage: 'clicked', template_name: { $nin: [null, ''] } } },
-    { $group: { _id: '$template_name', phones: { $addToSet: '$phone_number' } } },
+    { $addFields: waResolvedFields },
+    ...waDateStages,
+    { $match: { _waStage: 'clicked', _waTemplate: { $nin: [null, ''] } } },
+    { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
   ]).toArray()
 
   templatePhones = {}
@@ -917,18 +1390,19 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   }
 
   const clickBreakdownResult = await waCol.aggregate([
-    { $match: { ...matchFilter, stage: 'clicked' } },
-    { $sort: { event_timestamp: -1 } },
+    { $addFields: waResolvedFields },
+    { $match: waBreakdownMatch },
+    { $sort: { _waEventTs: -1 } },
     {
       $group: {
-        _id: '$phone_number',
+        _id: '$_waPhone',
         clicks: {
           $push: {
-            template: '$template_name',
-            button: '$button_text',
+            template: '$_waTemplate',
+            button: '$_waButtonText',
             link: '$button_link',
             type: '$click_type',
-            time: '$click_timestamp',
+            time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
           },
         },
       },
@@ -990,6 +1464,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }))
     .sort((a, b) => b.totalClicks - a.totalClicks)
 
+  await enrichClickBreakdownFromInterakt(waCol, clickBreakdown)
+
   function stringifyLeadId(raw) {
     if (raw == null || raw === '') return null
     const s = String(raw).trim()
@@ -1020,17 +1496,32 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const clickTimelineByNorm = new Map()
   const MAX_TIMELINE_EVENTS = 40
   if (convertedMobiles.length > 0) {
+    const timelineMatch = {
+      _waStage: 'clicked',
+      _waPhone: { $in: convertedPhoneVariants },
+    }
+    if (startDate || endDate) {
+      timelineMatch._waEventTs = {}
+      if (startDate) timelineMatch._waEventTs.$gte = new Date(startDate)
+      if (endDate) {
+        const end = new Date(endDate)
+        end.setDate(end.getDate() + 1)
+        timelineMatch._waEventTs.$lt = end
+      }
+    }
+
     const clickTimelineResult = await waCol.aggregate([
-      { $match: { ...matchFilter, stage: 'clicked', phone_number: { $in: convertedMobiles } } },
-      { $sort: { event_timestamp: 1 } },
+      { $addFields: waResolvedFields },
+      { $match: timelineMatch },
+      { $sort: { _waEventTs: 1 } },
       {
         $group: {
-          _id: '$phone_number',
+          _id: '$_waPhone',
           events: {
             $push: {
-              template: '$template_name',
-              button: '$button_text',
-              clickAt: { $ifNull: ['$click_timestamp', '$event_timestamp'] },
+              template: '$_waTemplate',
+              button: '$_waButtonText',
+              clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
             },
           },
         },
@@ -1046,11 +1537,12 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         : rawEvents
       const events = slice.map((e) => {
         const dt = parseOptDate(e.clickAt)
+        const ok = dt && !Number.isNaN(dt.getTime())
         return {
           template: e.template || '',
-          button: e.button || '',
-          clickAtIso: dt ? dt.toISOString() : null,
-          clickAtDisplay: dt
+          button: isUsefulWaButtonText(e.button) ? String(e.button).trim() : '',
+          clickAtIso: ok ? dt.toISOString() : null,
+          clickAtDisplay: ok
             ? dt.toLocaleString('en-IN', {
                 day: '2-digit',
                 month: 'short',
@@ -1065,6 +1557,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       clickTimelineByNorm.set(norm, events)
     }
   }
+
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm)
 
   paymentConversion = {
     conversionKind: 'mba_form',
@@ -1092,9 +1586,16 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   }
 
-  const lastDoc = await waCol.find({}).sort({ event_timestamp: -1 }).limit(1).toArray()
-  const lastRawDocTime = lastDoc[0]?.event_timestamp
-    ? new Date(lastDoc[0].event_timestamp).toISOString()
+  const lastDocArr = await waCol
+    .aggregate([
+      { $addFields: waResolvedFields },
+      { $sort: { _waEventTs: -1 } },
+      { $limit: 1 },
+      { $project: { _waEventTs: 1 } },
+    ])
+    .toArray()
+  const lastRawDocTime = lastDocArr[0]?._waEventTs
+    ? new Date(lastDocArr[0]._waEventTs).toISOString()
     : new Date().toISOString()
 
   const dashboard = {

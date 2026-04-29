@@ -485,9 +485,9 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
                       <td className="px-4 py-1.5">
                         {u.templates.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {u.templates.map((t) => (
+                            {u.templates.map((t, ti) => (
                               <span
-                                key={t}
+                                key={`tpl-${ti}-${t}`}
                                 className={`px-1.5 py-0.5 rounded-full border ${isDark ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-700'}`}
                               >
                                 {t}
@@ -501,9 +501,9 @@ export default function WAPaymentConversion({ buttonPhones = {}, templatePhones 
                       <td className="px-4 py-1.5">
                         {u.buttons.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {u.buttons.map((b) => (
+                            {u.buttons.map((b, bi) => (
                               <span
-                                key={b}
+                                key={`btn-${bi}-${b}`}
                                 className={`px-1.5 py-0.5 rounded-full border ${isDark ? 'border-brand-700 text-brand-300' : 'border-brand-300 text-brand-700'}`}
                               >
                                 {b}

@@ -196,10 +196,16 @@ export default function WAApiPage() {
 
   const engagementSummary = snapshot?.engagementSummary || {}
 
-  const filterOptions = useMemo(() => ({
-    templateNames: apiTemplateRows.map((r) => r.template_name).sort(),
-    eventTypes: [],
-  }), [apiTemplateRows])
+  const filterOptions = useMemo(() => {
+    const names = apiTemplateRows
+      .map((r) => r.template_name)
+      .filter((n) => n != null && String(n).trim() !== '')
+    const uniqueSorted = [...new Set(names)].sort((a, b) => String(a).localeCompare(String(b)))
+    return {
+      templateNames: uniqueSorted,
+      eventTypes: [],
+    }
+  }, [apiTemplateRows])
 
   const hasDates = useMemo(() => apiTemplateRows.some((r) => r.firstSeen || r.lastSeen), [apiTemplateRows])
 

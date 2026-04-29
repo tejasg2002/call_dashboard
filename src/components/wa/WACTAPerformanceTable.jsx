@@ -94,7 +94,7 @@ export default function WACTAPerformanceTable({ rows, theme }) {
               </tr>
             ) : (
               paginated.map((r) => (
-                <CTARow key={r.button_text} r={r} isDark={isDark} thClass={thClass} tdClass={tdClass} />
+                <CTARow key={`${r.source || 'api'}-${r.button_text}`} r={r} isDark={isDark} thClass={thClass} tdClass={tdClass} />
               ))
             )}
           </tbody>

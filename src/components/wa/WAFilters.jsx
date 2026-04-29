@@ -53,7 +53,7 @@ export default function WAFilters({ filters, setFilters, options, theme, onApply
             className={inputClass}
           >
             <option value="">All templates</option>
-            {options.templateNames?.map((t) => (
+            {[...new Set(options.templateNames || [])].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -66,7 +66,7 @@ export default function WAFilters({ filters, setFilters, options, theme, onApply
             className={inputClass}
           >
             <option value="">All events</option>
-            {options.eventTypes?.map((e) => (
+            {[...new Set(options.eventTypes || [])].map((e) => (
               <option key={e} value={e}>{friendlyEvent(e)}</option>
             ))}
           </select>

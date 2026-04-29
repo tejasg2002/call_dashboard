@@ -36,8 +36,8 @@ function CampaignCard({ data, isDark, color }) {
             <div>
               <p className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{data.name}</p>
               <div className="flex flex-wrap gap-1 mt-0.5">
-                {data.templates.map((t) => (
-                  <span key={t} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{t}</span>
+                {data.templates.map((t, i) => (
+                  <span key={`tpl-${i}-${t}`} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{t}</span>
                 ))}
               </div>
             </div>

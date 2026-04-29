@@ -186,8 +186,8 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
                       </div>
                       <div className="flex-1 min-w-0 px-2">
                         <div className="flex flex-wrap gap-1">
-                          {templates.slice(0, 3).map((t) => (
-                            <span key={t} className={cn(
+                          {templates.slice(0, 3).map((t, ti) => (
+                            <span key={`tpl-${ti}-${t}`} className={cn(
                               "px-1.5 py-0.5 rounded text-[9px] font-medium truncate max-w-[140px]",
                               isDark ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-700"
                             )} title={t}>{t}</span>
@@ -199,8 +199,8 @@ export default function WAClickBreakdown({ data, theme, dataMasked }) {
                       </div>
                       <div className="flex-1 min-w-0 px-2">
                         <div className="flex flex-wrap gap-1">
-                          {buttons.slice(0, 3).map((b) => (
-                            <span key={b} className={cn(
+                          {buttons.slice(0, 3).map((b, bi) => (
+                            <span key={`btn-${bi}-${b}`} className={cn(
                               "px-1.5 py-0.5 rounded text-[9px] font-medium truncate max-w-[120px]",
                               isDark ? "bg-amber-900/30 text-amber-400" : "bg-amber-50 text-amber-700"
                             )} title={b}>{b}</span>
