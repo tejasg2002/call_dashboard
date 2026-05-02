@@ -110,9 +110,18 @@ export default function WAApiPage() {
     try {
       setFetching(true)
       setToast(null)
-      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
+      const data = await fetchWADashboard({ mode: 'cached', workspace: ws })
+      if (data.pending) {
+        // Cache is cold — don't wipe existing data; prompt user to recompute
+        setToast('No snapshot available. Click "Recompute all" to build the cache, then Refresh again.')
+        setTimeout(() => setToast(null), 8000)
+        return
+      }
       if (finishWADashboardFetch(ws, data)) {
-        setToast(`Loaded ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
+        const ageMin = data.computedAt
+          ? Math.round((Date.now() - new Date(data.computedAt).getTime()) / 60000)
+          : 0
+        setToast(`Loaded ${formatCount(data.rawDocCount)} events (snapshot ${ageMin}m old)`)
         setTimeout(() => setToast(null), 4000)
       }
     } catch (err) {
@@ -123,24 +132,25 @@ export default function WAApiPage() {
     }
   }, [workspace, finishWADashboardFetch])
 
-  const handleRecomputeAll = useCallback(async () => {
+  const handleRecomputeAll = useCallback(() => {
     const ws = normalizeWAWorkspace(workspace)
-    try {
-      setFetching(true)
-      setToast(null)
-      setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
-      const data = await fetchWADashboard({ mode: 'full', workspace: ws })
-      if (finishWADashboardFetch(ws, data)) {
-        setToast(`Recomputed ${formatCount(data.rawDocCount)} events in ${(data.elapsed / 1000).toFixed(1)}s`)
-        setTimeout(() => setToast(null), 4000)
-      }
-    } catch (err) {
-      console.error('[WAPage] recompute error:', err)
-      setError(err.message)
-    } finally {
-      setFetching(false)
-    }
-  }, [workspace, finishWADashboardFetch])
+    setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }))
+    setToast('Recomputing in background — use Refresh in 1-2 min to see updated data.')
+    setTimeout(() => setToast(null), 10000)
+
+    // Fire and forget — UI stays responsive while heavy compute runs in background
+    fetch(`/api/wa-dashboard/recompute?workspace=${ws}`, { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) {
+          setToast(`Recompute done in ${(data.elapsed / 1000).toFixed(1)}s — click Refresh to load.`)
+          setTimeout(() => setToast(null), 8000)
+        } else {
+          console.warn('[WAPage] recompute failed', data.error)
+        }
+      })
+      .catch((err) => console.warn('[WAPage] recompute background error:', err))
+  }, [workspace])
 
   const recalibrateForDateRange = useCallback(async () => {
     const hasRange = filters.startDate || filters.endDate
@@ -323,6 +333,13 @@ export default function WAApiPage() {
             <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Loading analytics</p>
             <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>This may take a moment</p>
           </div>
+        </div>
+      ) : snapshot?.pending ? (
+        <div className={`p-6 rounded-xl text-center ${isDark ? 'bg-amber-900/20 border border-amber-700/40 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+          <p className="text-sm font-semibold">Initial snapshot is still computing</p>
+          <p className={`text-xs mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+            Click <strong>Recompute all</strong> to start a background recompute, then use <strong>Refresh</strong> in 1-2 minutes to load the data.
+          </p>
         </div>
       ) : (
         <div className="space-y-8">

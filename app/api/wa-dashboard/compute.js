@@ -409,6 +409,7 @@ async function fetchMarketingwaButtonsByFirestoreId(mwaCol, firestoreIds) {
         { firestore_id: { $in: firestoreIds }, button_text: { $nin: [null, '', '[]'] } },
         { projection: { _id: 0, firestore_id: 1, button_text: 1, template_name: 1 } },
       )
+      .limit(firestoreIds.length + 1)
       .toArray()
     const map = new Map()
     for (const d of docs) {
@@ -440,6 +441,7 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
   const docs = await waCol
     .aggregate(
       [
+        { $match: { stage: 'clicked' } },
         { $addFields: waR },
         { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
         {
@@ -460,7 +462,7 @@ async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmitted
             _waTemplate: 1,
           },
         },
-        { $limit: 250_000 },
+        { $limit: 50_000 },
       ],
       { maxTimeMS: 120_000 },
     )
@@ -611,6 +613,7 @@ async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
   const docs = await waCol
     .aggregate(
       [
+        { $match: { stage: 'clicked' } },
         { $addFields: waR },
         { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
         {
@@ -631,7 +634,7 @@ async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
             _waEventTs: 1,
           },
         },
-        { $limit: 250_000 },
+        { $limit: 50_000 },
       ],
       { maxTimeMS: 120_000 },
     )
@@ -710,7 +713,7 @@ async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
  * MBA: CTA + per-template button rows use Mongo `$_waButtonText`, which is usually empty on native Interakt
  * (label lives in JWT inside `data.message.message`). Re-aggregate from raw click docs with JS extraction.
  */
-async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages) {
+async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages, nativeDatePreStages = []) {
   const US = '\x1f'
   const ctaMap = new Map()
   const tplBtnMap = new Map()
@@ -738,9 +741,11 @@ async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolved
   }
 
   const pipeline = [
+    { $match: { stage: 'clicked' } },   // native index — eliminates ~80% of docs before $addFields
+    ...nativeDatePreStages,              // native date index for range queries
     { $addFields: waResolvedFields },
     ...waDateStages,
-    { $match: { _waStage: 'clicked' } },
+    { $match: { _waStage: 'clicked' } }, // safety net for edge-case doc shapes
     {
       $project: {
         _waSource: 1,
@@ -858,28 +863,34 @@ async function buildIhmPaymentConversion({
   const waR = waResolvedFieldsExpr()
   const clickedPhoneVariants = waPhoneVariantsForMatch(clickedPhoneDedup)
 
-  const firstOutboundResult = clickedPhoneDedup.length > 0
+  // IHM: firstOutbound + lastClick share the same phone $in filter → one $facet scan
+  const ihmAnchorRaw = clickedPhoneDedup.length > 0
     ? await waCol
-        .aggregate([
-          { $addFields: waR },
-          {
-            $match: {
-              _waPhone: { $in: clickedPhoneVariants },
-              _waStage: { $in: ['sent', 'delivered'] },
+        .aggregate(
+          [
+            { $addFields: waR },
+            { $match: { _waPhone: { $in: clickedPhoneVariants } } },
+            {
+              $facet: {
+                firstOutbound: [
+                  { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+                  { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
+                ],
+                lastClick: [
+                  { $match: { _waStage: 'clicked' } },
+                  { $addFields: { _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] } } },
+                  { $group: { _id: '$_waPhone', lastClickAt: { $max: '$_clickAt' } } },
+                ],
+              },
             },
-          },
-          {
-            $group: {
-              _id: '$_waPhone',
-              firstOutbound: { $min: '$_waEventTs' },
-            },
-          },
-        ])
+          ],
+          { allowDiskUse: true },
+        )
         .toArray()
-    : []
+    : [{ firstOutbound: [], lastClick: [] }]
 
   const firstOutboundByNorm = new Map()
-  for (const row of firstOutboundResult) {
+  for (const row of (ihmAnchorRaw[0]?.firstOutbound || [])) {
     const norm = normaliseMobile(row._id)
     if (!norm) continue
     const anchor = parseOptDate(row.firstOutbound)
@@ -888,33 +899,8 @@ async function buildIhmPaymentConversion({
     if (!prev || anchor.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, anchor)
   }
 
-  const lastClickResult = clickedPhoneDedup.length > 0
-    ? await waCol
-        .aggregate([
-          { $addFields: waR },
-          {
-            $match: {
-              _waPhone: { $in: clickedPhoneVariants },
-              _waStage: 'clicked',
-            },
-          },
-          {
-            $addFields: {
-              _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
-            },
-          },
-          {
-            $group: {
-              _id: '$_waPhone',
-              lastClickAt: { $max: '$_clickAt' },
-            },
-          },
-        ])
-        .toArray()
-    : []
-
   const lastClickByNorm = new Map()
-  for (const row of lastClickResult) {
+  for (const row of (ihmAnchorRaw[0]?.lastClick || [])) {
     const norm = normaliseMobile(row._id)
     if (!norm) continue
     const t = parseOptDate(row.lastClickAt)
@@ -987,6 +973,7 @@ async function buildIhmPaymentConversion({
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol
         .aggregate([
+          { $match: { stage: 'clicked' } },
           { $addFields: waR },
           { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
           {
@@ -1072,6 +1059,24 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     if (cached && workspacePayloadMatchesExpected(cached, cfg.workspace)) {
       return { ...cached, _id: undefined, fromCache: true, elapsed: Date.now() - start }
     }
+    // Cache miss — return empty placeholder; do NOT fall through to full compute which would timeout
+    return {
+      channel: 'wa',
+      workspace: cfg.workspace,
+      pending: true,
+      kpi: { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0, ctr: 0, readRate: 0, sdr: 0, str: 0 },
+      funnel: { sent: 0, delivered: 0, read: 0, clicked: 0 },
+      templateRows: [],
+      ctaRows: [],
+      clickBreakdown: [],
+      rawDocCount: 0,
+      lastRawDocTime: null,
+      formSubmittedCount: 0,
+      paymentConversion: { totalClicked: 0, formSubmitted: 0, conversionRate: 0, formSubmittedMobiles: [], formSubmittedDetails: [] },
+      computedAt: null,
+      fromCache: false,
+      elapsed: Date.now() - start,
+    }
   }
 
   const waDb = client.db(cfg.dataDb)
@@ -1110,22 +1115,29 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   const waDateStages = Object.keys(waDocMatch).length ? [{ $match: waDocMatch }] : []
 
-  const totalDocsPromise =
-    Object.keys(waDocMatch).length === 0
-      ? waCol.estimatedDocumentCount()
-      : waCol
-          .aggregate([{ $addFields: waResolvedFields }, ...waDateStages, { $count: 'n' }])
-          .toArray()
-          .then((arr) => arr[0]?.n ?? 0)
+  // Pre-filter on native (indexable) date fields BEFORE $addFields so MongoDB can use an index.
+  // $addFields computes derived fields (_waEventTs etc.) which cannot be indexed.
+  // waDateStages acts as the authoritative filter afterwards for edge-case doc shapes.
+  const nativeDatePreStages = []
+  if (startDate || endDate) {
+    const f = {}
+    if (startDate) f.$gte = new Date(startDate)
+    if (endDate) {
+      const e = new Date(endDate)
+      e.setDate(e.getDate() + 1)
+      f.$lt = e
+    }
+    nativeDatePreStages.push({ $match: { $or: [{ event_timestamp: f }, { createdAt: f }] } })
+  }
 
-  let [
-    kpiResult, templateResult, ctaResult,
-    clickedPhonesResult, totalDocs,
-    templateBtnResult, failureResult,
-  ] = await Promise.all([
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
+  const hasDates = !!(startDate || endDate)
+
+  // ─── Batch 1: ONE collection scan via $facet (kpi + templates + clickedPhones + failures + optional totalCount) ───
+  // When no date filter, use estimatedDocumentCount() for rawDocCount (instant) and omit totalCount facet.
+  const totalDocsPromise = hasDates ? null : waCol.estimatedDocumentCount()
+
+  const batch1Facets = {
+    kpi: [
       {
         $group: {
           _id: null,
@@ -1137,11 +1149,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
           cost: { $sum: { $ifNull: ['$_waCost', 0] } },
         },
       },
-    ]).toArray(),
-
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
+    ],
+    templates: [
       {
         $group: {
           _id: { template_name: '$_waTemplate', source: '$_waSource' },
@@ -1157,64 +1166,13 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         },
       },
       { $sort: { clicked: -1 } },
-    ]).toArray(),
-
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
-      { $match: { _waStage: 'clicked' } },
-      {
-        $addFields: {
-          _ctaKey: ctaKeyExpr(),
-        },
-      },
-      {
-        $group: {
-          _id: { button_text: '$_ctaKey', source: '$_waSource' },
-          total_clicks: { $sum: 1 },
-          unique_users: { $addToSet: '$_waPhone' },
-          templates: { $addToSet: '$_waTemplate' },
-        },
-      },
-      { $sort: { total_clicks: -1 } },
-    ]).toArray(),
-
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      { $match: { ...waRangeMatch, _waStage: 'clicked', _waPhone: { $nin: [null, ''] } } },
+    ],
+    clickedPhones: [
+      { $match: { _waStage: 'clicked', _waPhone: { $nin: [null, ''] } } },
       { $group: { _id: '$_waPhone' } },
-    ]).toArray(),
-
-    totalDocsPromise,
-
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
-      { $match: { _waStage: 'clicked' } },
-      {
-        $addFields: {
-          _btn: ctaKeyExpr(),
-        },
-      },
-      {
-        $group: {
-          _id: { template_name: '$_waTemplate', button_text: '$_btn' },
-          total_clicks: { $sum: 1 },
-          unique_users: { $addToSet: '$_waPhone' },
-        },
-      },
-      { $sort: { total_clicks: -1 } },
-    ]).toArray(),
-
-    waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
-      {
-        $match: {
-          _waStage: 'failed',
-          _waFailureReason: { $nin: [null, ''] },
-        },
-      },
+    ],
+    failures: [
+      { $match: { _waStage: 'failed', _waFailureReason: { $nin: [null, ''] } } },
       {
         $group: {
           _id: { template_name: '$_waTemplate', failure_reason: '$_waFailureReason' },
@@ -1222,11 +1180,74 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         },
       },
       { $sort: { count: -1 } },
-    ]).toArray(),
-  ])
+    ],
+  }
+  if (hasDates) batch1Facets.totalCount = [{ $count: 'n' }]
 
-  if (cfg.includeMbaConversion) {
-    const rebuilt = await rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages)
+  const batch1Raw = await waCol.aggregate(
+    [
+      ...nativeDatePreStages,
+      { $addFields: waResolvedFields },
+      ...waDateStages,
+      { $facet: batch1Facets },
+    ],
+    { allowDiskUse: true },
+  ).toArray()
+
+  const batch1 = batch1Raw[0] || {}
+  const kpiResult = batch1.kpi || []
+  const templateResult = batch1.templates || []
+  const clickedPhonesResult = batch1.clickedPhones || []
+  const failureResult = batch1.failures || []
+  const totalDocs = hasDates
+    ? (batch1.totalCount?.[0]?.n ?? 0)
+    : await totalDocsPromise
+
+  // ─── Batch 2: CTA + templateBtn — ONE scan via $facet, ctaKeyExpr computed once ───
+  // Skip entirely for MBA: rebuildMbaCtaAndTemplateButtonStatsFromInterakt produces these instead.
+  let ctaResult = []
+  let templateBtnResult = []
+  if (!cfg.includeMbaConversion) {
+    const batch2Raw = await waCol.aggregate(
+      [
+        { $match: { stage: 'clicked' } },
+        ...nativeDatePreStages,
+        { $addFields: waResolvedFields },
+        ...waDateStages,
+        { $match: { _waStage: 'clicked' } },
+        { $addFields: { _ctaKey: ctaKeyExpr() } },
+        {
+          $facet: {
+            cta: [
+              {
+                $group: {
+                  _id: { button_text: '$_ctaKey', source: '$_waSource' },
+                  total_clicks: { $sum: 1 },
+                  unique_users: { $addToSet: '$_waPhone' },
+                  templates: { $addToSet: '$_waTemplate' },
+                },
+              },
+              { $sort: { total_clicks: -1 } },
+            ],
+            templateBtn: [
+              {
+                $group: {
+                  _id: { template_name: '$_waTemplate', button_text: '$_ctaKey' },
+                  total_clicks: { $sum: 1 },
+                  unique_users: { $addToSet: '$_waPhone' },
+                },
+              },
+              { $sort: { total_clicks: -1 } },
+            ],
+          },
+        },
+      ],
+      { allowDiskUse: true },
+    ).toArray()
+    ctaResult = batch2Raw[0]?.cta || []
+    templateBtnResult = batch2Raw[0]?.templateBtn || []
+  } else {
+    const rebuilt = await rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolvedFields, waDateStages, nativeDatePreStages)
     ctaResult = rebuilt.ctaResult
     templateBtnResult = rebuilt.templateBtnResult
   }
@@ -1320,38 +1341,47 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   let paymentConversion
 
   if (!cfg.includeMbaConversion) {
-    const templatePhoneResultIhm = await waCol.aggregate([
-      { $addFields: waResolvedFields },
-      ...waDateStages,
-      { $match: { _waStage: 'clicked', _waTemplate: { $nin: [null, ''] } } },
-      { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
-    ]).toArray()
+    // IHM branch: templatePhones + clickBreakdown share same prefix → one $facet scan
+    const ihmBranchRaw = await waCol.aggregate(
+      [
+        { $match: { stage: 'clicked' } },
+        ...nativeDatePreStages,
+        { $addFields: waResolvedFields },
+        { $match: waBreakdownMatch },
+        {
+          $facet: {
+            templatePhones: [
+              { $match: { _waTemplate: { $nin: [null, ''] } } },
+              { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
+            ],
+            clickBreakdown: [
+              { $sort: { _waEventTs: -1 } },
+              {
+                $group: {
+                  _id: '$_waPhone',
+                  clicks: {
+                    $push: {
+                      template: '$_waTemplate',
+                      button: '$_waButtonText',
+                      link: '$button_link',
+                      type: '$click_type',
+                      time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+      { allowDiskUse: true },
+    ).toArray()
 
-    for (const r of templatePhoneResultIhm) {
+    for (const r of (ihmBranchRaw[0]?.templatePhones || [])) {
       if (r._id) templatePhones[r._id] = r.phones || []
     }
 
-    const clickBreakdownResultIhm = await waCol.aggregate([
-      { $addFields: waResolvedFields },
-      { $match: waBreakdownMatch },
-      { $sort: { _waEventTs: -1 } },
-      {
-        $group: {
-          _id: '$_waPhone',
-          clicks: {
-            $push: {
-              template: '$_waTemplate',
-              button: '$_waButtonText',
-              link: '$button_link',
-              type: '$click_type',
-              time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
-            },
-          },
-        },
-      },
-    ]).toArray()
-
-    clickBreakdown = clickBreakdownResultIhm
+    clickBreakdown = (ihmBranchRaw[0]?.clickBreakdown || [])
       .filter((r) => r._id)
       .map((r) => ({
         phone: r._id,
@@ -1382,27 +1412,32 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       }
     }
   } else {
-  /** Earliest outbound (sent/delivered) per normalised mobile — full history, not date-filtered */
-  const firstOutboundResult = clickedPhoneDedup.length > 0
-    ? await waCol.aggregate([
-        { $addFields: waResolvedFields },
-        {
-          $match: {
-            _waPhone: { $in: clickedPhoneDedup },
-            _waStage: { $in: ['sent', 'delivered'] },
+  // MBA: firstOutbound + lastClick share the same phone $in filter → one $facet scan
+  const mbaAnchorRaw = clickedPhoneDedup.length > 0
+    ? await waCol.aggregate(
+        [
+          { $addFields: waResolvedFields },
+          { $match: { _waPhone: { $in: clickedPhoneDedup } } },
+          {
+            $facet: {
+              firstOutbound: [
+                { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+                { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
+              ],
+              lastClick: [
+                { $match: { _waStage: 'clicked' } },
+                { $addFields: { _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] } } },
+                { $group: { _id: '$_waPhone', lastClickAt: { $max: '$_clickAt' } } },
+              ],
+            },
           },
-        },
-        {
-          $group: {
-            _id: '$_waPhone',
-            firstOutbound: { $min: '$_waEventTs' },
-          },
-        },
-      ]).toArray()
-    : []
+        ],
+        { allowDiskUse: true },
+      ).toArray()
+    : [{ firstOutbound: [], lastClick: [] }]
 
   const firstOutboundByNorm = new Map()
-  for (const row of firstOutboundResult) {
+  for (const row of (mbaAnchorRaw[0]?.firstOutbound || [])) {
     const norm = normaliseMobile(row._id)
     if (!norm) continue
     const anchor = parseOptDate(row.firstOutbound)
@@ -1411,32 +1446,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     if (!prev || anchor.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, anchor)
   }
 
-  /** Latest WA click per phone (full history, not date-filtered) — form must be on/after this so post-form clicks do not count. */
-  const lastClickResult = clickedPhoneDedup.length > 0
-    ? await waCol.aggregate([
-        { $addFields: waResolvedFields },
-        {
-          $match: {
-            _waPhone: { $in: clickedPhoneDedup },
-            _waStage: 'clicked',
-          },
-        },
-        {
-          $addFields: {
-            _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
-          },
-        },
-        {
-          $group: {
-            _id: '$_waPhone',
-            lastClickAt: { $max: '$_clickAt' },
-          },
-        },
-      ]).toArray()
-    : []
-
   const lastClickByNorm = new Map()
-  for (const row of lastClickResult) {
+  for (const row of (mbaAnchorRaw[0]?.lastClick || [])) {
     const norm = normaliseMobile(row._id)
     if (!norm) continue
     const t = parseOptDate(row.lastClickAt)
@@ -1493,6 +1504,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const convertedPhoneVariants = waPhoneVariantsForMatch(convertedMobiles)
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol.aggregate([
+        { $match: { stage: 'clicked' } },
         { $addFields: waResolvedFields },
         { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
         {
@@ -1517,37 +1529,48 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     ? parseFloat(((formSubmittedCount / clickedPhones.length) * 100).toFixed(2))
     : 0
 
-  const templatePhoneResult = await waCol.aggregate([
-    { $addFields: waResolvedFields },
-    ...waDateStages,
-    { $match: { _waStage: 'clicked', _waTemplate: { $nin: [null, ''] } } },
-    { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
-  ]).toArray()
+  // MBA branch: templatePhones + clickBreakdown share same prefix → one $facet scan
+  const mbaBranchRaw = await waCol.aggregate(
+    [
+      { $match: { stage: 'clicked' } },
+      ...nativeDatePreStages,
+      { $addFields: waResolvedFields },
+      { $match: waBreakdownMatch },
+      {
+        $facet: {
+          templatePhones: [
+            { $match: { _waTemplate: { $nin: [null, ''] } } },
+            { $group: { _id: '$_waTemplate', phones: { $addToSet: '$_waPhone' } } },
+          ],
+          clickBreakdown: [
+            { $sort: { _waEventTs: -1 } },
+            {
+              $group: {
+                _id: '$_waPhone',
+                clicks: {
+                  $push: {
+                    template: '$_waTemplate',
+                    button: '$_waButtonText',
+                    link: '$button_link',
+                    type: '$click_type',
+                    time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ],
+    { allowDiskUse: true },
+  ).toArray()
 
   templatePhones = {}
-  for (const r of templatePhoneResult) {
+  for (const r of (mbaBranchRaw[0]?.templatePhones || [])) {
     if (r._id) templatePhones[r._id] = r.phones || []
   }
 
-  const clickBreakdownResult = await waCol.aggregate([
-    { $addFields: waResolvedFields },
-    { $match: waBreakdownMatch },
-    { $sort: { _waEventTs: -1 } },
-    {
-      $group: {
-        _id: '$_waPhone',
-        clicks: {
-          $push: {
-            template: '$_waTemplate',
-            button: '$_waButtonText',
-            link: '$button_link',
-            type: '$click_type',
-            time: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
-          },
-        },
-      },
-    },
-  ]).toArray()
+  const clickBreakdownResult = mbaBranchRaw[0]?.clickBreakdown || []
 
   const phoneVariantsForLead = [
     ...new Set([
@@ -1651,6 +1674,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
 
     const clickTimelineResult = await waCol.aggregate([
+      { $match: { stage: 'clicked' } },
+      ...nativeDatePreStages,
       { $addFields: waResolvedFields },
       { $match: timelineMatch },
       { $sort: { _waEventTs: 1 } },
@@ -1726,17 +1751,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   }
 
+  // Sort on native indexed field — no $addFields scan needed
   const lastDocArr = await waCol
-    .aggregate([
-      { $addFields: waResolvedFields },
-      { $sort: { _waEventTs: -1 } },
-      { $limit: 1 },
-      { $project: { _waEventTs: 1 } },
-    ])
+    .find({}, { projection: { event_timestamp: 1, createdAt: 1 } })
+    .sort({ event_timestamp: -1 })
+    .limit(1)
     .toArray()
-  const lastRawDocTime = lastDocArr[0]?._waEventTs
-    ? new Date(lastDocArr[0]._waEventTs).toISOString()
-    : new Date().toISOString()
+  const lastRawDocTime = lastDocArr[0]?.event_timestamp
+    ? new Date(lastDocArr[0].event_timestamp).toISOString()
+    : lastDocArr[0]?.createdAt
+      ? new Date(lastDocArr[0].createdAt).toISOString()
+      : new Date().toISOString()
 
   const dashboard = {
     channel: 'wa',
