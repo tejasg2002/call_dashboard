@@ -5,6 +5,7 @@
  * Indexes created:
  *   itm.marketingwa           → { firestore_id: 1 }
  *   <waDb>.<waCollection>     → { stage: 1 }
+ *   <waDb>.<waCollection>     → { type: 1 }                  // native Interakt docs that lack `stage`
  *   <waDb>.<waCollection>     → { event_timestamp: 1 }
  *   <waDb>.<waCollection>     → { stage: 1, event_timestamp: 1 }
  *
@@ -51,6 +52,7 @@ await ensureIndex(mwaCol, { firestore_id: 1 })
 const waCol = client.db(WA_DB).collection(WA_COL)
 console.log(`\n=== ${WA_DB}.${WA_COL} ===`)
 await ensureIndex(waCol, { stage: 1 })
+await ensureIndex(waCol, { type: 1 })
 await ensureIndex(waCol, { event_timestamp: 1 })
 await ensureIndex(waCol, { stage: 1, event_timestamp: 1 })
 

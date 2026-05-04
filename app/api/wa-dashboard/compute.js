@@ -14,6 +14,19 @@ const CACHE_COL = 'wa_dashboard_cache'
 
 const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
 
+/**
+ * Pre-filter for click documents — must catch BOTH:
+ *  - migrated/normalised docs that have a top-level `stage: 'clicked'` field
+ *  - native Interakt docs that only have `type: 'message_api_clicked'` (no stage field)
+ * Use this as the very first $match in any pipeline that will later filter on _waStage='clicked'.
+ */
+const CLICKED_PRE_MATCH = {
+  $or: [
+    { stage: 'clicked' },
+    { type: { $in: ['message_api_clicked', 'message_campaign_clicked'] } },
+  ],
+}
+
 function waMessageStatusExpr() {
   return { $ifNull: ['$message_status', '$data.message.message_status'] }
 }
@@ -164,7 +177,26 @@ function waResolvedFieldsExpr() {
         },
       },
     },
-    _waButtonText: { $ifNull: ['$button_text', '$data.message.button_text'] },
+    // Treat empty string and "[]" as null so we fall through to data.message.button_text
+    // (some migrated docs have button_text: "" while the real label is in data.message.button_text)
+    _waButtonText: {
+      $let: {
+        vars: { primary: '$button_text' },
+        in: {
+          $cond: [
+            {
+              $and: [
+                { $ne: ['$$primary', null] },
+                { $ne: ['$$primary', ''] },
+                { $ne: [{ $toString: { $ifNull: ['$$primary', ''] } }, '[]'] },
+              ],
+            },
+            '$$primary',
+            '$data.message.button_text',
+          ],
+        },
+      },
+    },
     _waFailureReason: { $ifNull: ['$failure_reason', '$data.message.channel_failure_reason'] },
     _waCost: {
       $ifNull: [
@@ -193,7 +225,7 @@ function normaliseMobile(raw) {
   return n
 }
 
-/** Values to pass to Mongo `$in` for WA phone matching (raw + normalised + 91…). */
+/** Values to pass to Mongo `$in` for WA phone matching (raw + normalised + 91… + +91…). */
 function waPhoneVariantsForMatch(rawList) {
   const out = new Set()
   for (const raw of rawList || []) {
@@ -204,7 +236,10 @@ function waPhoneVariantsForMatch(rawList) {
     const n = normaliseMobile(s)
     if (n) {
       out.add(n)
-      if (n.length === 10) out.add(`91${n}`)
+      if (n.length === 10) {
+        out.add(`91${n}`)    // 91XXXXXXXXXX
+        out.add(`+91${n}`)   // +91XXXXXXXXXX — some Interakt docs store with + prefix
+      }
     }
   }
   return [...out]
@@ -430,19 +465,30 @@ async function fetchMarketingwaButtonsByFirestoreId(mwaCol, firestoreIds) {
  * Uses the same `_waStage` / `_waPhone` resolution as KPIs — not `type` regex alone,
  * so JWT-only button labels are found for the same rows that power the click timeline.
  */
-async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, mwaCol = null) {
+async function enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, mwaCol = null, extraRawPhones = []) {
   const convertedNorms = new Set(
     formSubmittedMobiles.map((m) => normaliseMobile(m)).filter(Boolean),
   )
   if (convertedNorms.size === 0) return
 
-  const variants = waPhoneVariantsForMatch(formSubmittedMobiles)
+  // Include raw phone values that normalise to a converted mobile so we catch
+  // docs where _waPhone has unusual formatting (whitespace, +, leading 00, etc).
+  const knownExtras = (extraRawPhones || []).filter((p) => {
+    const n = normaliseMobile(p)
+    return n && convertedNorms.has(n)
+  })
+  const variants = [...new Set([
+    ...waPhoneVariantsForMatch(formSubmittedMobiles),
+    ...knownExtras,
+  ])]
   const waR = waResolvedFieldsExpr()
   const docs = await waCol
     .aggregate(
       [
-        { $match: { stage: 'clicked' } },
+        { $match: CLICKED_PRE_MATCH },
         { $addFields: waR },
+        // Extend _waPhone to cover docs where phone is only in channel_phone_number
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
         { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
         {
           $project: {
@@ -613,7 +659,7 @@ async function enrichClickBreakdownFromInterakt(waCol, clickBreakdownRows) {
   const docs = await waCol
     .aggregate(
       [
-        { $match: { stage: 'clicked' } },
+        { $match: CLICKED_PRE_MATCH },
         { $addFields: waR },
         { $match: { _waStage: 'clicked', _waPhone: { $in: variants } } },
         {
@@ -741,7 +787,7 @@ async function rebuildMbaCtaAndTemplateButtonStatsFromInterakt(waCol, waResolved
   }
 
   const pipeline = [
-    { $match: { stage: 'clicked' } },   // native index — eliminates ~80% of docs before $addFields
+    { $match: CLICKED_PRE_MATCH },   // covers both stage='clicked' AND native Interakt type='message_*_clicked' (no stage field)
     ...nativeDatePreStages,              // native date index for range queries
     { $addFields: waResolvedFields },
     ...waDateStages,
@@ -968,19 +1014,30 @@ async function buildIhmPaymentConversion({
 
   const formSubmittedMobiles = ihmRows.map((r) => r.mobile)
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
-  const convertedPhoneVariants = waPhoneVariantsForMatch(convertedMobiles)
+  // Seed variants with raw _waPhone values from batch1 that normalise to a converted mobile
+  const convertedNormSet = new Set(convertedMobiles.map(normaliseMobile).filter(Boolean))
+  const knownRawPhones = clickedPhoneDedup.filter((p) => {
+    const n = normaliseMobile(p)
+    return n && convertedNormSet.has(n)
+  })
+  const convertedPhoneVariants = [...new Set([
+    ...waPhoneVariantsForMatch(convertedMobiles),
+    ...knownRawPhones,
+  ])]
 
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol
         .aggregate([
-          { $match: { stage: 'clicked' } },
+          { $match: CLICKED_PRE_MATCH },
           { $addFields: waR },
+          { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
           { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
+          { $addFields: { _ctaKey: ctaKeyExpr() } },
           {
             $group: {
               _id: '$_waPhone',
               templates: { $addToSet: '$_waTemplate' },
-              buttons: { $addToSet: '$_waButtonText' },
+              buttons: { $addToSet: '$_ctaKey' },
             },
           },
         ])
@@ -989,14 +1046,16 @@ async function buildIhmPaymentConversion({
 
   const clickAttrMap = new Map()
   for (const r of clickAttrResult) {
-    clickAttrMap.set(normaliseMobile(r._id), {
-      templates: (r.templates || []).filter(Boolean),
-      buttons: (r.buttons || []).filter(isUsefulWaButtonText),
-    })
+    const norm = normaliseMobile(r._id)
+    if (!norm) continue
+    const prev = clickAttrMap.get(norm)
+    const templates = new Set([...(prev?.templates || []), ...(r.templates || [])].filter(Boolean))
+    const buttons = new Set([...(prev?.buttons || []), ...(r.buttons || [])].filter(isUsefulWaButtonText))
+    clickAttrMap.set(norm, { templates: [...templates], buttons: [...buttons] })
   }
 
   const clickTimelineByNorm = new Map()
-  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, itmDb.collection('marketingwa'))
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, itmDb.collection('marketingwa'), clickedPhoneDedup)
 
   const formMetaByNorm = new Map()
   for (const row of ihmRows) {
@@ -1210,7 +1269,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   if (!cfg.includeMbaConversion) {
     const batch2Raw = await waCol.aggregate(
       [
-        { $match: { stage: 'clicked' } },
+        { $match: CLICKED_PRE_MATCH },
         ...nativeDatePreStages,
         { $addFields: waResolvedFields },
         ...waDateStages,
@@ -1344,7 +1403,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     // IHM branch: templatePhones + clickBreakdown share same prefix → one $facet scan
     const ihmBranchRaw = await waCol.aggregate(
       [
-        { $match: { stage: 'clicked' } },
+        { $match: CLICKED_PRE_MATCH },
         ...nativeDatePreStages,
         { $addFields: waResolvedFields },
         { $match: waBreakdownMatch },
@@ -1417,6 +1476,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     ? await waCol.aggregate(
         [
           { $addFields: waResolvedFields },
+          { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
           { $match: { _waPhone: { $in: clickedPhoneDedup } } },
           {
             $facet: {
@@ -1501,17 +1561,30 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
 
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
-  const convertedPhoneVariants = waPhoneVariantsForMatch(convertedMobiles)
+  // Build phone variants from NPF's 10-digit mobiles AND seed with the actual raw
+  // _waPhone values from batch1 that normalise to a converted mobile. This ensures
+  // we re-find the same clicked docs even when stored phone has unusual formatting.
+  const convertedNormSet = new Set(convertedMobiles.map(normaliseMobile).filter(Boolean))
+  const knownRawPhones = clickedPhoneDedup.filter((p) => {
+    const n = normaliseMobile(p)
+    return n && convertedNormSet.has(n)
+  })
+  const convertedPhoneVariants = [...new Set([
+    ...waPhoneVariantsForMatch(convertedMobiles),
+    ...knownRawPhones,
+  ])]
   const clickAttrResult = convertedMobiles.length > 0
     ? await waCol.aggregate([
-        { $match: { stage: 'clicked' } },
+        { $match: CLICKED_PRE_MATCH },
         { $addFields: waResolvedFields },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
         { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
+        { $addFields: { _ctaKey: ctaKeyExpr() } },
         {
           $group: {
             _id: '$_waPhone',
             templates: { $addToSet: '$_waTemplate' },
-            buttons: { $addToSet: '$_waButtonText' },
+            buttons: { $addToSet: '$_ctaKey' },
           },
         },
       ]).toArray()
@@ -1519,10 +1592,12 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   const clickAttrMap = new Map()
   for (const r of clickAttrResult) {
-    clickAttrMap.set(normaliseMobile(r._id), {
-      templates: (r.templates || []).filter(Boolean),
-      buttons: (r.buttons || []).filter(isUsefulWaButtonText),
-    })
+    const norm = normaliseMobile(r._id)
+    if (!norm) continue
+    const prev = clickAttrMap.get(norm)
+    const templates = new Set([...(prev?.templates || []), ...(r.templates || [])].filter(Boolean))
+    const buttons = new Set([...(prev?.buttons || []), ...(r.buttons || [])].filter(isUsefulWaButtonText))
+    clickAttrMap.set(norm, { templates: [...templates], buttons: [...buttons] })
   }
 
   const formConversionRate = clickedPhones.length > 0
@@ -1532,7 +1607,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   // MBA branch: templatePhones + clickBreakdown share same prefix → one $facet scan
   const mbaBranchRaw = await waCol.aggregate(
     [
-      { $match: { stage: 'clicked' } },
+      { $match: CLICKED_PRE_MATCH },
       ...nativeDatePreStages,
       { $addFields: waResolvedFields },
       { $match: waBreakdownMatch },
@@ -1674,10 +1749,12 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
 
     const clickTimelineResult = await waCol.aggregate([
-      { $match: { stage: 'clicked' } },
+      { $match: CLICKED_PRE_MATCH },
       ...nativeDatePreStages,
       { $addFields: waResolvedFields },
+      { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
       { $match: timelineMatch },
+      { $addFields: { _ctaKey: ctaKeyExpr() } },
       { $sort: { _waEventTs: 1 } },
       {
         $group: {
@@ -1685,7 +1762,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
           events: {
             $push: {
               template: '$_waTemplate',
-              button: '$_waButtonText',
+              button: '$_ctaKey',
               clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] },
             },
           },
@@ -1723,7 +1800,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
   }
 
-  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, db.collection('marketingwa'))
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, db.collection('marketingwa'), clickedPhoneDedup)
 
   paymentConversion = {
     conversionKind: 'mba_form',
