@@ -2,7 +2,12 @@ import clientPromise from '../../../src/lib/mongodb'
 import { normalizeWAWorkspace, workspaceUsesIsuCallLogs } from '../../../src/lib/waWorkspace'
 
 const DB = 'analytics'
-const COL = 'call_logs_isu'
+const COL_BBA   = 'call_logs_bba'
+const COL_BTECH = 'call_logs_btech'
+
+function collectionForWorkspace(workspace) {
+  return workspace === 'btech' ? COL_BTECH : COL_BBA
+}
 
 function toDate(raw) {
   if (!raw) return null
@@ -200,20 +205,6 @@ function mapDoc(doc, idx) {
   }
 }
 
-function workspaceMongoFilter(workspace) {
-  const w = normalizeWAWorkspace(workspace)
-  if (w !== 'bba' && w !== 'btech') return null
-  const re = new RegExp(`^${w}$`, 'i')
-  return {
-    $or: [
-      { program: re },
-      { bu: re },
-      { workspace: re },
-      { branch: re },
-      { course: re },
-    ],
-  }
-}
 
 export const maxDuration = 120
 
@@ -232,13 +223,9 @@ export async function GET(request) {
     }
 
     const client = await clientPromise
-    const col = client.db(DB).collection(COL)
+    const col = client.db(DB).collection(collectionForWorkspace(workspace))
 
-    const wsFilter = workspaceMongoFilter(workspace)
-    let docs = wsFilter ? await col.find(wsFilter).maxTimeMS(120000).toArray() : []
-    if (wsFilter && docs.length === 0) {
-      docs = await col.find({}).maxTimeMS(120000).toArray()
-    }
+    let docs = await col.find({}).maxTimeMS(120000).toArray()
 
     const start = startDate ? new Date(startDate) : null
     let end = endDate ? new Date(endDate) : null
