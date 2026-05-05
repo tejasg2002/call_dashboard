@@ -81,8 +81,8 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
 
   const isIhmPayment = conversionKind === 'ihm_payment_webhook'
   const isIsuForm = conversionKind === 'isu_form'
-  // Show payment column only when at least one row has paymentDone data (BBA/BTech)
-  const hasPaymentCol = isIsuForm && formSubmittedDetails.some((u) => u.paymentDone !== null && u.paymentDone !== undefined)
+  const hasStageCol = (isIsuForm || !isIhmPayment) && formSubmittedDetails.some((u) => u.applicationStage != null)
+  const hasPaymentCol = !isIhmPayment && formSubmittedDetails.some((u) => u.paymentDone !== null && u.paymentDone !== undefined)
   const secondLabel = isIhmPayment ? 'Payment completed' : 'Form Submitted'
   const title = isIhmPayment ? 'Payment conversion' : 'Form conversion'
   const subtitle = isIhmPayment
@@ -154,7 +154,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {isIhmPayment ? 'Payment completed' : 'Form submitted'}
                       </th>
-                      {isIsuForm && (
+                      {hasStageCol && (
                         <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Application Stage</th>
                       )}
                       {hasPaymentCol && (
@@ -182,7 +182,7 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
                         <td className={`px-3 py-2 align-top font-mono tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                           {u.formSubmittedAtDisplay || '—'}
                         </td>
-                        {isIsuForm && (
+                        {hasStageCol && (
                           <td className={`px-3 py-2 align-top text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                             {u.applicationStage ? (
                               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${

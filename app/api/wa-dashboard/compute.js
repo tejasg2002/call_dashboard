@@ -1881,6 +1881,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
             _id: '$personal_details.mobile_number',
             formSubmittedAt: { $max: '$_sortAt' },
             leadIdRaw: { $last: '$_npfLead' },
+            applicationNo: { $last: '$application_detail.application_no' },
           },
         },
       ]).toArray()
@@ -2066,6 +2067,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
           })
         : '—',
       leadIdFromNpf: stringifyLeadId(row.leadIdRaw),
+      applicationNo: row.applicationNo ? String(row.applicationNo).trim() : null,
     })
   }
 
@@ -2140,6 +2142,44 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, db.collection('marketingwa'), clickedPhoneDedup)
 
+  // MBA: enrich with application_stage and payment from ITM_BS collections
+  const mbaAppNos = formSubmittedResult.map((r) => formMetaByNorm.get(normaliseMobile(r._id))?.applicationNo).filter(Boolean)
+  const mbaStageByAppNo = new Map()
+  const mbaPaymentByAppNo = new Map()
+
+  if (mbaAppNos.length > 0) {
+    const itmbsDb = client.db('ITM_BS')
+
+    // Stage lookup
+    const stageDocs = await itmbsDb.collection('npfApplicationsWebhookEvents').find(
+      { Application_Number_Auto_Generated: { $in: mbaAppNos } },
+      { projection: { Application_Number_Auto_Generated: 1, application_stage: 1 } },
+    ).toArray()
+    for (const d of stageDocs) {
+      if (d.Application_Number_Auto_Generated && d.application_stage) {
+        mbaStageByAppNo.set(d.Application_Number_Auto_Generated, String(d.application_stage).trim())
+      }
+    }
+
+    // Payment lookup
+    const payDocs = await itmbsDb.collection('npfPaymentWebhookEvents').find(
+      { application_number: { $in: mbaAppNos } },
+    ).toArray()
+    for (const p of payDocs) {
+      if (!p.application_number) continue
+      const rawStatus = p.Payment_Status || p.paymentStatus || ''
+      const existing = mbaPaymentByAppNo.get(p.application_number)
+      const paidAt = parseOptDate(p.Payment_Approved_Date) || parseOptDate(p.createdAt)
+      if (!existing || (paidAt && existing.paidAt && paidAt.getTime() > existing.paidAt.getTime())) {
+        mbaPaymentByAppNo.set(p.application_number, {
+          paymentDone: /approved|success|complete/i.test(rawStatus),
+          paymentStatus: p.Payment_Status || p.paymentStatus || null,
+          paidAt,
+        })
+      }
+    }
+  }
+
   paymentConversion = {
     conversionKind: 'mba_form',
     totalClicked: clickedPhones.length,
@@ -2152,11 +2192,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       const meta = formMetaByNorm.get(norm)
       const npfLead = meta?.leadIdFromNpf
       const crmLead = leadByNormMobile.get(norm)
+      const appNo = meta?.applicationNo
+      const payment = appNo ? mbaPaymentByAppNo.get(appNo) : null
       return {
         mobile: m,
         leadId: npfLead || crmLead || null,
+        applicationStage: appNo ? (mbaStageByAppNo.get(appNo) || null) : null,
         formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
         formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
+        paymentDone: payment?.paymentDone ?? null,
+        paymentStatus: payment?.paymentStatus ?? null,
+        paymentAtDisplay: null,
         clickedTemplates: attr?.templates || [],
         clickedButtons: attr?.buttons || [],
         clickTimeline: clickTimelineByNorm.get(norm) || [],
