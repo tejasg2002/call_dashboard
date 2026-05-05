@@ -81,12 +81,14 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
 
   const isIhmPayment = conversionKind === 'ihm_payment_webhook'
   const isIsuForm = conversionKind === 'isu_form'
+  // Show payment column only when at least one row has paymentDone data (BBA/BTech)
+  const hasPaymentCol = isIsuForm && formSubmittedDetails.some((u) => u.paymentDone !== null && u.paymentDone !== undefined)
   const secondLabel = isIhmPayment ? 'Payment completed' : 'Form Submitted'
-  const title = isIhmPayment ? 'Payment conversion (IHM)' : 'Form conversion'
+  const title = isIhmPayment ? 'Payment conversion' : 'Form conversion'
   const subtitle = isIhmPayment
     ? 'Clicked users with a completed payment in itm.npfPaymentWebhookEvents, after first template send/deliver and on or after their last WhatsApp click. Lead ID from the webhook when present. Click timeline is IST.'
     : isIsuForm
-    ? 'Clicked users who submitted a BBA/BTech application (npfApplicationsWebhookEvents) after first template send/deliver and on or after their last WhatsApp click. Click timeline is IST.'
+    ? 'Clicked users who submitted an application (npfApplicationsWebhookEvents) after first template send/deliver and on or after their last WhatsApp click. Click timeline is IST.'
     : 'Clicked users with an MBA application (application no.) after first template send/deliver. Lead ID is always shown in full. Click timeline lists date and time only (IST), using the selected date range when filtered.'
 
   const funnelSteps = [
@@ -152,6 +154,12 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {isIhmPayment ? 'Payment completed' : 'Form submitted'}
                       </th>
+                      {isIsuForm && (
+                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Application Stage</th>
+                      )}
+                      {hasPaymentCol && (
+                        <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Payment</th>
+                      )}
                       <th className={`px-3 py-2 text-left font-medium min-w-[200px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click timeline</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Template Clicked</th>
                       <th className={`px-3 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Button Clicked</th>
@@ -174,6 +182,36 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
                         <td className={`px-3 py-2 align-top font-mono tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                           {u.formSubmittedAtDisplay || '—'}
                         </td>
+                        {isIsuForm && (
+                          <td className={`px-3 py-2 align-top text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {u.applicationStage ? (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                /submit|complete|enroll|paid/i.test(u.applicationStage)
+                                  ? isDark ? 'bg-green-900/40 text-green-400' : 'bg-green-50 text-green-700'
+                                  : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {u.applicationStage}
+                              </span>
+                            ) : (
+                              <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>—</span>
+                            )}
+                          </td>
+                        )}
+                        {hasPaymentCol && (
+                          <td className="px-3 py-2 align-top">
+                            {u.paymentDone === null || u.paymentDone === undefined ? (
+                              <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>—</span>
+                            ) : u.paymentDone ? (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${isDark ? 'bg-green-900/40 text-green-400' : 'bg-green-50 text-green-700'}`}>
+                                ✓ {u.paymentStatus || 'Paid'}
+                              </span>
+                            ) : (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                                {u.paymentStatus || 'Not paid'}
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 py-2 align-top">
                           <ClickTimeline events={u.clickTimeline} isDark={isDark} />
                         </td>

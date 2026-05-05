@@ -1128,10 +1128,13 @@ async function buildIsuFormConversion({
   endDate,
   isuAppsDb,
   isuAppsCollection,
+  isuAppsPhoneField = 'Mobile_Number',
+  isuPaymentCollection = null,
 }) {
   const isuDb = client.db(isuAppsDb)
   const appsCol = isuDb.collection(isuAppsCollection)
   const waR = waResolvedFields
+  const phoneField = isuAppsPhoneField
 
   // All phone variants for the full clicked set
   const clickedPhoneVariants = waPhoneVariantsForMatch(clickedPhoneDedup)
@@ -1179,17 +1182,24 @@ async function buildIsuFormConversion({
   }
 
   // Step 2: find applications for clicked phones
-  // Mobile_Number stored as "+91-9XXXXXXXXX" — normaliseMobile handles this now
+  // Phone stored as "+91-9XXXXXXXXX" — normaliseMobile handles this now
   const allMobileVariants = waPhoneVariantsForMatch(normalisedClickedMobiles)
   // Also add the "+91-" dash format that these collections use
   const dashVariants = normalisedClickedMobiles.map((n) => `+91-${n}`)
+
+  // Application number field: BBA/BTech/IHM/IDM use different field names
+  const appNoField = '$Application_Number_Auto_Generated'
+  const appNoAltField = '$Application_Number'
 
   const formSubmittedAgg = normalisedClickedMobiles.length > 0
     ? await appsCol.aggregate([
         {
           $match: {
-            Mobile_Number: { $in: [...allMobileVariants, ...dashVariants] },
-            Application_Number_Auto_Generated: { $nin: [null, ''] },
+            [phoneField]: { $in: [...allMobileVariants, ...dashVariants] },
+            $or: [
+              { Application_Number_Auto_Generated: { $nin: [null, ''] } },
+              { Application_Number: { $nin: [null, ''] } },
+            ],
           },
         },
         {
@@ -1201,14 +1211,16 @@ async function buildIsuFormConversion({
                 '$createdAt',
               ],
             },
+            _appNo: { $ifNull: [appNoField, appNoAltField] },
           },
         },
         {
           $group: {
-            _id: '$Mobile_Number',
+            _id: `$${phoneField}`,
             formSubmittedAt: { $max: '$_sortAt' },
-            applicationNo: { $last: '$Application_Number_Auto_Generated' },
-            leadIdRaw: { $last: '$Lead_ID' },
+            applicationNo: { $last: '$_appNo' },
+            leadIdRaw: { $last: { $ifNull: ['$Lead_ID', '$lead_id'] } },
+            applicationStage: { $last: { $ifNull: ['$application_stage', '$Application_Stage'] } },
           },
         },
       ]).toArray()
@@ -1325,7 +1337,52 @@ async function buildIsuFormConversion({
         : '—',
       leadIdRaw: r.leadIdRaw ? String(r.leadIdRaw).trim() : null,
       applicationNo: r.applicationNo || null,
+      applicationStage: r.applicationStage ? String(r.applicationStage).trim() : null,
     })
+  }
+
+  // Step 7: payment lookup — BBA/BTech by Application_Number, IDM by application_number (lowercase), IHM by lead_id
+  const paymentByKey = new Map()
+  if (isuPaymentCollection && formSubmittedResult.length > 0) {
+    const appNos   = formSubmittedResult.map((r) => r.applicationNo).filter(Boolean)
+    const leadIds  = formSubmittedResult.map((r) => r.leadIdRaw).filter(Boolean)
+
+    if (appNos.length > 0 || leadIds.length > 0) {
+      const payCol = client.db(isuAppsDb).collection(isuPaymentCollection)
+      const payDocs = await payCol.find({
+        $or: [
+          // BBA / BTech
+          ...(appNos.length  > 0 ? [{ Application_Number: { $in: appNos } }]   : []),
+          // IDM (lowercase field)
+          ...(appNos.length  > 0 ? [{ application_number: { $in: appNos } }]   : []),
+          // BBA / BTech Lead_ID (uppercase)
+          ...(leadIds.length > 0 ? [{ Lead_ID: { $in: leadIds } }]             : []),
+          // IHM lead_id (lowercase)
+          ...(leadIds.length > 0 ? [{ lead_id: { $in: leadIds } }]             : []),
+        ],
+      }).toArray()
+
+      for (const p of payDocs) {
+        // Resolve the link key — try every possible field
+        const key = p.Application_Number || p.application_number || p.Lead_ID || p.lead_id
+        if (!key) continue
+        const existing = paymentByKey.get(key)
+        const rawStatus = p.Payment_Status || p.paymentStatus || ''
+        const paidAt = parseOptDate(p.Payment_Approved_Date) || parseOptDate(p.createdAt)
+        if (!existing || (paidAt && existing.paidAt && paidAt.getTime() > existing.paidAt.getTime())) {
+          paymentByKey.set(key, {
+            paymentDone: /approved|success|complete/i.test(rawStatus),
+            paymentStatus: p.Payment_Status || p.paymentStatus || null,
+            paymentAmount: p.Payment_Amount || null,
+            transactionId: p.Transaction_ID || null,
+            paidAt,
+            paidAtDisplay: paidAt
+              ? paidAt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+              : '—',
+          })
+        }
+      }
+    }
   }
 
   const n = formSubmittedResult.length
@@ -1341,11 +1398,19 @@ async function buildIsuFormConversion({
       const norm = normaliseMobile(m)
       const attr = clickAttrMap.get(norm)
       const meta = formMetaByNorm.get(norm)
+      const appNo = meta?.applicationNo
+      const leadId = meta?.leadIdRaw
+      const payment = paymentByKey.get(appNo) || paymentByKey.get(leadId) || null
       return {
         mobile: m,
-        leadId: meta?.leadIdRaw || meta?.applicationNo || null,
+        leadId: meta?.leadIdRaw || appNo || null,
+        applicationStage: meta?.applicationStage || null,
         formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
         formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
+        paymentDone: payment?.paymentDone ?? null,
+        paymentStatus: payment?.paymentStatus ?? null,
+        paymentAmount: payment?.paymentAmount ?? null,
+        paymentAtDisplay: payment?.paidAtDisplay ?? null,
         clickedTemplates: attr?.templates || [],
         clickedButtons: attr?.buttons || [],
         clickTimeline: clickTimelineByNorm.get(norm) || [],
@@ -1526,6 +1591,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         { $match: CLICKED_PRE_MATCH },
         ...nativeDatePreStages,
         { $addFields: waResolvedFields },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
         ...waDateStages,
         { $match: { _waStage: 'clicked' } },
         { $addFields: { _ctaKey: ctaKeyExpr() } },
@@ -1660,6 +1726,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         { $match: CLICKED_PRE_MATCH },
         ...nativeDatePreStages,
         { $addFields: waResolvedFields },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
         { $match: waBreakdownMatch },
         {
           $facet: {
@@ -1728,6 +1795,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         endDate,
         isuAppsDb: cfg.isuAppsDb,
         isuAppsCollection: cfg.isuAppsCollection,
+        isuAppsPhoneField: cfg.isuAppsPhoneField,
+        isuPaymentCollection: cfg.isuPaymentCollection,
       })
       formSubmittedCount = paymentConversion.formSubmitted
     } else {

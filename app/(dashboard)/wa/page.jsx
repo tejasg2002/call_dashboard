@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { fetchWADashboard } from '../../../src/lib/waDashboardApi'
 import {
   WA_WORKSPACE_IHM,
+  WA_WORKSPACE_IDM,
   WA_WORKSPACE_MBA,
   WA_WORKSPACE_BBA,
   WA_WORKSPACE_BTECH,
@@ -398,12 +399,14 @@ export default function WAApiPage() {
           )}
 
           {/* ── Payment / Form Conversion ──────────────────────────────────── */}
-          {(workspace === WA_WORKSPACE_MBA || workspace === WA_WORKSPACE_IHM || workspace === WA_WORKSPACE_BBA || workspace === WA_WORKSPACE_BTECH) && snapshot?.paymentConversion && (
+          {snapshot?.paymentConversion && (
             <div className="space-y-4">
               <SectionHeader
                 title={
                   workspace === WA_WORKSPACE_IHM
-                    ? 'Payment conversion (IHM)'
+                    ? 'Form conversion (IHM)'
+                    : workspace === WA_WORKSPACE_IDM
+                    ? 'Form conversion (IDM)'
                     : workspace === WA_WORKSPACE_BBA
                     ? 'Form conversion (BBA)'
                     : workspace === WA_WORKSPACE_BTECH
@@ -412,7 +415,9 @@ export default function WAApiPage() {
                 }
                 description={
                   workspace === WA_WORKSPACE_IHM
-                    ? 'Clicked users with a completed IHM payment (Mongo itm.npfPaymentWebhookEvents) after template send and last click'
+                    ? 'Clicked users who submitted an IHM application (ITM_IHM.npfApplicationsWebhookEvents) after template send and last click'
+                    : workspace === WA_WORKSPACE_IDM
+                    ? 'Clicked users who submitted an IDM application (ITM_IDM.npfApplicationsWebhookEvents) after template send and last click'
                     : workspace === WA_WORKSPACE_BBA
                     ? 'Clicked users who submitted a BBA application (ITM_ISU.npfApplicationsWebhookEventsBBA) after template send and last click'
                     : workspace === WA_WORKSPACE_BTECH
