@@ -8,17 +8,20 @@ const ITM_DB = 'itm'
 const ANALYTICS_DB = 'analytics'
 const ITM_BS_DB = 'ITM_BS'
 const ITM_IDM_DB = 'ITM_IDM'
+const ITM_IHM_DB = 'ITM_IHM'
+const ITM_ISU_DB = 'ITM_ISU'
 
 /**
  * Non-MBA workspaces: same UX (WA-only subset, no MBA form conversion), separate cache + collection.
  * @type {ReadonlyArray<{ workspace: string, collection: string, cacheKey: string, label: string }>}
  */
 export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
-  { workspace: 'ihm', collection: 'IHMmarketingwa', cacheKey: 'wa_latest_ihm', label: 'IHM' },
+  // IHM moved to ITM_IHM.interaktWhatsappWebhookEvents (new Interakt JSON shape)
+  { workspace: 'ihm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_ihm', label: 'IHM', dataDb: ITM_IHM_DB },
   // IDM moved to ITM_IDM.interaktWhatsappWebhookEvents (new Interakt JSON shape)
   { workspace: 'idm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_idm', label: 'IDM', dataDb: ITM_IDM_DB },
-  { workspace: 'bba', collection: 'BBAmarketingwa', cacheKey: 'wa_latest_bba', label: 'BBA' },
-  { workspace: 'btech', collection: 'BTECHmarketingwa', cacheKey: 'wa_latest_btech', label: 'BTECH' },
+  { workspace: 'bba', collection: 'interaktWhatsappWebhookEventsBBA', cacheKey: 'wa_latest_bba', label: 'BBA', dataDb: ITM_ISU_DB, isuAppsDb: ITM_ISU_DB, isuAppsCollection: 'npfApplicationsWebhookEventsBBA' },
+  { workspace: 'btech', collection: 'interaktWhatsappWebhookEventsBTech', cacheKey: 'wa_latest_btech', label: 'BTECH', dataDb: ITM_ISU_DB, isuAppsDb: ITM_ISU_DB, isuAppsCollection: 'npfApplicationsWebhookEventsBTech' },
 ])
 
 /** @type {ReadonlySet<string>} */
@@ -186,6 +189,9 @@ export function waWorkspaceConfig(workspace) {
       includeMbaConversion: false,
       /** IHM payment conversion (was itm.npfPaymentWebhookEvents): off until DB user has read on that collection. */
       ihmPaymentWebhookCollection: null,
+      /** BBA / BTECH NPF application form conversion */
+      isuAppsDb: def.isuAppsDb || null,
+      isuAppsCollection: def.isuAppsCollection || null,
     }
   }
   return {

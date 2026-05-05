@@ -80,10 +80,13 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
   } = data
 
   const isIhmPayment = conversionKind === 'ihm_payment_webhook'
+  const isIsuForm = conversionKind === 'isu_form'
   const secondLabel = isIhmPayment ? 'Payment completed' : 'Form Submitted'
   const title = isIhmPayment ? 'Payment conversion (IHM)' : 'Form conversion'
   const subtitle = isIhmPayment
     ? 'Clicked users with a completed payment in itm.npfPaymentWebhookEvents, after first template send/deliver and on or after their last WhatsApp click. Lead ID from the webhook when present. Click timeline is IST.'
+    : isIsuForm
+    ? 'Clicked users who submitted a BBA/BTech application (npfApplicationsWebhookEvents) after first template send/deliver and on or after their last WhatsApp click. Click timeline is IST.'
     : 'Clicked users with an MBA application (application no.) after first template send/deliver. Lead ID is always shown in full. Click timeline lists date and time only (IST), using the selected date range when filtered.'
 
   const funnelSteps = [
@@ -204,6 +207,10 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
         {isIhmPayment ? (
           <>
             Counts use <code className="font-mono">itm.npfPaymentWebhookEvents</code> (completed payment statuses) matched by mobile to IHM WhatsApp clicks, with payment time on or after first send/deliver and last click.
+          </>
+        ) : isIsuForm ? (
+          <>
+            Form counts use <code className="font-mono">ITM_ISU.npfApplicationsWebhookEventsBBA/BTech</code> matched by <code className="font-mono">Mobile_Number</code>. Only applications with completion date on or after first WA send and last click are counted.
           </>
         ) : (
           <>

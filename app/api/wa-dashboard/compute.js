@@ -219,8 +219,10 @@ function waResolvedFieldsExpr() {
 
 function normaliseMobile(raw) {
   if (!raw) return ''
-  let n = String(raw).trim().replace(/\s+/g, '').replace(/^00/, '')
+  let n = String(raw).trim()
   if (n.startsWith('+')) n = n.slice(1)
+  // Strip all non-digit characters (handles "+91-98XXXXXXXX", spaces, dashes, etc.)
+  n = n.replace(/\D/g, '')
   if (n.startsWith('91') && n.length === 12) n = n.slice(2)
   return n
 }
@@ -1102,6 +1104,256 @@ async function buildIhmPaymentConversion({
   }
 }
 
+/**
+ * BBA / BTECH form conversion.
+ * Looks up npfApplicationsWebhookEventsBBA / BTech for phones that clicked a WA message,
+ * then filters to apps submitted on or after the first WA send AND last click.
+ *
+ * Collection schema (flat top-level fields):
+ *   Mobile_Number  — "+91-9XXXXXXXXX" format
+ *   Application_Number_Auto_Generated — non-empty means submitted
+ *   Application_Completion_Date — completion timestamp (string "YYYY-MM-DD HH:MM:SS")
+ *   Lead_ID — present in BTech, absent in BBA
+ *   application_stage — "Submitted" when complete
+ */
+async function buildIsuFormConversion({
+  client,
+  clickedPhones,
+  clickedPhoneDedup,
+  normalisedClickedMobiles,
+  waCol,
+  waResolvedFields,
+  nativeDatePreStages,
+  startDate,
+  endDate,
+  isuAppsDb,
+  isuAppsCollection,
+}) {
+  const isuDb = client.db(isuAppsDb)
+  const appsCol = isuDb.collection(isuAppsCollection)
+  const waR = waResolvedFields
+
+  // All phone variants for the full clicked set
+  const clickedPhoneVariants = waPhoneVariantsForMatch(clickedPhoneDedup)
+
+  // Step 1: firstOutbound + lastClick per phone (same $facet pattern as MBA anchor)
+  const anchorRaw = clickedPhoneDedup.length > 0
+    ? await waCol.aggregate([
+        { $addFields: waR },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+        { $match: { _waPhone: { $in: clickedPhoneDedup } } },
+        {
+          $facet: {
+            firstOutbound: [
+              { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+              { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
+            ],
+            lastClick: [
+              { $match: { _waStage: 'clicked' } },
+              { $addFields: { _clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] } } },
+              { $group: { _id: '$_waPhone', lastClickAt: { $max: '$_clickAt' } } },
+            ],
+          },
+        },
+      ], { allowDiskUse: true }).toArray()
+    : [{ firstOutbound: [], lastClick: [] }]
+
+  const firstOutboundByNorm = new Map()
+  for (const row of (anchorRaw[0]?.firstOutbound || [])) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const t = parseOptDate(row.firstOutbound)
+    if (!t) continue
+    const prev = firstOutboundByNorm.get(norm)
+    if (!prev || t.getTime() < prev.getTime()) firstOutboundByNorm.set(norm, t)
+  }
+
+  const lastClickByNorm = new Map()
+  for (const row of (anchorRaw[0]?.lastClick || [])) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const t = parseOptDate(row.lastClickAt)
+    if (!t) continue
+    const prev = lastClickByNorm.get(norm)
+    if (!prev || t.getTime() > prev.getTime()) lastClickByNorm.set(norm, t)
+  }
+
+  // Step 2: find applications for clicked phones
+  // Mobile_Number stored as "+91-9XXXXXXXXX" — normaliseMobile handles this now
+  const allMobileVariants = waPhoneVariantsForMatch(normalisedClickedMobiles)
+  // Also add the "+91-" dash format that these collections use
+  const dashVariants = normalisedClickedMobiles.map((n) => `+91-${n}`)
+
+  const formSubmittedAgg = normalisedClickedMobiles.length > 0
+    ? await appsCol.aggregate([
+        {
+          $match: {
+            Mobile_Number: { $in: [...allMobileVariants, ...dashVariants] },
+            Application_Number_Auto_Generated: { $nin: [null, ''] },
+          },
+        },
+        {
+          $addFields: {
+            _sortAt: {
+              $ifNull: [
+                { $dateFromString: { dateString: '$Application_Completion_Date', onError: null, onNull: null } },
+                { $dateFromString: { dateString: '$Updated_Date', onError: null, onNull: null } },
+                '$createdAt',
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: '$Mobile_Number',
+            formSubmittedAt: { $max: '$_sortAt' },
+            applicationNo: { $last: '$Application_Number_Auto_Generated' },
+            leadIdRaw: { $last: '$Lead_ID' },
+          },
+        },
+      ]).toArray()
+    : []
+
+  // Step 3: filter to apps submitted on/after firstOutbound AND lastClick
+  const formSubmittedResult = formSubmittedAgg.filter((r) => {
+    const norm = normaliseMobile(r._id)
+    const outboundAnchor = firstOutboundByNorm.get(norm)
+    const lastClick = lastClickByNorm.get(norm)
+    if (!outboundAnchor || !lastClick || r.formSubmittedAt == null) return false
+    if (!isOnOrAfter(r.formSubmittedAt, outboundAnchor)) return false
+    return isOnOrAfter(r.formSubmittedAt, lastClick)
+  })
+
+  const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
+  const convertedMobiles = [...new Set(formSubmittedMobiles)]
+
+  const convertedNormSet = new Set(convertedMobiles.map(normaliseMobile).filter(Boolean))
+  const knownRawPhones = clickedPhoneDedup.filter((p) => {
+    const n = normaliseMobile(p)
+    return n && convertedNormSet.has(n)
+  })
+  const convertedPhoneVariants = [...new Set([
+    ...waPhoneVariantsForMatch(convertedMobiles),
+    ...knownRawPhones,
+  ])]
+
+  // Step 4: click attribution (template + button) for converted phones
+  const clickAttrResult = convertedMobiles.length > 0
+    ? await waCol.aggregate([
+        { $match: CLICKED_PRE_MATCH },
+        { $addFields: waR },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
+        { $addFields: { _ctaKey: ctaKeyExpr() } },
+        {
+          $group: {
+            _id: '$_waPhone',
+            templates: { $addToSet: '$_waTemplate' },
+            buttons: { $addToSet: '$_ctaKey' },
+          },
+        },
+      ]).toArray()
+    : []
+
+  const clickAttrMap = new Map()
+  for (const r of clickAttrResult) {
+    const norm = normaliseMobile(r._id)
+    if (!norm) continue
+    const prev = clickAttrMap.get(norm)
+    const templates = new Set([...(prev?.templates || []), ...(r.templates || [])].filter(Boolean))
+    const buttons = new Set([...(prev?.buttons || []), ...(r.buttons || [])].filter(isUsefulWaButtonText))
+    clickAttrMap.set(norm, { templates: [...templates], buttons: [...buttons] })
+  }
+
+  // Step 5: click timeline for converted phones
+  const clickTimelineByNorm = new Map()
+  if (convertedMobiles.length > 0) {
+    const timelineMatch = { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } }
+    if (startDate || endDate) {
+      timelineMatch._waEventTs = {}
+      if (startDate) timelineMatch._waEventTs.$gte = new Date(startDate)
+      if (endDate) {
+        const end = new Date(endDate); end.setDate(end.getDate() + 1)
+        timelineMatch._waEventTs.$lt = end
+      }
+    }
+    const tlResult = await waCol.aggregate([
+      { $match: CLICKED_PRE_MATCH },
+      ...nativeDatePreStages,
+      { $addFields: waR },
+      { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+      { $match: timelineMatch },
+      { $addFields: { _ctaKey: ctaKeyExpr() } },
+      { $sort: { _waEventTs: 1 } },
+      {
+        $group: {
+          _id: '$_waPhone',
+          events: { $push: { template: '$_waTemplate', button: '$_ctaKey', clickAt: { $ifNull: ['$_waClickTs', '$_waEventTs'] } } },
+        },
+      },
+    ]).toArray()
+
+    for (const row of tlResult) {
+      const norm = normaliseMobile(row._id)
+      if (!norm) continue
+      const rawEvents = (row.events || []).slice(-40)
+      clickTimelineByNorm.set(norm, rawEvents.map((e) => {
+        const dt = parseOptDate(e.clickAt)
+        const ok = dt && !Number.isNaN(dt.getTime())
+        return {
+          template: e.template || '',
+          button: isUsefulWaButtonText(e.button) ? String(e.button).trim() : '',
+          clickAtIso: ok ? dt.toISOString() : null,
+          clickAtDisplay: ok ? dt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : '—',
+        }
+      }))
+    }
+  }
+
+  await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, null, clickedPhoneDedup)
+
+  // Step 6: build formMetaByNorm
+  const formMetaByNorm = new Map()
+  for (const r of formSubmittedResult) {
+    const norm = normaliseMobile(r._id)
+    if (!norm) continue
+    const dt = parseOptDate(r.formSubmittedAt)
+    formMetaByNorm.set(norm, {
+      formSubmittedAtIso: dt ? dt.toISOString() : null,
+      formSubmittedAtDisplay: dt
+        ? dt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+        : '—',
+      leadIdRaw: r.leadIdRaw ? String(r.leadIdRaw).trim() : null,
+      applicationNo: r.applicationNo || null,
+    })
+  }
+
+  const n = formSubmittedResult.length
+  const rate = clickedPhones.length > 0 ? parseFloat(((n / clickedPhones.length) * 100).toFixed(2)) : 0
+
+  return {
+    conversionKind: 'isu_form',
+    totalClicked: clickedPhones.length,
+    formSubmitted: n,
+    conversionRate: rate,
+    formSubmittedMobiles,
+    formSubmittedDetails: formSubmittedMobiles.map((m) => {
+      const norm = normaliseMobile(m)
+      const attr = clickAttrMap.get(norm)
+      const meta = formMetaByNorm.get(norm)
+      return {
+        mobile: m,
+        leadId: meta?.leadIdRaw || meta?.applicationNo || null,
+        formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
+        formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
+        clickedTemplates: attr?.templates || [],
+        clickedButtons: attr?.buttons || [],
+        clickTimeline: clickTimelineByNorm.get(norm) || [],
+      }
+    }),
+  }
+}
+
 export async function computeWADashboard({ mode = 'cached', startDate, endDate, workspace } = {}) {
   const start = Date.now()
   const cfg = waWorkspaceConfig(workspace)
@@ -1247,6 +1499,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     [
       ...nativeDatePreStages,
       { $addFields: waResolvedFields },
+      // For native Interakt docs (BBA/BTech/IHM/IDM) phone_number is absent; fall back to channel_phone_number
+      { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
       ...waDateStages,
       { $facet: batch1Facets },
     ],
@@ -1459,6 +1713,21 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         clickedPhoneDedup,
         normalisedClickedMobiles,
         waCol,
+      })
+      formSubmittedCount = paymentConversion.formSubmitted
+    } else if (cfg.isuAppsCollection) {
+      paymentConversion = await buildIsuFormConversion({
+        client,
+        clickedPhones,
+        clickedPhoneDedup,
+        normalisedClickedMobiles,
+        waCol,
+        waResolvedFields,
+        nativeDatePreStages,
+        startDate,
+        endDate,
+        isuAppsDb: cfg.isuAppsDb,
+        isuAppsCollection: cfg.isuAppsCollection,
       })
       formSubmittedCount = paymentConversion.formSubmitted
     } else {

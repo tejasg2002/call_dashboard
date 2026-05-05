@@ -5,6 +5,8 @@ import { fetchWADashboard } from '../../../src/lib/waDashboardApi'
 import {
   WA_WORKSPACE_IHM,
   WA_WORKSPACE_MBA,
+  WA_WORKSPACE_BBA,
+  WA_WORKSPACE_BTECH,
   normalizeWAWorkspace,
   workspacePayloadMatchesExpected,
 } from '../../../src/lib/waWorkspace'
@@ -395,14 +397,26 @@ export default function WAApiPage() {
             </div>
           )}
 
-          {/* ── Payment Conversion ────────────────────────────────────────── */}
-          {(workspace === WA_WORKSPACE_MBA || workspace === WA_WORKSPACE_IHM) && snapshot?.paymentConversion && (
+          {/* ── Payment / Form Conversion ──────────────────────────────────── */}
+          {(workspace === WA_WORKSPACE_MBA || workspace === WA_WORKSPACE_IHM || workspace === WA_WORKSPACE_BBA || workspace === WA_WORKSPACE_BTECH) && snapshot?.paymentConversion && (
             <div className="space-y-4">
               <SectionHeader
-                title={workspace === WA_WORKSPACE_IHM ? 'Payment conversion (IHM)' : 'Form conversion'}
+                title={
+                  workspace === WA_WORKSPACE_IHM
+                    ? 'Payment conversion (IHM)'
+                    : workspace === WA_WORKSPACE_BBA
+                    ? 'Form conversion (BBA)'
+                    : workspace === WA_WORKSPACE_BTECH
+                    ? 'Form conversion (BTech)'
+                    : 'Form conversion'
+                }
                 description={
                   workspace === WA_WORKSPACE_IHM
                     ? 'Clicked users with a completed IHM payment (Mongo itm.npfPaymentWebhookEvents) after template send and last click'
+                    : workspace === WA_WORKSPACE_BBA
+                    ? 'Clicked users who submitted a BBA application (ITM_ISU.npfApplicationsWebhookEventsBBA) after template send and last click'
+                    : workspace === WA_WORKSPACE_BTECH
+                    ? 'Clicked users who submitted a BTech application (ITM_ISU.npfApplicationsWebhookEventsBTech) after template send and last click'
                     : 'Clicked users who submitted an MBA application after template send'
                 }
                 isDark={isDark}
