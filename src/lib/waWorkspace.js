@@ -19,7 +19,7 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
   // IHM moved to ITM_IHM.interaktWhatsappWebhookEvents (new Interakt JSON shape)
   { workspace: 'ihm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_ihm', label: 'IHM', dataDb: ITM_IHM_DB, isuAppsDb: ITM_IHM_DB, isuAppsCollection: 'npfApplicationsWebhookEvents', isuAppsPhoneField: 'Mobile_Number', isuPaymentCollection: 'npfPaymentWebhookEvents' },
   // IDM moved to ITM_IDM.interaktWhatsappWebhookEvents (new Interakt JSON shape)
-  { workspace: 'idm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_idm', label: 'IDM', dataDb: ITM_IDM_DB, isuAppsDb: ITM_IDM_DB, isuAppsCollection: 'npfApplicationsWebhookEvents', isuAppsPhoneField: 'Mobile_No', isuPaymentCollection: 'npfPaymentWebhookEvents' },
+  { workspace: 'idm', collection: 'interaktWhatsappWebhookEvents', cacheKey: 'wa_latest_idm', label: 'IDM', dataDb: ITM_IDM_DB, isuAppsDb: ITM_IDM_DB, isuAppsCollection: 'npfApplicationsWebhookEvents', isuAppsPhoneField: 'Mobile_No_Alt', isuPaymentCollection: 'npfPaymentWebhookEvents' },
   { workspace: 'bba', collection: 'interaktWhatsappWebhookEventsBBA', cacheKey: 'wa_latest_bba', label: 'BBA', dataDb: ITM_ISU_DB, isuAppsDb: ITM_ISU_DB, isuAppsCollection: 'npfApplicationsWebhookEventsBBA', isuAppsPhoneField: 'Mobile_Number', isuPaymentCollection: 'npfPaymentWebhookEventsBBA' },
   { workspace: 'btech', collection: 'interaktWhatsappWebhookEventsBTech', cacheKey: 'wa_latest_btech', label: 'BTECH', dataDb: ITM_ISU_DB, isuAppsDb: ITM_ISU_DB, isuAppsCollection: 'npfApplicationsWebhookEventsBTech', isuAppsPhoneField: 'Mobile_Number', isuPaymentCollection: 'npfPaymentWebhookEventsBTech' },
 ])

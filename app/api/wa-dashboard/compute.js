@@ -1226,14 +1226,19 @@ async function buildIsuFormConversion({
       ]).toArray()
     : []
 
-  // Step 3: filter to apps submitted on/after firstOutbound AND lastClick
+  // Step 3: filter to apps submitted on/after firstOutbound AND lastClick,
+  // then deduplicate by normalised mobile (some docs store Mobile_No_Alt with/without +91- prefix).
+  const seenNormsStep3 = new Set()
   const formSubmittedResult = formSubmittedAgg.filter((r) => {
     const norm = normaliseMobile(r._id)
     const outboundAnchor = firstOutboundByNorm.get(norm)
     const lastClick = lastClickByNorm.get(norm)
     if (!outboundAnchor || !lastClick || r.formSubmittedAt == null) return false
     if (!isOnOrAfter(r.formSubmittedAt, outboundAnchor)) return false
-    return isOnOrAfter(r.formSubmittedAt, lastClick)
+    if (!isOnOrAfter(r.formSubmittedAt, lastClick)) return false
+    if (seenNormsStep3.has(norm)) return false
+    seenNormsStep3.add(norm)
+    return true
   })
 
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
@@ -1367,12 +1372,14 @@ async function buildIsuFormConversion({
         const key = p.Application_Number || p.application_number || p.Lead_ID || p.lead_id
         if (!key) continue
         const existing = paymentByKey.get(key)
-        const rawStatus = p.Payment_Status || p.paymentStatus || ''
+        // Prefer paymentStatus (NPF completion flag: "Complete") over Payment_Status
+        // (stage tracker: "Pre Payment" / "Payment Approved") to avoid false negatives.
+        const rawStatus = p.paymentStatus || p.Payment_Status || ''
         const paidAt = parseOptDate(p.Payment_Approved_Date) || parseOptDate(p.createdAt)
         if (!existing || (paidAt && existing.paidAt && paidAt.getTime() > existing.paidAt.getTime())) {
           paymentByKey.set(key, {
             paymentDone: /approved|success|complete/i.test(rawStatus),
-            paymentStatus: p.Payment_Status || p.paymentStatus || null,
+            paymentStatus: p.paymentStatus || p.Payment_Status || null,
             paymentAmount: p.Payment_Amount || null,
             transactionId: p.Transaction_ID || null,
             paidAt,
@@ -1529,14 +1536,14 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     templates: [
       {
         $group: {
-          _id: { template_name: '$_waTemplate', source: '$_waSource' },
+          _id: '$_waTemplate',
           sent: { $sum: { $cond: [{ $eq: ['$_waStage', 'sent'] }, 1, 0] } },
           delivered: { $sum: { $cond: [{ $eq: ['$_waStage', 'delivered'] }, 1, 0] } },
           read: { $sum: { $cond: [{ $eq: ['$_waStage', 'read'] }, 1, 0] } },
           clicked: { $sum: { $cond: [{ $eq: ['$_waStage', 'clicked'] }, 1, 0] } },
           failed: { $sum: { $cond: [{ $eq: ['$_waStage', 'failed'] }, 1, 0] } },
           cost: { $sum: { $ifNull: ['$_waCost', 0] } },
-          category: { $first: '$_waTemplateCategory' },
+          source: { $first: '$_waSource' },
           firstSeen: { $min: '$_waEventTs' },
           lastSeen: { $max: '$_waEventTs' },
         },
@@ -1657,25 +1664,24 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
   }
 
   const templateRows = templateResult
-    .filter((r) => r._id.template_name)
+    .filter((r) => r._id)
     .map((r) => ({
-      template_name: r._id.template_name,
-      source: r._id.source || 'api',
+      template_name: r._id,
+      source: r.source || 'api',
       sent: r.sent,
       delivered: r.delivered,
       read: r.read,
       clicked: r.clicked,
       failed: r.failed,
       total_cost: r.cost,
-      category: r.category || '—',
       ctr: pct(r.clicked, r.delivered),
       readRate: pct(r.read, r.delivered),
       sdr: pct(r.delivered, r.sent),
       str: pct(r.read, r.sent),
       firstSeen: r.firstSeen ? new Date(r.firstSeen).toISOString() : null,
       lastSeen: r.lastSeen ? new Date(r.lastSeen).toISOString() : null,
-      failureReasons: tplFailMap[r._id.template_name] || [],
-      templateBtnStats: tplBtnMap[r._id.template_name] || [],
+      failureReasons: tplFailMap[r._id] || [],
+      templateBtnStats: tplBtnMap[r._id] || [],
     }))
 
   const ctaRows = ctaResult.map((r) => ({
@@ -2167,13 +2173,13 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     ).toArray()
     for (const p of payDocs) {
       if (!p.application_number) continue
-      const rawStatus = p.Payment_Status || p.paymentStatus || ''
+      const rawStatus = p.paymentStatus || p.Payment_Status || ''
       const existing = mbaPaymentByAppNo.get(p.application_number)
       const paidAt = parseOptDate(p.Payment_Approved_Date) || parseOptDate(p.createdAt)
       if (!existing || (paidAt && existing.paidAt && paidAt.getTime() > existing.paidAt.getTime())) {
         mbaPaymentByAppNo.set(p.application_number, {
           paymentDone: /approved|success|complete/i.test(rawStatus),
-          paymentStatus: p.Payment_Status || p.paymentStatus || null,
+          paymentStatus: p.paymentStatus || p.Payment_Status || null,
           paidAt,
         })
       }

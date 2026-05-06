@@ -7,7 +7,6 @@ import WATemplatePreview from './WATemplatePreview'
 
 const COLUMNS = [
   { key: 'template_name', label: 'Template name',  sortable: true },
-  { key: 'category',      label: 'Category',        sortable: true },
   { key: 'sent',          label: 'Sent',            sortable: true },
   { key: 'delivered',     label: 'Delivered',       sortable: true },
   { key: 'read',          label: 'Read',            sortable: true },
@@ -55,15 +54,47 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
     }
   }
 
+  // Merge rows that share the same template_name (can occur with old cached data that
+  // grouped by {template_name, source} instead of template_name alone).
+  const dedupedRows = useMemo(() => {
+    const map = new Map()
+    for (const r of rows) {
+      const name = r.template_name
+      if (!map.has(name)) {
+        map.set(name, { ...r })
+      } else {
+        const prev = map.get(name)
+        const sent      = prev.sent      + (r.sent      ?? 0)
+        const delivered = prev.delivered + (r.delivered ?? 0)
+        const read      = prev.read      + (r.read      ?? 0)
+        const clicked   = prev.clicked   + (r.clicked   ?? 0)
+        const failed    = prev.failed    + (r.failed    ?? 0)
+        const total_cost = (prev.total_cost ?? 0) + (r.total_cost ?? 0)
+        const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
+        map.set(name, {
+          ...prev,
+          sent, delivered, read, clicked, failed, total_cost,
+          ctr:      pct(clicked,   delivered),
+          readRate: pct(read,      delivered),
+          sdr:      pct(delivered, sent),
+          str:      pct(read,      sent),
+          failureReasons: [...(prev.failureReasons || []), ...(r.failureReasons || [])],
+          templateBtnStats: [...(prev.templateBtnStats || []), ...(r.templateBtnStats || [])],
+        })
+      }
+    }
+    return [...map.values()]
+  }, [rows])
+
   const sortedRows = useMemo(() => {
-    const sorted = [...rows].sort((a, b) => {
+    const sorted = [...dedupedRows].sort((a, b) => {
       const av = a[sortKey] ?? (typeof a[sortKey] === 'string' ? '' : -Infinity)
       const bv = b[sortKey] ?? (typeof b[sortKey] === 'string' ? '' : -Infinity)
       if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
       return sortDir === 'asc' ? av - bv : bv - av
     })
     return sorted
-  }, [rows, sortKey, sortDir])
+  }, [dedupedRows, sortKey, sortDir])
 
   const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(sortedRows, 10)
 
@@ -104,7 +135,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
             <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
               {sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className={`${tdClass} py-8 text-center`}>No data</td>
+                  <td colSpan={12} className={`${tdClass} py-8 text-center`}>No data</td>
                 </tr>
               ) : (
                 paginated.map((r) => (
@@ -113,17 +144,6 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
                       <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-brand-300' : 'bg-brand-50 text-brand-700'}`}>
                         {r.template_name}
                       </span>
-                    </td>
-                    <td className={tdClass}>
-                      {r.category && r.category !== '—' ? (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                          r.category === 'MARKETING'
-                            ? isDark ? 'bg-amber-800/40 text-amber-300' : 'bg-amber-50 text-amber-700'
-                            : r.category === 'UTILITY'
-                              ? isDark ? 'bg-blue-800/40 text-blue-300' : 'bg-blue-50 text-blue-700'
-                              : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
-                        }`}>{r.category}</span>
-                      ) : <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>}
                     </td>
                     <td className={tdClass}>{r.sent}</td>
                     <td className={tdClass}>{r.delivered}</td>
