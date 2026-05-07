@@ -1196,9 +1196,13 @@ async function buildIsuFormConversion({
         {
           $match: {
             [phoneField]: { $in: [...allMobileVariants, ...dashVariants] },
+            // Include docs that have an application number OR an application stage —
+            // some collections store stage on a separate event without the app number field.
             $or: [
               { Application_Number_Auto_Generated: { $nin: [null, ''] } },
               { Application_Number: { $nin: [null, ''] } },
+              { application_stage: { $nin: [null, ''] } },
+              { Application_Stage: { $nin: [null, ''] } },
             ],
           },
         },
@@ -1212,15 +1216,23 @@ async function buildIsuFormConversion({
               ],
             },
             _appNo: { $ifNull: [appNoField, appNoAltField] },
+            // 1 when this doc carries an application stage, 0 otherwise — used to sort
+            // docs-with-stage to the front so $first reliably picks a non-null value.
+            _hasStage: {
+              $cond: [{ $ifNull: ['$application_stage', { $ifNull: ['$Application_Stage', false] }] }, 1, 0],
+            },
           },
         },
+        // Sort: docs with a stage first (desc), then most-recent date first.
+        // $first in the group therefore picks the most informative document.
+        { $sort: { _hasStage: -1, _sortAt: -1 } },
         {
           $group: {
             _id: `$${phoneField}`,
             formSubmittedAt: { $max: '$_sortAt' },
-            applicationNo: { $last: '$_appNo' },
-            leadIdRaw: { $last: { $ifNull: ['$Lead_ID', '$lead_id'] } },
-            applicationStage: { $last: { $ifNull: ['$application_stage', '$Application_Stage'] } },
+            applicationNo: { $first: '$_appNo' },
+            leadIdRaw: { $first: { $ifNull: ['$Lead_ID', '$lead_id'] } },
+            applicationStage: { $first: { $ifNull: ['$application_stage', '$Application_Stage'] } },
           },
         },
       ]).toArray()
@@ -1640,6 +1652,11 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   const rawKpi = kpiResult[0] || { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0 }
   delete rawKpi._id
+  // Interakt sometimes skips the "delivered" webhook when a message is read quickly —
+  // normalise delivered >= read >= clicked. Leave "sent" as-is (Interakt can legitimately
+  // send fewer "sent" webhooks than "delivered" ones).
+  rawKpi.read      = Math.max(rawKpi.read      ?? 0, rawKpi.clicked ?? 0)
+  rawKpi.delivered = Math.max(rawKpi.delivered ?? 0, rawKpi.read)
   rawKpi.ctr = pct(rawKpi.clicked, rawKpi.delivered)
   rawKpi.readRate = pct(rawKpi.read, rawKpi.delivered)
   rawKpi.sdr = pct(rawKpi.delivered, rawKpi.sent)
@@ -1665,24 +1682,31 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
 
   const templateRows = templateResult
     .filter((r) => r._id)
-    .map((r) => ({
-      template_name: r._id,
-      source: r.source || 'api',
-      sent: r.sent,
-      delivered: r.delivered,
-      read: r.read,
-      clicked: r.clicked,
-      failed: r.failed,
-      total_cost: r.cost,
-      ctr: pct(r.clicked, r.delivered),
-      readRate: pct(r.read, r.delivered),
-      sdr: pct(r.delivered, r.sent),
-      str: pct(r.read, r.sent),
-      firstSeen: r.firstSeen ? new Date(r.firstSeen).toISOString() : null,
-      lastSeen: r.lastSeen ? new Date(r.lastSeen).toISOString() : null,
-      failureReasons: tplFailMap[r._id] || [],
-      templateBtnStats: tplBtnMap[r._id] || [],
-    }))
+    .map((r) => {
+      // Normalise delivered >= read >= clicked. Leave "sent" as-is.
+      const clicked   = r.clicked   ?? 0
+      const read      = Math.max(r.read      ?? 0, clicked)
+      const delivered = Math.max(r.delivered ?? 0, read)
+      const sent      = r.sent ?? 0
+      return {
+        template_name: r._id,
+        source: r.source || 'api',
+        sent,
+        delivered,
+        read,
+        clicked,
+        failed: r.failed ?? 0,
+        total_cost: r.cost,
+        ctr:      pct(clicked,   delivered),
+        readRate: pct(read,      delivered),
+        sdr:      pct(delivered, sent),
+        str:      pct(read,      sent),
+        firstSeen: r.firstSeen ? new Date(r.firstSeen).toISOString() : null,
+        lastSeen:  r.lastSeen  ? new Date(r.lastSeen).toISOString()  : null,
+        failureReasons:   tplFailMap[r._id] || [],
+        templateBtnStats: tplBtnMap[r._id]  || [],
+      }
+    })
 
   const ctaRows = ctaResult.map((r) => ({
     button_text: r._id.button_text,

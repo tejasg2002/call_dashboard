@@ -57,6 +57,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
   // Merge rows that share the same template_name (can occur with old cached data that
   // grouped by {template_name, source} instead of template_name alone).
   const dedupedRows = useMemo(() => {
+    const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
     const map = new Map()
     for (const r of rows) {
       const name = r.template_name
@@ -64,13 +65,15 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
         map.set(name, { ...r })
       } else {
         const prev = map.get(name)
-        const sent      = prev.sent      + (r.sent      ?? 0)
-        const delivered = prev.delivered + (r.delivered ?? 0)
-        const read      = prev.read      + (r.read      ?? 0)
-        const clicked   = prev.clicked   + (r.clicked   ?? 0)
-        const failed    = prev.failed    + (r.failed    ?? 0)
+        const sent      = (prev.sent      ?? 0) + (r.sent      ?? 0)
+        const clicked   = (prev.clicked   ?? 0) + (r.clicked   ?? 0)
+        const readRaw   = (prev.read      ?? 0) + (r.read      ?? 0)
+        const delivRaw  = (prev.delivered ?? 0) + (r.delivered ?? 0)
+        const failed    = (prev.failed    ?? 0) + (r.failed    ?? 0)
         const total_cost = (prev.total_cost ?? 0) + (r.total_cost ?? 0)
-        const pct = (n, d) => (d > 0 ? Math.min((n / d) * 100, 100) : 0)
+        // Normalise delivered >= read >= clicked. Leave sent as-is.
+        const read      = Math.max(readRaw,  clicked)
+        const delivered = Math.max(delivRaw, read)
         map.set(name, {
           ...prev,
           sent, delivered, read, clicked, failed, total_cost,
@@ -78,7 +81,7 @@ export default function WATemplatePerformanceTable({ rows, ctaRows = [], theme, 
           readRate: pct(read,      delivered),
           sdr:      pct(delivered, sent),
           str:      pct(read,      sent),
-          failureReasons: [...(prev.failureReasons || []), ...(r.failureReasons || [])],
+          failureReasons:   [...(prev.failureReasons   || []), ...(r.failureReasons   || [])],
           templateBtnStats: [...(prev.templateBtnStats || []), ...(r.templateBtnStats || [])],
         })
       }
