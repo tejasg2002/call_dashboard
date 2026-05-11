@@ -21,6 +21,9 @@ export async function GET(request) {
     const templateName = searchParams.get('template_name')
     if (templateName) filter.template_name = templateName
 
+    const phoneNumber = searchParams.get('phone_number')
+    if (phoneNumber) filter.phone_number = phoneNumber
+
     const stage = searchParams.get('stage')
     if (stage) filter.stage = stage
 
@@ -44,7 +47,8 @@ export async function GET(request) {
 
     const isIncremental = !!since
     const isTemplateQuery = !!templateName
-    const isUnpaginated = isIncremental || isTemplateQuery
+    const isPhoneQuery = !!phoneNumber
+    const isUnpaginated = isIncremental || isTemplateQuery || isPhoneQuery
     const limitParam = searchParams.get('limit')
     const hardLimit = limitParam ? parseInt(limitParam, 10) : 0
 

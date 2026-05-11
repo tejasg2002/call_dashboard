@@ -11,6 +11,7 @@ import {
   normalizeWAWorkspace,
   workspacePayloadMatchesExpected,
 } from '../../../src/lib/waWorkspace'
+import { normaliseMobile } from '../../../src/lib/waPhoneMatch'
 import { useAuth, useTheme } from '../../providers'
 import { useWAWorkspace } from '../../../src/context/BuWorkspaceProvider'
 import WAKpiCards from '../../../src/components/wa/WAKpiCards'
@@ -38,6 +39,51 @@ function formatCount(n) {
   return (n || 0).toLocaleString('en-IN')
 }
 
+function leadFilterSectionSuffix(pickedStages, pickedSources) {
+  const st = pickedStages || []
+  const so = pickedSources || []
+  const bits = []
+  if (st.length) bits.push(`stages: ${st.join(', ')}`)
+  if (so.length) bits.push(`sources: ${so.join(', ')}`)
+  return bits.length ? ` (${bits.join(' · ')})` : ''
+}
+
+/** Lead cohort phones from /api/wa-lead-filter (mode=phones) are already normalised. */
+function filterPaymentConversionByLeadCohort(paymentConversion, clickBreakdown, normalizedPhoneList) {
+  if (!paymentConversion) return null
+  if (!Array.isArray(normalizedPhoneList) || normalizedPhoneList.length === 0) {
+    return {
+      ...paymentConversion,
+      totalClicked: 0,
+      formSubmitted: 0,
+      conversionRate: 0,
+      formSubmittedMobiles: [],
+      formSubmittedDetails: [],
+    }
+  }
+  const normSet = new Set(normalizedPhoneList)
+  const details = (paymentConversion.formSubmittedDetails || []).filter((d) => {
+    const n = normaliseMobile(d.mobile)
+    return n && normSet.has(n)
+  })
+  let totalClicked = 0
+  for (const row of clickBreakdown || []) {
+    const n = normaliseMobile(row.phone)
+    if (n && normSet.has(n)) totalClicked += 1
+  }
+  const formSubmitted = details.length
+  const conversionRate =
+    totalClicked > 0 ? parseFloat(((formSubmitted / totalClicked) * 100).toFixed(2)) : 0
+  return {
+    ...paymentConversion,
+    totalClicked,
+    formSubmitted,
+    conversionRate,
+    formSubmittedMobiles: details.map((d) => d.mobile).filter(Boolean),
+    formSubmittedDetails: details,
+  }
+}
+
 function SectionHeader({ title, description, isDark }) {
   return (
     <div className="pt-1">
@@ -46,6 +92,9 @@ function SectionHeader({ title, description, isDark }) {
     </div>
   )
 }
+
+// Workspaces that support lead stage / source filtering
+const LEAD_FILTER_WORKSPACES = new Set([WA_WORKSPACE_BBA, WA_WORKSPACE_BTECH, WA_WORKSPACE_IDM])
 
 export default function WAApiPage() {
   const { isAdmin, dataMasked } = useAuth()
@@ -58,10 +107,28 @@ export default function WAApiPage() {
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState(null)
-  const [filters, setFilters] = useState({ templateName: '', eventType: '', startDate: '', endDate: '' })
+  const [filters, setFilters] = useState({
+    templateName: '',
+    eventType: '',
+    startDate: '',
+    endDate: '',
+    pickedLeadStages: [],
+    pickedSources: [],
+  })
   const [campaigns, _setCampaigns] = useState(loadCampaigns)
   const [toast, setToast] = useState(null)
   const [elapsed, setElapsed] = useState(null)
+
+  // ── Lead filter state ──────────────────────────────────────────────────────
+  const hasLeadFilter       = LEAD_FILTER_WORKSPACES.has(normalizeWAWorkspace(workspace))
+  const [leadFilterOpts, setLeadFilterOpts]         = useState(null)    // { leadStages, sources }
+  const [leadFilterLoading, setLeadFilterLoading]   = useState(false)
+  const [leadAnalytics, setLeadAnalytics]           = useState(null)    // result from /api/wa-lead-analytics
+  const [leadAnalyticsLoading, setLeadAnalyticsLoading] = useState(false)
+  /** Normalised CRM/webhook phones for the active lead filter (same cohort as analytics). */
+  const [leadFilterPhoneNormals, setLeadFilterPhoneNormals] = useState(null)
+  const isLeadFilterActive =
+    (filters.pickedLeadStages?.length || 0) > 0 || (filters.pickedSources?.length || 0) > 0
 
   const finishWADashboardFetch = useCallback((requestedWs, data) => {
     const ws = normalizeWAWorkspace(requestedWs)
@@ -84,6 +151,35 @@ export default function WAApiPage() {
   useEffect(() => {
     setSnapshot(null)
     setError(null)
+    setLeadAnalytics(null)
+    setLeadFilterPhoneNormals(null)
+    setLeadFilterOpts(null)
+    setFilters((f) => ({ ...f, pickedLeadStages: [], pickedSources: [] }))
+  }, [workspace])
+
+  // Load lead filter options whenever workspace switches to BBA/BTECH
+  useEffect(() => {
+    const ws = normalizeWAWorkspace(workspace)
+    if (!LEAD_FILTER_WORKSPACES.has(ws)) return
+    setLeadFilterLoading(true)
+    fetch(`/api/wa-lead-filter?workspace=${ws}&mode=options`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) {
+          console.error('[WAPage] leadFilterOpts:', data.error)
+          setToast(`Lead filter options: ${data.error}`)
+          setTimeout(() => setToast(null), 8000)
+          setLeadFilterOpts({ leadStages: [], sources: [] })
+          return
+        }
+        setLeadFilterOpts(data)
+      })
+      .catch((err) => {
+        console.error('[WAPage] leadFilterOpts error:', err)
+        setToast('Could not load lead stage / source options')
+        setTimeout(() => setToast(null), 8000)
+      })
+      .finally(() => setLeadFilterLoading(false))
   }, [workspace])
 
   function setCampaigns(updater) {
@@ -155,20 +251,76 @@ export default function WAApiPage() {
       .catch((err) => console.warn('[WAPage] recompute background error:', err))
   }, [workspace])
 
-  const recalibrateForDateRange = useCallback(async () => {
-    const hasRange = filters.startDate || filters.endDate
+  const recalibrateForDateRange = useCallback(async (partialFilters = null) => {
+    // Ignore React click events if onApply is ever passed directly as onClick.
+    const partial =
+      partialFilters &&
+      typeof partialFilters === 'object' &&
+      !('nativeEvent' in partialFilters)
+        ? partialFilters
+        : null
+    const f = partial ? { ...filters, ...partial } : filters
+    if (partial) {
+      setFilters((prev) => ({ ...prev, ...partial }))
+    }
+
+    const hasRange = f.startDate || f.endDate
+
+    // ── Lead filter: if active, fetch filtered analytics ─────────────────────
+    const ws = normalizeWAWorkspace(workspace)
+    const pickedStages = f.pickedLeadStages || []
+    const pickedSrcs = f.pickedSources || []
+    if (hasLeadFilter && (pickedStages.length || pickedSrcs.length)) {
+      setLeadAnalyticsLoading(true)
+      const analyticsParams = new URLSearchParams({ workspace: ws })
+      for (const v of pickedStages) analyticsParams.append('leadStage', v)
+      for (const v of pickedSrcs) analyticsParams.append('source', v)
+      if (f.startDate) analyticsParams.set('startDate', f.startDate)
+      if (f.endDate) analyticsParams.set('endDate', f.endDate)
+
+      const phoneParams = new URLSearchParams({ workspace: ws, mode: 'phones' })
+      for (const v of pickedStages) phoneParams.append('leadStage', v)
+      for (const v of pickedSrcs) phoneParams.append('source', v)
+
+      try {
+        const [aRes, pRes] = await Promise.all([
+          fetch(`/api/wa-lead-analytics?${analyticsParams.toString()}`),
+          fetch(`/api/wa-lead-filter?${phoneParams.toString()}`),
+        ])
+        const data = await aRes.json()
+        const phonesPayload = await pRes.json()
+        if (!aRes.ok || data.error) throw new Error(data.error || 'Lead analytics failed')
+        if (!pRes.ok || phonesPayload.error) throw new Error(phonesPayload.error || 'Lead phones lookup failed')
+        setLeadAnalytics(data)
+        setLeadFilterPhoneNormals(Array.isArray(phonesPayload.phones) ? phonesPayload.phones : [])
+        setToast(`Lead filter: ${data.totalLeads.toLocaleString('en-IN')} leads matched`)
+        setTimeout(() => setToast(null), 5000)
+      } catch (err) {
+        console.error('[WAPage] lead analytics error:', err)
+        setLeadAnalytics(null)
+        setLeadFilterPhoneNormals(null)
+        setToast(`Lead filter error: ${err.message}`)
+        setTimeout(() => setToast(null), 6000)
+      } finally {
+        setLeadAnalyticsLoading(false)
+      }
+    } else {
+      // Clear lead analytics when filter is cleared
+      setLeadAnalytics(null)
+      setLeadFilterPhoneNormals(null)
+    }
+
+    // Always refresh the cached snapshot after Apply (lead filter and/or dates)
     if (!hasRange) {
-      if (snapshot?.fromCache === undefined) return
-      handleRefresh()
+      await handleRefresh()
       return
     }
     try {
       setFetching(true)
-      const ws = normalizeWAWorkspace(workspace)
       const data = await fetchWADashboard({
         mode: 'range',
-        startDate: filters.startDate || '',
-        endDate: filters.endDate || '',
+        startDate: f.startDate || '',
+        endDate: f.endDate || '',
         workspace: ws,
       })
       if (finishWADashboardFetch(ws, data)) {
@@ -180,7 +332,7 @@ export default function WAApiPage() {
     } finally {
       setFetching(false)
     }
-  }, [filters.startDate, filters.endDate, snapshot, handleRefresh, workspace, finishWADashboardFetch])
+  }, [filters, snapshot, handleRefresh, workspace, finishWADashboardFetch, hasLeadFilter])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -193,14 +345,27 @@ export default function WAApiPage() {
     [snapshot]
   )
 
+  const paymentConversionForDisplay = useMemo(() => {
+    const pc = snapshot?.paymentConversion
+    if (!pc) return null
+    if (!isLeadFilterActive || !leadAnalytics || !Array.isArray(leadFilterPhoneNormals)) return pc
+    return filterPaymentConversionByLeadCohort(pc, snapshot?.clickBreakdown, leadFilterPhoneNormals)
+  }, [
+    snapshot?.paymentConversion,
+    snapshot?.clickBreakdown,
+    isLeadFilterActive,
+    leadAnalytics,
+    leadFilterPhoneNormals,
+  ])
+
   const baseKpi = snapshot?.kpi || { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, cost: 0, ctr: 0, readRate: 0, sdr: 0, str: 0 }
   const totalCost = Number(snapshot?.totalCost || baseKpi.cost || 0)
   const totalClicked = Number(baseKpi.clicked || 0)
   const costPerClick = Number(snapshot?.costPerClick || (totalClicked > 0 ? totalCost / totalClicked : 0))
-  const formSubmitted = snapshot?.formSubmittedCount || 0
-  const failureRate =
-    baseKpi.sent > 0 ? Math.min(((baseKpi.failed || 0) / baseKpi.sent) * 100, 100) : 0
-  const kpi = { ...baseKpi, failureRate, costPerClick, formSubmitted }
+  const formSubmitted =
+    isLeadFilterActive && leadAnalytics && paymentConversionForDisplay
+      ? paymentConversionForDisplay.formSubmitted
+      : snapshot?.formSubmittedCount || 0
 
   const funnel = snapshot?.funnel || { sent: 0, delivered: 0, read: 0, clicked: 0 }
 
@@ -220,18 +385,30 @@ export default function WAApiPage() {
   const hasDates = useMemo(() => apiTemplateRows.some((r) => r.firstSeen || r.lastSeen), [apiTemplateRows])
 
   const filteredTemplateRows = useMemo(() => {
-    let rows = apiTemplateRows
+    // When lead filter is active, use lead-analytics rows (already server-filtered)
+    let rows = isLeadFilterActive && leadAnalytics
+      ? (leadAnalytics.templateRows || [])
+      : apiTemplateRows
+
     if (filters.templateName) rows = rows.filter((r) => r.template_name === filters.templateName)
-    if (hasDates && filters.startDate) {
-      const start = new Date(filters.startDate).getTime()
-      rows = rows.filter((r) => !r.lastSeen || new Date(r.lastSeen).getTime() >= start)
-    }
-    if (hasDates && filters.endDate) {
-      const end = new Date(filters.endDate + 'T23:59:59').getTime()
-      rows = rows.filter((r) => !r.firstSeen || new Date(r.firstSeen).getTime() <= end)
+    if (!isLeadFilterActive || !leadAnalytics) {
+      // Date slicing only needed on snapshot rows (lead analytics already respects dates)
+      if (hasDates && filters.startDate) {
+        const start = new Date(filters.startDate).getTime()
+        rows = rows.filter((r) => !r.lastSeen || new Date(r.lastSeen).getTime() >= start)
+      }
+      if (hasDates && filters.endDate) {
+        const end = new Date(filters.endDate + 'T23:59:59').getTime()
+        rows = rows.filter((r) => !r.firstSeen || new Date(r.firstSeen).getTime() <= end)
+      }
     }
     return rows
-  }, [apiTemplateRows, filters.templateName, filters.startDate, filters.endDate, hasDates])
+  }, [apiTemplateRows, filters.templateName, filters.startDate, filters.endDate, hasDates, isLeadFilterActive, leadAnalytics])
+
+  // KPI: use lead-analytics KPI when lead filter is active, snapshot KPI otherwise
+  const activeKpiBase = isLeadFilterActive && leadAnalytics ? leadAnalytics.kpi : baseKpi
+  const failureRate   = activeKpiBase.sent > 0 ? Math.min(((activeKpiBase.failed || 0) / activeKpiBase.sent) * 100, 100) : 0
+  const kpi           = { ...activeKpiBase, failureRate, costPerClick, formSubmitted }
 
   const lastUpdated = snapshot?.computedAt
     ? new Date(snapshot.computedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -316,7 +493,49 @@ export default function WAApiPage() {
           options={filterOptions}
           theme={theme}
           onApply={recalibrateForDateRange}
+          hasLeadFilter={hasLeadFilter}
+          leadFilterOpts={leadFilterOpts}
+          leadFilterLoading={leadFilterLoading}
         />
+        {/* Lead filter active banner */}
+        {isLeadFilterActive && leadAnalytics && (
+          <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm ${
+            isDark
+              ? 'bg-brand-900/20 border-brand-700/40 text-brand-300'
+              : 'bg-brand-50 border-brand-200 text-brand-700'
+          }`}>
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span className="font-medium">
+              Showing data for{' '}
+              <strong>{leadAnalytics.totalLeads.toLocaleString('en-IN')} leads</strong>
+              {(filters.pickedLeadStages || []).length > 0 && (
+                <>
+                  {' '}
+                  in stage{(filters.pickedLeadStages || []).length > 1 ? 's' : ''}{' '}
+                  <strong>{(filters.pickedLeadStages || []).join(' · ')}</strong>
+                </>
+              )}
+              {(filters.pickedSources || []).length > 0 && (
+                <>
+                  {' '}
+                  from source{(filters.pickedSources || []).length > 1 ? 's' : ''}{' '}
+                  <strong>{(filters.pickedSources || []).join(' · ')}</strong>
+                </>
+              )}
+            </span>
+            {leadAnalyticsLoading && (
+              <span className="ml-auto inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+        )}
+        {leadAnalyticsLoading && !leadAnalytics && (
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <span className="inline-block w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+            Loading lead-filtered analytics…
+          </div>
+        )}
       </div>
 
       {/* ── Error ─────────────────────────────────────────────────────────── */}
@@ -352,7 +571,15 @@ export default function WAApiPage() {
 
           {/* ── Template Performance ──────────────────────────────────────── */}
           <div className="space-y-4">
-            <SectionHeader title="Template Performance" description={`${filteredTemplateRows.length} templates tracked across all API messages`} isDark={isDark} />
+            <SectionHeader
+              title="Template Performance"
+              description={
+                isLeadFilterActive && leadAnalytics
+                  ? `${filteredTemplateRows.length} templates · filtered to ${leadAnalytics.totalLeads.toLocaleString('en-IN')} leads${leadFilterSectionSuffix(filters.pickedLeadStages, filters.pickedSources)}`
+                  : `${filteredTemplateRows.length} templates tracked across all API messages`
+              }
+              isDark={isDark}
+            />
 
             <LazySection height="320px">
               <WATemplatePerformanceTable rows={filteredTemplateRows} ctaRows={apiCtaRows} theme={theme} dataMasked={dataMasked} workspace={workspace} />
@@ -427,7 +654,11 @@ export default function WAApiPage() {
                 isDark={isDark}
               />
               <LazySection height="280px">
-                <WAPaymentConversionServer data={snapshot.paymentConversion} theme={theme} dataMasked={dataMasked} />
+                <WAPaymentConversionServer
+                  data={paymentConversionForDisplay ?? snapshot.paymentConversion}
+                  theme={theme}
+                  dataMasked={dataMasked}
+                />
               </LazySection>
             </div>
           )}

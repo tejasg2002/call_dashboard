@@ -24,9 +24,8 @@ export default function WACampaignsPage() {
   const isDark = theme === 'dark'
 
   useEffect(() => {
-    if (isNonMbaWaWorkspace(ws)) {
-      router.replace(nonMbaWaHomePath(ws))
-    }
+    // Campaigns page is retired — redirect all workspaces back to the main WA page
+    router.replace(isNonMbaWaWorkspace(ws) ? nonMbaWaHomePath(ws) : '/wa')
   }, [ws, router])
   const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
