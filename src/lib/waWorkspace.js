@@ -206,6 +206,7 @@ export function isRouteAllowedForBuWorkspace(pathname, workspace) {
   if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1) || "/";
   if (p === "/settings") return true;
   if (p === "/wa") return true;
+  if (p === "/wa/user-journey") return true;
   if (p.startsWith("/wa/templates/")) return true;
   if (workspaceUsesIsuCallLogs(w)) {
     if (p === "/" || p === "/call-review") return true;

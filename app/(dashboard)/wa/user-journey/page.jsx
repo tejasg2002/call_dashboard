@@ -18,7 +18,7 @@ export default function WAUserJourneyPage() {
           User Journey
         </h1>
         <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Trace every WhatsApp interaction for a specific user — templates sent, delivery stages, reads, and button clicks.
+          Enter a mobile number to see a simple timeline: each template sent, then form submission when it exists in program data.
         </p>
       </div>
       <WAUserJourney workspace={ws} isDark={isDark} />
