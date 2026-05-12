@@ -1,6 +1,6 @@
 /**
  * GET /api/wa-lead-analytics
- * Lead-filtered WA template aggregates (BBA / BTECH / IDM).
+ * Lead-filtered WA template aggregates (MBA / BBA / BTECH / IDM).
  * Phone matching aligns with wa-dashboard/compute.js (_waPhone + variants).
  * Repeat leadStage=… and/or source=… for multi-select (OR within each; AND across dimensions).
  */
@@ -16,6 +16,11 @@ import {
   buildGroupedLeadFilterMatch,
   normalizeLeadFilterList,
   resolveLeadStageFilterContext,
+  mbaItmCrmLeadPhoneExpr,
+  mbaItmCrmLeadStageExpr,
+  mbaItmCrmLeadSourceExpr,
+  MBA_ITM_CRM_STAGE_MATCH_FIELDS,
+  mbaItmCrmLeadFilterMatchExtras,
 } from '../../../src/lib/waLeadMongo'
 
 const LATEST_SORT = { createdAt: -1, Updated_Date: -1, updatedAt: -1, _id: -1 }
@@ -67,8 +72,8 @@ function waStageExpr() {
   }
 }
 
-async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields) {
-  const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields)
+async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields, matchExtras) {
+  const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields, matchExtras)
   const rows = await col
     .aggregate([
       ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -80,7 +85,7 @@ async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageM
   return rows.map((r) => r._id).filter(Boolean)
 }
 
-async function fetchWebhookPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageExpr) {
+async function fetchWebhookPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageExpr, sourceExpr = leadSourceExpr) {
   const rows = await col
     .aggregate([
       { $sort: LATEST_SORT },
@@ -88,7 +93,7 @@ async function fetchWebhookPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, st
         $group: {
           _id: phoneStrExpr,
           leadStage: { $first: stageExpr },
-          source: { $first: leadSourceExpr },
+          source: { $first: sourceExpr },
         },
       },
       { $match: { _id: { $nin: [null, ''] } } },
@@ -120,6 +125,7 @@ export async function GET(request) {
     const endDate = (searchParams.get('endDate') || '').trim()
 
     const cfg = waWorkspaceConfig(workspace)
+    const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
 
     if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection) {
       return Response.json({ error: 'Lead analytics not available for this workspace' }, { status: 400 })
@@ -131,12 +137,17 @@ export async function GET(request) {
     const crmCol = cfg.crmSnapshotCollection ? leadDb.collection(cfg.crmSnapshotCollection) : null
     const webhookCol = cfg.leadWebhookCollection ? leadDb.collection(cfg.leadWebhookCollection) : null
     const waCol = waDb.collection(cfg.waCollection)
-    const phoneStrExpr = leadPhoneStringExpr(buildLeadPhoneExpr(cfg.leadPhoneField))
     const st = resolveLeadStageFilterContext(cfg)
+    const phoneExpr = isMbaItmCrm ? mbaItmCrmLeadPhoneExpr : buildLeadPhoneExpr(cfg.leadPhoneField)
+    const phoneStrExpr = leadPhoneStringExpr(phoneExpr)
+    const stageExpr = isMbaItmCrm ? mbaItmCrmLeadStageExpr : st.stageExpr
+    const sourceExpr = isMbaItmCrm ? mbaItmCrmLeadSourceExpr : leadSourceExpr
+    const stageMatchFields = isMbaItmCrm ? MBA_ITM_CRM_STAGE_MATCH_FIELDS : st.stageMatchFields
+    const matchExtras = isMbaItmCrm ? mbaItmCrmLeadFilterMatchExtras() : null
 
     const [crmPhones, webhookPhones] = await Promise.all([
-      crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, pickedSources, phoneStrExpr, st.stageMatchFields) : [],
-      webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, pickedSources, phoneStrExpr, st.stageExpr) : [],
+      crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, pickedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
+      webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, pickedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
     ])
 
     const phones = mergePhonesForWaJoin(crmPhones, webhookPhones)

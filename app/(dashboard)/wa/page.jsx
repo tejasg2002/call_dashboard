@@ -94,7 +94,12 @@ function SectionHeader({ title, description, isDark }) {
 }
 
 // Workspaces that support lead stage / source filtering
-const LEAD_FILTER_WORKSPACES = new Set([WA_WORKSPACE_BBA, WA_WORKSPACE_BTECH, WA_WORKSPACE_IDM])
+const LEAD_FILTER_WORKSPACES = new Set([
+  WA_WORKSPACE_MBA,
+  WA_WORKSPACE_BBA,
+  WA_WORKSPACE_BTECH,
+  WA_WORKSPACE_IDM,
+])
 
 export default function WAApiPage() {
   const { isAdmin, dataMasked } = useAuth()
@@ -157,7 +162,7 @@ export default function WAApiPage() {
     setFilters((f) => ({ ...f, pickedLeadStages: [], pickedSources: [] }))
   }, [workspace])
 
-  // Load lead filter options whenever workspace switches to BBA/BTECH
+  // Load lead filter options when workspace supports CRM / webhook lead cohorts
   useEffect(() => {
     const ws = normalizeWAWorkspace(workspace)
     if (!LEAD_FILTER_WORKSPACES.has(ws)) return
@@ -310,9 +315,12 @@ export default function WAApiPage() {
       setLeadFilterPhoneNormals(null)
     }
 
-    // Always refresh the cached snapshot after Apply (lead filter and/or dates)
+    // No custom date range: reload full snapshot unless we only applied a lead cohort
+    // (lead-filtered template/KPI rows come from /api/wa-lead-analytics; refreshing the cache
+    // here is redundant and can briefly replace the view or fail workspace checks).
     if (!hasRange) {
-      await handleRefresh()
+      const leadCohortActive = hasLeadFilter && (pickedStages.length || pickedSrcs.length)
+      if (!leadCohortActive) await handleRefresh()
       return
     }
     try {

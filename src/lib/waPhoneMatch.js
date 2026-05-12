@@ -12,7 +12,7 @@ export function normaliseMobile(raw) {
   return n
 }
 
-/** Values for Mongo `$in` when matching WA `_waPhone` (raw + normalised + 91…). */
+/** Values for Mongo `$in` when matching WA `_waPhone` (raw + normalised + 91… + +91-… + numeric BSON). */
 export function waPhoneVariantsForMatch(rawList) {
   const out = new Set()
   for (const raw of rawList || []) {
@@ -26,6 +26,15 @@ export function waPhoneVariantsForMatch(rawList) {
       if (n.length === 10) {
         out.add(`91${n}`)
         out.add(`+91${n}`)
+        out.add(`+91-${n}`)
+        const as10 = Number(n)
+        const as12 = Number(`91${n}`)
+        if (Number.isSafeInteger(as10)) out.add(as10)
+        if (Number.isSafeInteger(as12)) out.add(as12)
+      }
+      if (n.length === 12 && n.startsWith('91')) {
+        const as = Number(n)
+        if (Number.isSafeInteger(as)) out.add(as)
       }
     }
   }

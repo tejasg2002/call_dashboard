@@ -7,6 +7,8 @@ export const WA_DASHBOARD_CACHE_ID_MBA_LEGACY = "wa_latest";
 const ITM_DB = "itm";
 const ANALYTICS_DB = "analytics";
 const ITM_BS_DB = "ITM_BS";
+/** MBA lead stage / source filters (ITM CRM sync). */
+const ITM_CRM_DB = "itm-crm";
 const ITM_IDM_DB = "ITM_IDM";
 const ITM_IHM_DB = "ITM_IHM";
 const ITM_ISU_DB = "ITM_ISU";
@@ -279,5 +281,9 @@ export function waWorkspaceConfig(workspace) {
     waCollection: "interaktWhatsappWebhookEvents",
     cacheKey: WA_DASHBOARD_CACHE_ID_MBA,
     includeMbaConversion: true,
+    /** Lead filters: ITM CRM `leads` (phone → cohort for WA analytics). */
+    leadFilterDataDb: ITM_CRM_DB,
+    crmSnapshotCollection: "leads",
+    crmLeadFilterSchema: "itm_crm_leads",
   };
 }

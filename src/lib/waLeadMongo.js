@@ -236,7 +236,12 @@ export function leadPhoneStringExpr(phoneExpr) {
   return {
     $trim: {
       input: {
-        $toString: { $ifNull: [phoneExpr, ""] },
+        $convert: {
+          input: { $ifNull: [phoneExpr, null] },
+          to: 'string',
+          onError: '',
+          onNull: '',
+        },
       },
     },
   };
@@ -250,6 +255,70 @@ export const leadStageExpr = {
   $ifNull: ["$lead_stage", "$Lead_Stage"],
 };
 
+/** ITM CRM `itm-crm.leads` — phone for WA cohort join (see sample `personal.phone`, `_source.mobile`). */
+export const mbaItmCrmLeadPhoneExpr = {
+  $ifNull: [
+    "$personal.phone",
+    {
+      $ifNull: ["$_source.mobile", { $ifNull: ["$mobile", leadPhoneExpr] }],
+    },
+  ],
+};
+
+/** Funnel stage: canonical `stage.current`, legacy flat `_source.lead_stage`. */
+export const mbaItmCrmLeadStageExpr = {
+  $ifNull: ["$stage.current", "$_source.lead_stage"],
+};
+
+/** Primary channel / source string for filters and dropdowns. */
+export const mbaItmCrmLeadSourceExpr = {
+  $trim: {
+    input: {
+      $convert: {
+        input: { $ifNull: ['$source.channel', { $ifNull: ['$_source.source', null] }] },
+        to: 'string',
+        onError: '',
+        onNull: '',
+      },
+    },
+  },
+};
+
+export const MBA_ITM_CRM_STAGE_MATCH_FIELDS = Object.freeze([
+  "$stage.current",
+  "$_source.lead_stage",
+]);
+
+export const MBA_ITM_CRM_STAGE_DISTINCT_PATHS = Object.freeze([
+  "stage.current",
+  "_source.lead_stage",
+]);
+
+export const MBA_ITM_CRM_SOURCE_DISTINCT_PATHS = Object.freeze([
+  "source.channel",
+  "_source.source",
+  "source.utmSource",
+]);
+
+/** Extra paths for $expr source matching (segment + full string, same as other CRM rows). */
+export const MBA_ITM_CRM_SOURCE_EXTRA_SEGMENT_PATHS = Object.freeze([
+  "$source.channel",
+  "$_source.source",
+]);
+
+export const MBA_ITM_CRM_SOURCE_EXTRA_MATCH_FIELDS = Object.freeze([
+  "$source.channel",
+  "$_source.source",
+  "$source.utmSource",
+]);
+
+export function mbaItmCrmLeadFilterMatchExtras() {
+  return {
+    extraSourceSegmentPaths: [...MBA_ITM_CRM_SOURCE_EXTRA_SEGMENT_PATHS],
+    extraSourceMatchFields: [...MBA_ITM_CRM_SOURCE_EXTRA_MATCH_FIELDS],
+  };
+}
+
 /**
  * First `/`-delimited token, lowercased (e.g. google/search/BBA-Branded-2026 → google).
  * Returns null when missing/empty so $ifNull chains fall through.
@@ -261,7 +330,14 @@ export function sourceRootSegmentExpr(pathWithDollar) {
   return {
     $let: {
       vars: {
-        raw: { $toString: { $ifNull: [p, ""] } },
+        raw: {
+          $convert: {
+            input: { $ifNull: [p, null] },
+            to: 'string',
+            onError: '',
+            onNull: '',
+          },
+        },
       },
       in: {
         $let: {
@@ -448,12 +524,19 @@ export const leadSourceExpr = {
   ],
 };
 
-/** Mongo: stringify + trim + lower */
+/** Mongo: stringify + trim + lower (objects / odd types → "" via $convert). */
 function normFieldExpr(fieldPath) {
   return {
     $toLower: {
       $trim: {
-        input: { $toString: { $ifNull: [fieldPath, ""] } },
+        input: {
+          $convert: {
+            input: { $ifNull: [fieldPath, null] },
+            to: 'string',
+            onError: '',
+            onNull: '',
+          },
+        },
       },
     },
   };
@@ -648,6 +731,7 @@ export function buildLeadStageSourceMatchInsensitive(
   leadStagesIn,
   sourcesIn,
   stageMatchFields = LEAD_STAGE_MATCH_DOLLAR_PATHS,
+  extras = null,
 ) {
   const stageTargets = leadFilterTargetsFromPicks(leadStagesIn);
   const sourceTargets = leadFilterTargetsFromPicks(sourcesIn);
@@ -658,6 +742,13 @@ export function buildLeadStageSourceMatchInsensitive(
     for (const f of stageMatchFields) {
       for (const t of stageTargets) {
         stageOr.push({ $eq: [normFieldExpr(f), t] });
+      }
+    }
+    if (extras?.extraStagePaths?.length) {
+      for (const f of extras.extraStagePaths) {
+        for (const t of stageTargets) {
+          stageOr.push({ $eq: [normFieldExpr(f), t] });
+        }
       }
     }
     clauses.push({ $expr: { $or: stageOr } });
@@ -673,6 +764,20 @@ export function buildLeadStageSourceMatchInsensitive(
     for (const f of SOURCE_MATCH_FIELDS) {
       for (const t of sourceTargets) {
         sourceOr.push({ $eq: [normFieldExpr(f), t] });
+      }
+    }
+    if (extras?.extraSourceSegmentPaths?.length) {
+      for (const path of extras.extraSourceSegmentPaths) {
+        for (const t of sourceTargets) {
+          sourceOr.push({ $eq: [sourceRootSegmentExpr(path), t] });
+        }
+      }
+    }
+    if (extras?.extraSourceMatchFields?.length) {
+      for (const f of extras.extraSourceMatchFields) {
+        for (const t of sourceTargets) {
+          sourceOr.push({ $eq: [normFieldExpr(f), t] });
+        }
       }
     }
     clauses.push({ $expr: { $or: sourceOr } });
