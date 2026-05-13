@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { maskPhone } from '../../lib/userManagement'
+import { normalizeWAWorkspace } from '../../lib/waWorkspace'
 import { useClientPagination } from '../../hooks/useClientPagination'
 import PaginationBar from '../PaginationBar'
+import { WAUserJourneyByPhone } from './WAUserJourney'
 
 function SectionHeader({ title, description, isDark }) {
   return (
@@ -41,12 +44,39 @@ function extrasSummary(extras) {
 /**
  * Full-width application + lead + WhatsApp context table (one row per converted user).
  * Data comes from `paymentConversion.formSubmittedDetails` (see wa-dashboard compute).
+ * Click a row to load that user’s full WhatsApp + form journey (same API as User journey).
  */
-export default function WAApplicationFormSection({ paymentConversion, theme, dataMasked }) {
+export default function WAApplicationFormSection({ paymentConversion, theme, dataMasked, workspace }) {
   const isDark = theme === 'dark'
+  const ws = normalizeWAWorkspace(workspace || '')
   const mp = (phone) => (dataMasked ? maskPhone(phone) : phone)
   const rows = paymentConversion?.formSubmittedDetails ?? []
   const { page, setPage, totalPages, total, pageSize, paginated } = useClientPagination(rows, 12)
+  const [selectedMobile, setSelectedMobile] = useState(null)
+  const journeyAnchorRef = useRef(null)
+
+  const rowKey = (m) => String(m ?? '').replace(/\D/g, '')
+
+  useEffect(() => {
+    setSelectedMobile(null)
+  }, [ws])
+
+  useEffect(() => {
+    if (!selectedMobile) return
+    const stillThere = rows.some((r) => rowKey(r.mobile) === rowKey(selectedMobile))
+    if (!stillThere) setSelectedMobile(null)
+  }, [rows, selectedMobile])
+
+  const openJourneyForRow = (rawMobile) => {
+    const digits = rowKey(rawMobile)
+    if (digits.length < 10) return
+    setSelectedMobile((prev) => (rowKey(prev) === digits ? null : rawMobile))
+  }
+
+  useEffect(() => {
+    if (!selectedMobile || !journeyAnchorRef.current) return
+    journeyAnchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [selectedMobile])
 
   if (!paymentConversion || rows.length === 0) return null
 
@@ -57,11 +87,11 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Application form"
+        title="Applications"
         description={
           isPayment
-            ? 'Converted users with lead ID, how many distinct templates were sent/delivered to their number, and click context.'
-            : 'Submitted applications with lead ID, name, application number, templates sent (sent/delivered), and templates clicked.'
+            ? 'Converted users with lead ID, how many distinct templates were sent/delivered to their number, and click context. Click a row to see that user’s journey.'
+            : 'Submitted applications with lead ID, name, application number, templates sent, and templates clicked. Click a row to see that applicant’s full WhatsApp and form journey.'
         }
         isDark={isDark}
       />
@@ -69,6 +99,9 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
         <div className={`px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2 ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
           <p className={`text-[11px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
             {total.toLocaleString('en-IN')} record{total === 1 ? '' : 's'}
+            <span className={`font-normal ml-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+              · Click a row for journey
+            </span>
           </p>
         </div>
         <div className="max-h-[min(70vh,520px)] overflow-x-auto overflow-y-auto">
@@ -96,8 +129,30 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
                 const sent = Array.isArray(u.templatesSent) ? u.templatesSent : []
                 const sentCount = typeof u.templatesSentCount === 'number' ? u.templatesSentCount : sent.length
                 const extraLine = extrasSummary(u.applicationExtras)
+                const rk = rowKey(u.mobile)
+                const selected = selectedMobile != null && rk.length >= 10 && rk === rowKey(selectedMobile)
                 return (
-                  <tr key={`${u.leadId || ''}-${u.mobile}-${(page - 1) * pageSize + idx}`}>
+                  <tr
+                    key={`${u.leadId || ''}-${u.mobile}-${(page - 1) * pageSize + idx}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openJourneyForRow(u.mobile)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        openJourneyForRow(u.mobile)
+                      }
+                    }}
+                    className={`cursor-pointer transition-colors ${
+                      selected
+                        ? isDark
+                          ? 'bg-brand-900/25 ring-1 ring-inset ring-brand-600/40'
+                          : 'bg-brand-50 ring-1 ring-inset ring-brand-200'
+                        : isDark
+                          ? 'hover:bg-slate-800/80'
+                          : 'hover:bg-slate-50'
+                    }`}
+                  >
                     <td className={`px-2 py-2 align-top ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {(page - 1) * pageSize + idx + 1}
                     </td>
@@ -153,6 +208,18 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
           />
         )}
       </div>
+
+      {ws && selectedMobile && rowKey(selectedMobile).length >= 10 && (
+        <div ref={journeyAnchorRef} className="scroll-mt-4">
+          <WAUserJourneyByPhone
+            workspace={ws}
+            isDark={isDark}
+            phone={selectedMobile}
+            dataMasked={dataMasked}
+            onClose={() => setSelectedMobile(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }

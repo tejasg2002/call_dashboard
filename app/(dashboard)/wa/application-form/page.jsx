@@ -93,11 +93,11 @@ export default function WAApplicationFormPage() {
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
           <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            Application form
+            Applications
           </h1>
           <p className={`text-sm mt-1 max-w-2xl ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Lead ID, name, application number, templates sent (sent/delivered), course and email where
-            available — same cohort as Form conversion on API Messages (cached snapshot).
+            Same cohort as Form conversion on API Messages (cached snapshot). Click a row to open that
+            applicant’s journey: WhatsApp template timeline and form milestones.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -175,7 +175,12 @@ export default function WAApplicationFormPage() {
           here — or widen the date range from <strong>API Messages</strong> if you use a custom range.
         </p>
       ) : (
-        <WAApplicationFormSection paymentConversion={pc} theme={theme} dataMasked={dataMasked} />
+        <WAApplicationFormSection
+          paymentConversion={pc}
+          theme={theme}
+          dataMasked={dataMasked}
+          workspace={normalizeWAWorkspace(workspace)}
+        />
       )}
     </div>
   )
