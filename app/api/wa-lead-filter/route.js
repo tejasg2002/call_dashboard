@@ -8,6 +8,8 @@
 
 import clientPromise from '../../../src/lib/mongodb'
 import { waWorkspaceConfig, normalizeWAWorkspace } from '../../../src/lib/waWorkspace'
+import { loadLeadFilterOptions } from '../../../src/lib/waLeadFilterOptions.js'
+import { expandLeadFilterSourcePicksForMatch } from '../../../src/lib/leadFilterSourcePrimary.js'
 import {
   buildLeadPhoneExpr,
   leadPhoneStringExpr,
@@ -15,70 +17,14 @@ import {
   buildLeadStageSourceMatchInsensitive,
   buildGroupedLeadFilterMatch,
   normalizeLeadFilterList,
-  distinctNonEmptyStrings,
   resolveLeadStageFilterContext,
-  LEAD_SOURCE_DISTINCT_PATHS,
   mbaItmCrmLeadPhoneExpr,
   mbaItmCrmLeadStageExpr,
   mbaItmCrmLeadSourceExpr,
   MBA_ITM_CRM_STAGE_MATCH_FIELDS,
-  MBA_ITM_CRM_STAGE_DISTINCT_PATHS,
-  MBA_ITM_CRM_SOURCE_DISTINCT_PATHS,
   mbaItmCrmLeadFilterMatchExtras,
 } from '../../../src/lib/waLeadMongo'
 import { normaliseMobile } from '../../../src/lib/waPhoneMatch'
-
-const LATEST_SORT = { createdAt: -1, Updated_Date: -1, updatedAt: -1, _id: -1 }
-
-async function fetchOptions(col, stageExpr, sourceExpr = leadSourceExpr) {
-  const rows = await col
-    .aggregate([
-      { $project: { leadStage: stageExpr, source: sourceExpr } },
-      {
-        $group: {
-          _id: null,
-          stages: { $addToSet: '$leadStage' },
-          sources: { $addToSet: '$source' },
-        },
-      },
-    ])
-    .toArray()
-
-  if (!rows[0]) return { stages: [], sources: [] }
-  return {
-    stages: (rows[0].stages || []).filter((s) => s != null && String(s).trim() !== ''),
-    sources: (rows[0].sources || []).filter((s) => s != null && String(s).trim() !== ''),
-  }
-}
-
-async function fetchWebhookOptions(col, phoneStrExpr, stageExpr, sourceExpr = leadSourceExpr) {
-  const rows = await col
-    .aggregate([
-      { $sort: LATEST_SORT },
-      {
-        $group: {
-          _id: phoneStrExpr,
-          leadStage: { $first: stageExpr },
-          source: { $first: sourceExpr },
-        },
-      },
-      { $match: { _id: { $nin: [null, ''] } } },
-      {
-        $group: {
-          _id: null,
-          stages: { $addToSet: '$leadStage' },
-          sources: { $addToSet: '$source' },
-        },
-      },
-    ])
-    .toArray()
-
-  if (!rows[0]) return { stages: [], sources: [] }
-  return {
-    stages: (rows[0].stages || []).filter((s) => s != null && String(s).trim() !== ''),
-    sources: (rows[0].sources || []).filter((s) => s != null && String(s).trim() !== ''),
-  }
-}
 
 async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields, matchExtras) {
   const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields, matchExtras)
@@ -92,6 +38,8 @@ async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageM
     .toArray()
   return rows.map((r) => r._id).filter(Boolean)
 }
+
+const LATEST_SORT = { createdAt: -1, Updated_Date: -1, updatedAt: -1, _id: -1 }
 
 async function fetchWebhookPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageExpr, sourceExpr = leadSourceExpr) {
   const rows = await col
@@ -131,6 +79,7 @@ export async function GET(request) {
     const mode = searchParams.get('mode') || 'options'
     const pickedLeadStages = normalizeLeadFilterList(searchParams.getAll('leadStage'))
     const pickedSources = normalizeLeadFilterList(searchParams.getAll('source'))
+    const expandedSources = expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
 
     const cfg = waWorkspaceConfig(workspace)
     const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
@@ -150,51 +99,19 @@ export async function GET(request) {
     const sourceExpr = isMbaItmCrm ? mbaItmCrmLeadSourceExpr : leadSourceExpr
     const stageMatchFields = isMbaItmCrm ? MBA_ITM_CRM_STAGE_MATCH_FIELDS : st.stageMatchFields
     const matchExtras = isMbaItmCrm ? mbaItmCrmLeadFilterMatchExtras() : null
-    const crmStagePaths = isMbaItmCrm ? [...MBA_ITM_CRM_STAGE_DISTINCT_PATHS] : st.stageDistinctPaths
-    const crmSourcePaths = isMbaItmCrm ? [...MBA_ITM_CRM_SOURCE_DISTINCT_PATHS] : LEAD_SOURCE_DISTINCT_PATHS
 
     if (mode === 'options') {
-      const [
-        crmOpts,
-        webhookOpts,
-        crmStagesDist,
-        crmSourcesDist,
-        whStagesDist,
-        whSourcesDist,
-      ] = await Promise.all([
-        crmCol ? fetchOptions(crmCol, stageExpr, sourceExpr) : { stages: [], sources: [] },
-        webhookCol ? fetchWebhookOptions(webhookCol, phoneStrExpr, stageExpr, sourceExpr) : { stages: [], sources: [] },
-        crmCol ? distinctNonEmptyStrings(crmCol, crmStagePaths) : [],
-        crmCol ? distinctNonEmptyStrings(crmCol, crmSourcePaths) : [],
-        webhookCol ? distinctNonEmptyStrings(webhookCol, st.stageDistinctPaths) : [],
-        webhookCol ? distinctNonEmptyStrings(webhookCol, LEAD_SOURCE_DISTINCT_PATHS) : [],
-      ])
-
-      const leadStages = [
-        ...new Set([
-          ...crmOpts.stages,
-          ...webhookOpts.stages,
-          ...crmStagesDist,
-          ...whStagesDist,
-        ]),
-      ].sort((a, b) => String(a).localeCompare(String(b)))
-
-      const sources = [
-        ...new Set([
-          ...crmOpts.sources,
-          ...webhookOpts.sources,
-          ...crmSourcesDist,
-          ...whSourcesDist,
-        ]),
-      ].sort((a, b) => String(a).localeCompare(String(b)))
-
+      const { leadStages, sources, unavailable } = await loadLeadFilterOptions(client, workspace)
+      if (unavailable) {
+        return Response.json({ error: unavailable }, { status: 400 })
+      }
       return Response.json({ leadStages, sources })
     }
 
     if (mode === 'phones') {
       const [crmPhones, webhookPhones] = await Promise.all([
-        crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, pickedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
-        webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, pickedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
+        crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, expandedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
+        webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, expandedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
       ])
       const phones = mergePhonesForWaJoin(crmPhones, webhookPhones)
       return Response.json({ phones, count: phones.length })

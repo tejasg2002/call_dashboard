@@ -25,6 +25,12 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     cacheKey: "wa_latest_ihm",
     label: "IHM",
     dataDb: ITM_IHM_DB,
+    /** Same lead-filter pattern as IDM (CRM snapshot + NPF lead webhooks on ITM_IHM). */
+    leadFilterDataDb: ITM_IHM_DB,
+    crmSnapshotCollection: "crmSnapshot",
+    leadWebhookCollection: "npfLeadsWebhookEvents",
+    leadPhoneField: "mobile",
+    leadFunnelStageField: "lead_stage",
     isuAppsDb: ITM_IHM_DB,
     isuAppsCollection: "npfApplicationsWebhookEvents",
     isuAppsPhoneField: "Mobile_Number",
@@ -76,8 +82,8 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     isuAppsCollection: "npfApplicationsWebhookEventsBTech",
     isuAppsPhoneField: "Mobile_Number",
     isuPaymentCollection: "npfPaymentWebhookEventsBTech",
-    crmSnapshotCollection: "crmSnapshotBtech",
-    leadWebhookCollection: "npfLeadWebhookEventsBTech",
+    crmSnapshotCollection: "crmSnapshotBTech",
+    leadWebhookCollection: "npfLeadsWebhookEventsBTech",
     leadPhoneField: "registered_mobile",
   },
 ]);
@@ -209,6 +215,7 @@ export function isRouteAllowedForBuWorkspace(pathname, workspace) {
   if (p === "/settings") return true;
   if (p === "/wa") return true;
   if (p === "/wa/user-journey") return true;
+  if (p === "/wa/application-form") return true;
   if (p.startsWith("/wa/templates/")) return true;
   if (workspaceUsesIsuCallLogs(w)) {
     if (p === "/" || p === "/call-review") return true;

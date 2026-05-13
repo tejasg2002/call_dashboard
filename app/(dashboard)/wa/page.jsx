@@ -99,6 +99,7 @@ const LEAD_FILTER_WORKSPACES = new Set([
   WA_WORKSPACE_BBA,
   WA_WORKSPACE_BTECH,
   WA_WORKSPACE_IDM,
+  WA_WORKSPACE_IHM,
 ])
 
 export default function WAApiPage() {

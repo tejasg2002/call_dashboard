@@ -40,7 +40,7 @@ export default function WALayout({ children }) {
             </span>
           </Link>
           <Link
-            href="/wa/user-journey"
+            href={withWorkspaceQuery('/wa/user-journey', workspace)}
             className={cn(
               "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
               pathname === '/wa/user-journey'
@@ -55,10 +55,26 @@ export default function WALayout({ children }) {
               User Journey
             </span>
           </Link>
+          <Link
+            href={withWorkspaceQuery('/wa/application-form', workspace)}
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              pathname === '/wa/application-form'
+                ? "border-brand-700 text-brand-700 dark:text-brand-400 dark:border-brand-400"
+                : cn("border-transparent", isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800")
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Application Form
+            </span>
+          </Link>
           {!limitedWaNav && (
             <>
               <Link
-                href="/wa/chat"
+                href={withWorkspaceQuery('/wa/chat', workspace)}
                 className={cn(
                   "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                   pathname === '/wa/chat'

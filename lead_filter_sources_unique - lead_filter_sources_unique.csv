@@ -1,0 +1,712 @@
+workspace_slug,workspace_name,source,Primary
+bba,BBA,agents,Agents
+bba,BBA,Agents,Agents
+bba,BBA,api,Meta
+bba,BBA,blank,Invalid
+bba,BBA,blog,Organic
+bba,BBA,btl,BTL
+bba,BBA,BTL,BTL
+bba,BBA,careers360,Publisher
+bba,BBA,Careers360,Publisher
+bba,BBA,chat,Meta
+bba,BBA,Chat,Meta
+bba,BBA,Chatgpt,Meta
+bba,BBA,chatgpt.com,Meta
+bba,BBA,chatgpt.com?utm_source=web,Meta
+bba,BBA,chatgpt.com#cuet-ug-previous-year-question-papers-year-wise-pdf-access-plan,Meta
+bba,BBA,collegedunia,Publisher
+bba,BBA,Collegedunia,Publisher
+bba,BBA,default_source,Invalid
+bba,BBA,direct,Organic
+bba,BBA,Direct,Organic
+bba,BBA,email,Organic
+bba,BBA,facebook,Meta
+bba,BBA,Facebook,Meta
+bba,BBA,fb,Meta
+bba,BBA,google,Meta
+bba,BBA,Google Ads,Meta
+bba,BBA,ig,Meta
+bba,BBA,inhouse social media,Organic
+bba,BBA,justdial,Invalid
+bba,BBA,kollegeapply,Publisher
+bba,BBA,Kollegeapply,Publisher
+bba,BBA,Lets Upgrade,Data Base
+bba,BBA,letsupgrade,Data Base
+bba,BBA,Not Mapped,Data Base
+bba,BBA,npf,Data Base
+bba,BBA,offline,Data Base
+bba,BBA,Offline,Data Base
+bba,BBA,organic,Organic
+bba,BBA,Organic,Organic
+bba,BBA,other,Invalid
+bba,BBA,Other Campaigns,Invalid
+bba,BBA,Others,Invalid
+bba,BBA,Paid Ads,Meta
+bba,BBA,perplexity,Meta
+bba,BBA,Previous Year Paper,Data Base
+bba,BBA,Publisher Campaign,Publisher
+bba,BBA,referral,Referral
+bba,BBA,Referral,Referral
+bba,BBA,shiksha,Publisher
+bba,BBA,Shiksha,Publisher
+bba,BBA,Social,Meta
+bba,BBA,Source Not Set,Data Base
+bba,BBA,wa,Walk - in
+bba,BBA,Walk In,Walk - in
+bba,BBA,walk-in,Walk - in
+bba,BBA,web,Organic
+bba,BBA,Webinar USA SA,Organic
+bba,BBA,website,Organic
+bba,BBA,Website,Organic
+bba,BBA,websitepyq,Organic
+btech,BTECH,agents,Agents
+btech,BTECH,Agents,Agents
+btech,BTECH,api,Meta
+btech,BTECH,blank,Invalid
+btech,BTECH,blog,Organic
+btech,BTECH,brochure,BTL
+btech,BTECH,btl,BTL
+btech,BTECH,BTL,BTL
+btech,BTECH,careers360,Publisher
+btech,BTECH,Careers360,Publisher
+btech,BTECH,chat,Meta
+btech,BTECH,Chat,Meta
+btech,BTECH,Chatgpt,Meta
+btech,BTECH,chatgpt.com,Meta
+btech,BTECH,collegedunia,Publisher
+btech,BTECH,Collegedunia,Publisher
+btech,BTECH,database,Data Base
+btech,BTECH,Database,Data Base
+btech,BTECH,default_source,Invalid
+btech,BTECH,direct,Organic
+btech,BTECH,Direct,Organic
+btech,BTECH,DOT,Invalid
+btech,BTECH,email,Organic
+btech,BTECH,facebook,Meta
+btech,BTECH,Facebook,Meta
+btech,BTECH,fb,Meta
+btech,BTECH,flyer,BTL
+btech,BTECH,google,Meta
+btech,BTECH,Google Ads,Meta
+btech,BTECH,inbound call,Incomming calls
+btech,BTECH,kollegeapply,Publisher
+btech,BTECH,Kollegeapply,Publisher
+btech,BTECH,lead nurturing,Organic
+btech,BTECH,Lead Nurturing,Organic
+btech,BTECH,Lets Upgrade,Data Base
+btech,BTECH,letsupgrade,Data Base
+btech,BTECH,NA,invalid
+btech,BTECH,Not Mapped,Data Base
+btech,BTECH,npf,Data Base
+btech,BTECH,Offline,Data Base
+btech,BTECH,organic,Organic
+btech,BTECH,Organic,Organic
+btech,BTECH,other,invalid
+btech,BTECH,Other Campaigns,invalid
+btech,BTECH,Others,invalid
+btech,BTECH,Paid Ads,Meta
+btech,BTECH,Previous Year Paper,Data Base
+btech,BTECH,Publisher Campaign,Publisher
+btech,BTECH,referral,Referral
+btech,BTECH,Referral,Referral
+btech,BTECH,shiksha,Publisher
+btech,BTECH,Shiksha,Publisher
+btech,BTECH,social,Meta
+btech,BTECH,Social,Meta
+btech,BTECH,Source Not Set,Data Base
+btech,BTECH,Telephony,Incomming calls
+btech,BTECH,Telephony Inbound,Incomming calls
+btech,BTECH,visitingcard,BTL
+btech,BTECH,wa,Walk - in
+btech,BTECH,wakin,Walk - in
+btech,BTECH,Walk In,Walk - in
+btech,BTECH,walk-in,Walk - in
+btech,BTECH,web,Organic
+btech,BTECH,Webinar USA SA,Organic
+btech,BTECH,website,Organic
+btech,BTECH,Website,Organic
+btech,BTECH,websitepyq,Organic
+btech,BTECH,youtube,Meta
+btech,BTECH,Youtube,Meta
+idm,IDM,2265867145,
+idm,IDM,147,
+idm,IDM,181,
+idm,IDM,182,
+idm,IDM,186,
+idm,IDM,186_RV,
+idm,IDM,192,
+idm,IDM,195,
+idm,IDM,195_RV,
+idm,IDM,196,
+idm,IDM,196_RV,
+idm,IDM,198,
+idm,IDM,198_RV,
+idm,IDM,199,
+idm,IDM,199_RV,
+idm,IDM,208,
+idm,IDM,208_RV,
+idm,IDM,211,
+idm,IDM,211_RV,
+idm,IDM,214,
+idm,IDM,214_RV,
+idm,IDM,220,
+idm,IDM,220_RV,
+idm,IDM,223,
+idm,IDM,223_RV,
+idm,IDM,225,
+idm,IDM,227,
+idm,IDM,227_RV,
+idm,IDM,229,
+idm,IDM,229_RV,
+idm,IDM,230,
+idm,IDM,230_RV,
+idm,IDM,240,
+idm,IDM,241,
+idm,IDM,243,
+idm,IDM,259,
+idm,IDM,260,
+idm,IDM,262,
+idm,IDM,264,
+idm,IDM,278_RV,
+idm,IDM,279,
+idm,IDM,37,
+idm,IDM,90Ta,
+idm,IDM,918634127518,
+idm,IDM,A10,
+idm,IDM,admission,
+idm,IDM,admissionpage,
+idm,IDM,adwords,
+idm,IDM,Adwords,
+idm,IDM,agents,Agents
+idm,IDM,Agents,Agents
+idm,IDM,Alag Angle,
+idm,IDM,alagangle,
+idm,IDM,AMU01,
+idm,IDM,Archi Learn,
+idm,IDM,archilearn,
+idm,IDM,B10,
+idm,IDM,beyondees,
+idm,IDM,Beyondees,
+idm,IDM,blog,Organic
+idm,IDM,Blog,Organic
+idm,IDM,bm03,
+idm,IDM,bm100,
+idm,IDM,bm49,
+idm,IDM,bm51,
+idm,IDM,bm54,
+idm,IDM,bm62,
+idm,IDM,bm67,
+idm,IDM,bm68,
+idm,IDM,bm75,
+idm,IDM,bm81,
+idm,IDM,bm88,
+idm,IDM,bm91,
+idm,IDM,brds,Agents
+idm,IDM,BRDS,Agents
+idm,IDM,brochure,BTL
+idm,IDM,btl,BTL
+idm,IDM,BTL,BTL
+idm,IDM,C10_3,
+idm,IDM,ca147 comp,
+idm,IDM,ca55 KA91,
+idm,IDM,ca55 kapp01,
+idm,IDM,CAARREERS360,Publisher
+idm,IDM,cad90 VJ38zp,
+idm,IDM,cap1000,
+idm,IDM,cap1002,
+idm,IDM,careeer360,Publisher
+idm,IDM,career360,Publisher
+idm,IDM,careers360,Publisher
+idm,IDM,Careers360,Publisher
+idm,IDM,CDC,
+idm,IDM,chat,Organic
+idm,IDM,Chat,Organic
+idm,IDM,chatbot,Organic
+idm,IDM,Chatgpt,Meta
+idm,IDM,chatgpt.com,Meta
+idm,IDM,chatgpt.com#professional-certification,Meta
+idm,IDM,cidco event,BTL
+idm,IDM,CJ003,
+idm,IDM,Coaching Institute,Agents
+idm,IDM,coachinginstitute,Agents
+idm,IDM,collegedunia,Publisher
+idm,IDM,Collegedunia,Publisher
+idm,IDM,colleges/schools,Agents
+idm,IDM,Colleges/Schools,Agents
+idm,IDM,Colourking,Agents
+idm,IDM,com.google.android.googlequicksearchbox,Meta
+idm,IDM,consultant,Agents
+idm,IDM,Consultant,Agents
+idm,IDM,creativeedge,invalid
+idm,IDM,cv55 PNP28,
+idm,IDM,d2,
+idm,IDM,database,Data Base
+idm,IDM,Database,Data Base
+idm,IDM,default_medium,
+idm,IDM,default_source,
+idm,IDM,Demand-Gen,
+idm,IDM,Design Ifffa,
+idm,IDM,designifffa,
+idm,IDM,Desizn Circle,
+idm,IDM,desizncircle,
+idm,IDM,digitalbrochure,
+idm,IDM,direct,Organic
+idm,IDM,Direct,Organic
+idm,IDM,educon,
+idm,IDM,Educon,
+idm,IDM,exhibition banner,
+idm,IDM,facebook,Meta
+idm,IDM,Facebook,Meta
+idm,IDM,flyer,BTL
+idm,IDM,Forms,
+idm,IDM,fs,
+idm,IDM,G31,
+idm,IDM,G31_V,
+idm,IDM,G310,
+idm,IDM,G32,
+idm,IDM,G33,
+idm,IDM,G39,
+idm,IDM,G47,
+idm,IDM,GBP,
+idm,IDM,google,Meta
+idm,IDM,Google Ads,Meta
+idm,IDM,GQ,
+idm,IDM,GQ_V,
+idm,IDM,idm_qr_code,
+idm,IDM,idm2026,
+idm,IDM,idmbachelorofdesigninanimationandvfxpage,
+idm,IDM,idmbachelorofdesigninfashiondesignpage,
+idm,IDM,idmbachelorofdesignininteriordesignpage,
+idm,IDM,inbound call,Incomming calls
+idm,IDM,Inbound Call,Incomming calls
+idm,IDM,Instagram,
+idm,IDM,instituteofdesignandmediapage,
+idm,IDM,Interest-AI-PROOF-Mumbai,
+idm,IDM,Interest-IOS-Mumbai,
+idm,IDM,Interest-UCEED-Mumbai,
+idm,IDM,Isu,
+idm,IDM,Itm,
+idm,IDM,ITM Alumnus,
+idm,IDM,ITM Website,Organic
+idm,IDM,JZ2,
+idm,IDM,k100,
+idm,IDM,K1059,
+idm,IDM,KA100,
+idm,IDM,kollegeapply,Publisher
+idm,IDM,KollegeApply,Publisher
+idm,IDM,KWA24,
+idm,IDM,KWA75,
+idm,IDM,KWA82,
+idm,IDM,KWV24,
+idm,IDM,last year data,Data Base
+idm,IDM,Lat1,
+idm,IDM,Lat1_d,
+idm,IDM,lead nurturing,Organic
+idm,IDM,Lead Nurturing,Organic
+idm,IDM,lead nururing,Organic
+idm,IDM,Lead-Gen,
+idm,IDM,LeadAd,
+idm,IDM,LG,
+idm,IDM,liveform,
+idm,IDM,LTM01,
+idm,IDM,m14,
+idm,IDM,m15,
+idm,IDM,m16,
+idm,IDM,ma11,
+idm,IDM,ma53,
+idm,IDM,ma69,
+idm,IDM,ma70,
+idm,IDM,ma72,
+idm,IDM,MI331,
+idm,IDM,Mobile App,
+idm,IDM,MYCIVA,
+idm,IDM,NA,
+idm,IDM,New ITM Student,
+idm,IDM,Nopaperforms,
+idm,IDM,Not Mapped,
+idm,IDM,Offline,
+idm,IDM,online_content,
+idm,IDM,organic,Organic
+idm,IDM,Organic,Organic
+idm,IDM,Other Campaigns,
+idm,IDM,others,
+idm,IDM,outbound call,invalid
+idm,IDM,Outbound Call,invalid
+idm,IDM,paid,Meta
+idm,IDM,Paid Ads,Meta
+idm,IDM,placementpage,
+idm,IDM,PNP85,Agents
+idm,IDM,PNP89,Agents
+idm,IDM,pop_socket,
+idm,IDM,Premium Database,Data Base
+idm,IDM,Previous Year Paper,
+idm,IDM,prospect data,Data Base
+idm,IDM,Prospect Data,Data Base
+idm,IDM,Publisher Campaign,Publisher
+idm,IDM,RD5,
+idm,IDM,referral,Referral
+idm,IDM,Referral,Referral
+idm,IDM,response,
+idm,IDM,s15302604,Agents
+idm,IDM,S15302604,Agents
+idm,IDM,Samarth Educares,Agents
+idm,IDM,samartheducares,Agents
+idm,IDM,sarvgyan,Agents
+idm,IDM,Sarvgyan,Agents
+idm,IDM,search,Meta
+idm,IDM,shiksha,Publisher
+idm,IDM,Shiksha,Publisher
+idm,IDM,Silica,Agents
+idm,IDM,SINGING LINES,
+idm,IDM,singinglines,
+idm,IDM,social,Meta
+idm,IDM,Social,Meta
+idm,IDM,standbanner,BTTL
+idm,IDM,Telephony,Incomming calls
+idm,IDM,Telephony Inbound,Incomming calls
+idm,IDM,Telephony Outbound,Incomming calls
+idm,IDM,thankyoupage,Organic
+idm,IDM,Top Rankers,invalid
+idm,IDM,TQi1,invalid
+idm,IDM,twigz network,Publisher
+idm,IDM,twigz_network,Publisher
+idm,IDM,uceed,Data Base
+idm,IDM,urmis arts,Agents
+idm,IDM,Urmis Arts,Agents
+idm,IDM,urmisarts,Agents
+idm,IDM,VD_10,Data Base
+idm,IDM,VJ38d,Data Base
+idm,IDM,VJ38e,Data Base
+idm,IDM,VJ38zp,Data Base
+idm,IDM,VJ398a,Data Base
+idm,IDM,VJ62,Data Base
+idm,IDM,Walk In,Walk - in
+idm,IDM,walk ins,Walk - in
+idm,IDM,Walk Ins,Walk - in
+idm,IDM,web,Organic
+idm,IDM,Web,Organic
+idm,IDM,website,Organic
+idm,IDM,Website,Organic
+idm,IDM,Website Chat,Organic
+idm,IDM,websitepyq,Organic
+idm,IDM,whatsapp,Organic
+idm,IDM,whatsappleadnurturing_medium=i_ux_1,Organic
+idm,IDM,yahoo,Meta
+idm,IDM,Zin3,Meta
+ihm,IHM,2271775144,invalid
+ihm,IHM,12th-comm,Data Base
+ihm,IHM,1725678642,invalid
+ihm,IHM,1725678643,invalid
+ihm,IHM,208,Data Base
+ihm,IHM,211,Data Base
+ihm,IHM,211_RV,Data Base
+ihm,IHM,214,Data Base
+ihm,IHM,217,Data Base
+ihm,IHM,217_RV,Data Base
+ihm,IHM,220,Data Base
+ihm,IHM,227,Data Base
+ihm,IHM,227_RV,Data Base
+ihm,IHM,230,Data Base
+ihm,IHM,255,Data Base
+ihm,IHM,262,Data Base
+ihm,IHM,agents,Agents
+ihm,IHM,Agents,Agents
+ihm,IHM,bing,Meta
+ihm,IHM,Bing,Meta
+ihm,IHM,blog,Organic
+ihm,IHM,Blog,Organic
+ihm,IHM,bm51,Data Base
+ihm,IHM,bm54,Data Base
+ihm,IHM,btl,BTL
+ihm,IHM,BTL,BTL
+ihm,IHM,btl activity ihm nerul,BTL
+ihm,IHM,BTL Activity IHM Nerul,BTL
+ihm,IHM,btl activity ihm oshiwara,BTL
+ihm,IHM,BTL Activity IHM Oshiwara,BTL
+ihm,IHM,btl rom,BTL
+ihm,IHM,BTL ROM,BTL
+ihm,IHM,ca226 kapp02,Data Base
+ihm,IHM,cad90 bm51,Data Base
+ihm,IHM,cad90 U200,Data Base
+ihm,IHM,cad90 VJ38e,Data Base
+ihm,IHM,chat,Organic
+ihm,IHM,Chat,Organic
+ihm,IHM,Chatgpt,Meta
+ihm,IHM,chatgpt.com,Meta
+ihm,IHM,collegedunia,Publisher
+ihm,IHM,Collegedunia,Publisher
+ihm,IHM,colleges/schools,Data Base
+ihm,IHM,Colleges/Schools,Data Base
+ihm,IHM,Current ITM Student,Data Base
+ihm,IHM,database,Data Base
+ihm,IHM,Database,Data Base
+ihm,IHM,default_source,Data Base
+ihm,IHM,Demand-Gen,Meta
+ihm,IHM,direct,Organic
+ihm,IHM,Direct,Organic
+ihm,IHM,direct walk-in,Walk - in
+ihm,IHM,email,Organic
+ihm,IHM,facebook,Meta
+ihm,IHM,Facebook,Meta
+ihm,IHM,fb,Meta
+ihm,IHM,flyer,BTL
+ihm,IHM,G490,Data Base
+ihm,IHM,GBP,Data Base
+ihm,IHM,GG001,Data Base
+ihm,IHM,google,Meta
+ihm,IHM,Google Ads,Meta
+ihm,IHM,inbound call,Incomming calls
+ihm,IHM,Inbound Call,Incomming calls
+ihm,IHM,Incoming Call,Incomming calls
+ihm,IHM,incoming calls,Incomming calls
+ihm,IHM,inhouse,Data Base
+ihm,IHM,ITM Alumnus,Organic
+ihm,IHM,ITM Faculty,Organic
+ihm,IHM,itm hosted on campus event,BTL
+ihm,IHM,JustDial,invalid
+ihm,IHM,k100,invalid
+ihm,IHM,K1059,invalid
+ihm,IHM,KiG03,invalid
+ihm,IHM,kollegeapply,Publisher
+ihm,IHM,Kollegeapply,Publisher
+ihm,IHM,last year future eligible,invalid
+ihm,IHM,lead nurturing,Organic
+ihm,IHM,Lead Nurturing,Organic
+ihm,IHM,LeadAd,invalid
+ihm,IHM,ma17,invalid
+ihm,IHM,MCM,invalid
+ihm,IHM,me43,invalid
+ihm,IHM,Mobile App,invalid
+ihm,IHM,NA,invalid
+ihm,IHM,nerul,Data Base
+ihm,IHM,Not Mapped,Data Base
+ihm,IHM,npf,Data Base
+ihm,IHM,Offline,Data Base
+ihm,IHM,organic,Organic
+ihm,IHM,Organic,Organic
+ihm,IHM,oshiwara,Data Base
+ihm,IHM,Other Campaigns,invalid
+ihm,IHM,outbound call,invalid
+ihm,IHM,Outbound Call,invalid
+ihm,IHM,paid,Meta
+ihm,IHM,Paid Ads,Meta
+ihm,IHM,perplexity,Meta
+ihm,IHM,Previous Year Paper,Data Base
+ihm,IHM,Publisher Campaign,Publisher
+ihm,IHM,referral,Referral
+ihm,IHM,Referral,Referral
+ihm,IHM,response,invalid
+ihm,IHM,search,Meta
+ihm,IHM,shiksha,Publisher
+ihm,IHM,Shiksha,Publisher
+ihm,IHM,social,Meta
+ihm,IHM,Social,Meta
+ihm,IHM,static,invalid
+ihm,IHM,static-HM,invalid
+ihm,IHM,Success Mart - Subhash Mate,invalid
+ihm,IHM,Telephony,Incomming calls
+ihm,IHM,Telephony Inbound,Incomming calls
+ihm,IHM,Telephony Outbound,Incomming calls
+ihm,IHM,test,invalid
+ihm,IHM,thankyoupage,Organic
+ihm,IHM,tm51,invalid
+ihm,IHM,Vivek Youtuber,Meta
+ihm,IHM,wa,Organic
+ihm,IHM,Walk In,Walk - in
+ihm,IHM,walk-in,Walk - in
+ihm,IHM,web,Organic
+ihm,IHM,Web,Organic
+ihm,IHM,Webinar USA SA,Organic
+ihm,IHM,website,Organic
+ihm,IHM,Website,Organic
+ihm,IHM,websitepyq,Organic
+ihm,IHM,whatsapp,Organic
+ihm,IHM,WhatsApp,Organic
+ihm,IHM,whatsappapplynow,Organic
+mba,MBA,Adwords,Invalid
+mba,MBA,agents,Agents
+mba,MBA,Agents,Agents
+mba,MBA,API,Meta
+mba,MBA,bing,Meta
+mba,MBA,Bing,Meta
+mba,MBA,blog,Organic
+mba,MBA,Blog,Organic
+mba,MBA,Blogs,Organic
+mba,MBA,btl,BTL
+mba,MBA,Btl,BTL
+mba,MBA,BTL,BTL
+mba,MBA,btl activity ihm nerul,BTL
+mba,MBA,BTL Activity IHM Nerul,BTL
+mba,MBA,btl activity ihm oshiwara,BTL
+mba,MBA,BTL Activity IHM Oshiwara,BTL
+mba,MBA,BTL MM,BTL
+mba,MBA,btl rom,BTL
+mba,MBA,BTL ROM,BTL
+mba,MBA,btlmm,BTL
+mba,MBA,Calendly,Organic
+mba,MBA,careers360,Publisher
+mba,MBA,Careers360,Publisher
+mba,MBA,chat,Meta
+mba,MBA,Chat,Meta
+mba,MBA,Chatgpt,Meta
+mba,MBA,chatgpt.com,Meta
+mba,MBA,chatgpt.com?utm_source=web,Meta
+mba,MBA,college_direct,Organic
+mba,MBA,collegedunia,Publisher
+mba,MBA,Collegedunia,Publisher
+mba,MBA,database,Data Base
+mba,MBA,Database,Data Base
+mba,MBA,default_source,Invalid
+mba,MBA,direct,Organic
+mba,MBA,Direct,Organic
+mba,MBA,Direct Walk-in,Walk - in
+mba,MBA,facebook,Meta
+mba,MBA,Facebook,Meta
+mba,MBA,flyer,BTL
+mba,MBA,gdn,Meta
+mba,MBA,GDN,Meta
+mba,MBA,google,Meta
+mba,MBA,Google,Meta
+mba,MBA,Google Ads,Meta
+mba,MBA,ig,Meta
+mba,MBA,Inbound Call,Incomming calls
+mba,MBA,Incoming call,Incomming calls
+mba,MBA,Incoming Calls,Incomming calls
+mba,MBA,Inhouse Social,Meta
+mba,MBA,Inhouse Social Media,Meta
+mba,MBA,itm,Invalid
+mba,MBA,itmpartner100,Agents
+mba,MBA,itmpartner117,Agents
+mba,MBA,itmpartner121,Agents
+mba,MBA,itmpartner143,Agents
+mba,MBA,itmpartner51,Agents
+mba,MBA,itmpartner66,Agents
+mba,MBA,itmpartner74,Agents
+mba,MBA,itmpartner77,Agents
+mba,MBA,itmpartner78,Agents
+mba,MBA,itmpartner85,Agents
+mba,MBA,itmpartner86,Agents
+mba,MBA,itmpartner96,Agents
+mba,MBA,kollegeapply,Publisher
+mba,MBA,Kollegeapply,Publisher
+mba,MBA,lead nurturing,Invalid
+mba,MBA,Lead Nurturing,Invalid
+mba,MBA,letsupgrade,Data Base
+mba,MBA,Not Mapped,Data Base
+mba,MBA,Offline,Data Base
+mba,MBA,Online,Organic
+mba,MBA,organic,Organic
+mba,MBA,Organic,Organic
+mba,MBA,other,Invalid
+mba,MBA,Others,Invalid
+mba,MBA,Outbound Call,Invalid
+mba,MBA,Partner 114,Agents
+mba,MBA,Partner 131,Agents
+mba,MBA,Partner 142,Agents
+mba,MBA,Partner 150,Agents
+mba,MBA,Partner 154,Agents
+mba,MBA,Partner 164,Agents
+mba,MBA,Partner 166,Agents
+mba,MBA,Partner 167,Agents
+mba,MBA,Partner 187,Agents
+mba,MBA,Partner 189,Agents
+mba,MBA,Partner 2,Agents
+mba,MBA,Partner 23,Agents
+mba,MBA,Partner 24,Agents
+mba,MBA,Partner 28,Agents
+mba,MBA,Partner 33,Agents
+mba,MBA,Partner 34,Agents
+mba,MBA,Partner 37,Agents
+mba,MBA,Partner 4,Agents
+mba,MBA,Partner 44,Agents
+mba,MBA,Partner 49,Agents
+mba,MBA,Partner 6,Agents
+mba,MBA,Partner 7,Agents
+mba,MBA,Partner 70,Agents
+mba,MBA,Partner 75,Agents
+mba,MBA,Partner 89,Agents
+mba,MBA,partner10,Agents
+mba,MBA,partner100,Agents
+mba,MBA,partner114,Agents
+mba,MBA,partner12,Agents
+mba,MBA,partner121,Agents
+mba,MBA,partner131,Agents
+mba,MBA,partner137,Agents
+mba,MBA,partner140,Agents
+mba,MBA,partner142,Agents
+mba,MBA,partner143,Agents
+mba,MBA,partner150,Agents
+mba,MBA,partner154,Agents
+mba,MBA,partner157,Agents
+mba,MBA,partner164,Agents
+mba,MBA,partner166,Agents
+mba,MBA,partner167,Agents
+mba,MBA,partner174,Agents
+mba,MBA,partner186,Agents
+mba,MBA,partner187,Agents
+mba,MBA,partner188,Agents
+mba,MBA,partner189,Agents
+mba,MBA,partner196,Agents
+mba,MBA,partner2,Agents
+mba,MBA,partner210,Agents
+mba,MBA,partner222,Agents
+mba,MBA,partner223,Agents
+mba,MBA,partner225,Agents
+mba,MBA,partner230,Agents
+mba,MBA,partner24,Agents
+mba,MBA,partner240,Agents
+mba,MBA,partner241,Agents
+mba,MBA,partner28,Agents
+mba,MBA,partner30,Agents
+mba,MBA,partner33,Agents
+mba,MBA,partner34,Agents
+mba,MBA,partner37,Agents
+mba,MBA,partner4,Agents
+mba,MBA,partner49,Agents
+mba,MBA,partner51,Agents
+mba,MBA,partner52,Agents
+mba,MBA,partner54,Agents
+mba,MBA,partner6,Agents
+mba,MBA,partner66,Agents
+mba,MBA,partner7,Agents
+mba,MBA,partner70,Agents
+mba,MBA,partner74,Agents
+mba,MBA,partner77,Agents
+mba,MBA,partner78,Agents
+mba,MBA,partner82,Agents
+mba,MBA,partner85,Agents
+mba,MBA,partner86,Agents
+mba,MBA,partner89,Agents
+mba,MBA,partner96,Agents
+mba,MBA,perplexity,Meta
+mba,MBA,referral,Referral
+mba,MBA,Referral,Referral
+mba,MBA,remarketing,Meta
+mba,MBA,Remarketing,Meta
+mba,MBA,shiksha,Publisher
+mba,MBA,Shiksha,Publisher
+mba,MBA,social,Meta
+mba,MBA,Social,Meta
+mba,MBA,Telephony,Incomming calls
+mba,MBA,Telephony Inbound,Incomming calls
+mba,MBA,Telephony Outbound,Incomming calls
+mba,MBA,test,Invalid
+mba,MBA,Twigz,Publisher
+mba,MBA,Twigz Network,Publisher
+mba,MBA,twigznetwork,Publisher
+mba,MBA,Visiting Card,BTL
+mba,MBA,visitingCard,BTL
+mba,MBA,wa,Walk - in
+mba,MBA,Walk In,Walk - in
+mba,MBA,Walk-in,Walk - in
+mba,MBA,Walkin,Walk - in
+mba,MBA,web,Organic
+mba,MBA,Web,Organic
+mba,MBA,Webinar USA SA,Organic
+mba,MBA,website,Organic
+mba,MBA,Website,Organic
+mba,MBA,websitepyq,Organic
+mba,MBA,whatsapp,Organic
+mba,MBA,WhatsApp,Organic
+mba,MBA,whatsappleadnurturing_medium=imba_1,Organic
+mba,MBA,Widget,Organic

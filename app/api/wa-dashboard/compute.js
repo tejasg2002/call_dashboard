@@ -247,6 +247,114 @@ function waPhoneVariantsForMatch(rawList) {
   return [...out]
 }
 
+function tidyDetailStr(v) {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s === '' || s === '[object Object]' ? null : s
+}
+
+/**
+ * Distinct template names per normalised phone with at least one sent/delivered row.
+ * Uses the same date + resolved-field pipeline as KPI batch1 — must NOT use CLICKED_PRE_MATCH
+ * (that filter is click-only and would exclude every sent/delivered document).
+ */
+async function aggregateTemplatesSentByNormMap(
+  waCol,
+  waResolvedFields,
+  nativeDatePreStages,
+  phoneVariants,
+  waDateStages = [],
+) {
+  const map = new Map()
+  if (!phoneVariants || phoneVariants.length === 0) return map
+  const rows = await waCol
+    .aggregate(
+      [
+        ...(nativeDatePreStages || []),
+        { $addFields: waResolvedFields },
+        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+        ...(waDateStages || []),
+        {
+          $match: {
+            _waStage: { $in: ['sent', 'delivered'] },
+            _waPhone: { $in: phoneVariants },
+            _waTemplate: { $nin: [null, ''] },
+          },
+        },
+        { $group: { _id: '$_waPhone', templates: { $addToSet: '$_waTemplate' } } },
+      ],
+      { allowDiskUse: true },
+    )
+    .toArray()
+
+  for (const row of rows) {
+    const norm = normaliseMobile(row._id)
+    if (!norm) continue
+    const templates = (row.templates || []).filter(Boolean).map((t) => String(t))
+    const prev = map.get(norm)
+    if (!prev) {
+      map.set(norm, templates)
+      continue
+    }
+    map.set(norm, [...new Set([...prev, ...templates])])
+  }
+  return map
+}
+
+/**
+ * Fill missing `leadName` on ISU form rows from CRM snapshot (mobile match).
+ */
+async function enrichFormMetaLeadNamesFromCrm(client, { db, collection }, formMetaByNorm) {
+  if (!db || !collection || !formMetaByNorm?.size) return
+  const normList = [...formMetaByNorm.keys()].filter(Boolean)
+  if (normList.length === 0) return
+  const variants = waPhoneVariantsForMatch(normList)
+  if (variants.length === 0) return
+  try {
+    const crmCol = client.db(db).collection(collection)
+    const crmRows = await crmCol
+      .find({
+        $or: [
+          { registered_mobile: { $in: variants } },
+          { mobile: { $in: variants } },
+          { Mobile_Number: { $in: variants } },
+        ],
+      })
+      .project({
+        registered_mobile: 1,
+        mobile: 1,
+        Mobile_Number: 1,
+        Student_Name: 1,
+        Name: 1,
+        name: 1,
+        Lead_Name: 1,
+        lead_name: 1,
+      })
+      .limit(8000)
+      .toArray()
+
+    const nameByNorm = new Map()
+    for (const doc of crmRows) {
+      const nm = tidyDetailStr(
+        doc.Student_Name || doc.Name || doc.name || doc.Lead_Name || doc.lead_name,
+      )
+      if (!nm) continue
+      for (const raw of [doc.registered_mobile, doc.mobile, doc.Mobile_Number]) {
+        const n = normaliseMobile(raw)
+        if (n && !nameByNorm.has(n)) nameByNorm.set(n, nm)
+      }
+    }
+
+    for (const [norm, meta] of formMetaByNorm) {
+      if (!meta?.leadName && nameByNorm.has(norm)) {
+        meta.leadName = nameByNorm.get(norm)
+      }
+    }
+  } catch (e) {
+    console.warn('[computeWADashboard] CRM lead name enrich skipped:', e?.message || e)
+  }
+}
+
 function isUsefulWaButtonText(b) {
   const s = String(b ?? '').trim()
   return Boolean(s && s !== '[]' && s !== '""' && s.toLowerCase() !== 'null')
@@ -905,6 +1013,8 @@ async function buildIhmPaymentConversion({
   clickedPhoneDedup,
   normalisedClickedMobiles,
   waCol,
+  nativeDatePreStages = [],
+  waDateStages = [],
 }) {
   const itmDb = client.db(ITM_DB)
   const ihmCol = itmDb.collection('npfPaymentWebhookEvents')
@@ -1059,6 +1169,14 @@ async function buildIhmPaymentConversion({
   const clickTimelineByNorm = new Map()
   await enrichFormConversionClickDetailsFromInterakt(waCol, formSubmittedMobiles, clickAttrMap, clickTimelineByNorm, itmDb.collection('marketingwa'), clickedPhoneDedup)
 
+  const templatesSentByNorm = await aggregateTemplatesSentByNormMap(
+    waCol,
+    waR,
+    nativeDatePreStages,
+    convertedPhoneVariants,
+    waDateStages,
+  )
+
   const formMetaByNorm = new Map()
   for (const row of ihmRows) {
     const dt = row.paidAt
@@ -1091,9 +1209,17 @@ async function buildIhmPaymentConversion({
       const norm = normaliseMobile(m)
       const attr = clickAttrMap.get(norm)
       const meta = formMetaByNorm.get(norm)
+      const sentList = templatesSentByNorm.get(norm) || []
       return {
         mobile: m,
         leadId: meta?.leadIdFromNpf || null,
+        leadName: null,
+        applicationNumber: null,
+        courseOrProgram: null,
+        email: null,
+        applicationExtras: null,
+        templatesSentCount: sentList.length,
+        templatesSent: sentList,
         formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
         formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
         clickedTemplates: attr?.templates || [],
@@ -1124,12 +1250,15 @@ async function buildIsuFormConversion({
   waCol,
   waResolvedFields,
   nativeDatePreStages,
+  waDateStages = [],
   startDate,
   endDate,
   isuAppsDb,
   isuAppsCollection,
   isuAppsPhoneField = 'Mobile_Number',
   isuPaymentCollection = null,
+  /** When set, fills missing leadName from CRM snapshot by mobile. */
+  crmSnapshotEnrich = null,
 }) {
   const isuDb = client.db(isuAppsDb)
   const appsCol = isuDb.collection(isuAppsCollection)
@@ -1215,7 +1344,14 @@ async function buildIsuFormConversion({
                 '$createdAt',
               ],
             },
-            _appNo: { $ifNull: [appNoField, appNoAltField] },
+            _appNo: {
+              $ifNull: [
+                appNoField,
+                appNoAltField,
+                '$Application_No',
+                '$application_no',
+              ],
+            },
             // 1 when this doc carries an application stage, 0 otherwise — used to sort
             // docs-with-stage to the front so $first reliably picks a non-null value.
             _hasStage: {
@@ -1233,6 +1369,76 @@ async function buildIsuFormConversion({
             applicationNo: { $first: '$_appNo' },
             leadIdRaw: { $first: { $ifNull: ['$Lead_ID', '$lead_id'] } },
             applicationStage: { $first: { $ifNull: ['$application_stage', '$Application_Stage'] } },
+            leadNameRaw: {
+              $first: {
+                $ifNull: [
+                  '$Student_Name',
+                  {
+                    $ifNull: [
+                      '$Applicant_Name',
+                      {
+                        $ifNull: [
+                          '$Candidate_Name',
+                          {
+                            $ifNull: [
+                              '$Name_Of_The_Candidate',
+                              {
+                                $ifNull: [
+                                  '$Lead_Name',
+                                  {
+                                    $ifNull: [
+                                      '$Name',
+                                      {
+                                        $ifNull: [
+                                          '$lead_name',
+                                          {
+                                            $ifNull: [
+                                              '$Full_Name',
+                                              {
+                                                $trim: {
+                                                  input: {
+                                                    $concat: [
+                                                      { $toString: { $ifNull: ['$Student_First_Name', ''] } },
+                                                      ' ',
+                                                      { $toString: { $ifNull: ['$Student_Last_Name', ''] } },
+                                                    ],
+                                                  },
+                                                },
+                                              },
+                                            ],
+                                          },
+                                        ],
+                                      },
+                                    ],
+                                  },
+                                ],
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+            courseOrProgramRaw: {
+              $first: {
+                $ifNull: [
+                  '$Course_Applied',
+                  { $ifNull: ['$Program_Name', { $ifNull: ['$Course_Name', '$Program_Applied'] }] },
+                ],
+              },
+            },
+            emailRaw: {
+              $first: {
+                $ifNull: ['$Email', { $ifNull: ['$email', { $ifNull: ['$EMail', '$email_id'] }] }],
+              },
+            },
+            cityRaw: { $first: { $ifNull: ['$City', '$city'] } },
+            registrationChannelRaw: {
+              $first: { $ifNull: ['$Registration_Channel', { $ifNull: ['$Traffic_Channel', '$Publisher_Name'] }] },
+            },
           },
         },
       ]).toArray()
@@ -1267,22 +1473,27 @@ async function buildIsuFormConversion({
   ])]
 
   // Step 4: click attribution (template + button) for converted phones
-  const clickAttrResult = convertedMobiles.length > 0
-    ? await waCol.aggregate([
-        { $match: CLICKED_PRE_MATCH },
-        { $addFields: waR },
-        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
-        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
-        { $addFields: { _ctaKey: ctaKeyExpr() } },
-        {
-          $group: {
-            _id: '$_waPhone',
-            templates: { $addToSet: '$_waTemplate' },
-            buttons: { $addToSet: '$_ctaKey' },
-          },
-        },
-      ]).toArray()
-    : []
+  const [clickAttrResult, templatesSentByNorm] = await Promise.all([
+    convertedMobiles.length > 0
+      ? waCol
+          .aggregate([
+            { $match: CLICKED_PRE_MATCH },
+            { $addFields: waR },
+            { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+            { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
+            { $addFields: { _ctaKey: ctaKeyExpr() } },
+            {
+              $group: {
+                _id: '$_waPhone',
+                templates: { $addToSet: '$_waTemplate' },
+                buttons: { $addToSet: '$_ctaKey' },
+              },
+            },
+          ])
+          .toArray()
+      : [],
+    aggregateTemplatesSentByNormMap(waCol, waResolvedFields, nativeDatePreStages, convertedPhoneVariants, waDateStages),
+  ])
 
   const clickAttrMap = new Map()
   for (const r of clickAttrResult) {
@@ -1347,6 +1558,11 @@ async function buildIsuFormConversion({
     const norm = normaliseMobile(r._id)
     if (!norm) continue
     const dt = parseOptDate(r.formSubmittedAt)
+    const city = tidyDetailStr(r.cityRaw)
+    const regCh = tidyDetailStr(r.registrationChannelRaw)
+    const extras = {}
+    if (city) extras.city = city
+    if (regCh) extras.registrationOrTraffic = regCh
     formMetaByNorm.set(norm, {
       formSubmittedAtIso: dt ? dt.toISOString() : null,
       formSubmittedAtDisplay: dt
@@ -1355,7 +1571,15 @@ async function buildIsuFormConversion({
       leadIdRaw: r.leadIdRaw ? String(r.leadIdRaw).trim() : null,
       applicationNo: r.applicationNo || null,
       applicationStage: r.applicationStage ? String(r.applicationStage).trim() : null,
+      leadName: tidyDetailStr(r.leadNameRaw),
+      courseOrProgram: tidyDetailStr(r.courseOrProgramRaw),
+      email: tidyDetailStr(r.emailRaw),
+      applicationExtras: Object.keys(extras).length ? extras : null,
     })
+  }
+
+  if (crmSnapshotEnrich?.db && crmSnapshotEnrich?.collection) {
+    await enrichFormMetaLeadNamesFromCrm(client, crmSnapshotEnrich, formMetaByNorm)
   }
 
   // Step 7: payment lookup — BBA/BTech by Application_Number, IDM by application_number (lowercase), IHM by lead_id
@@ -1420,9 +1644,17 @@ async function buildIsuFormConversion({
       const appNo = meta?.applicationNo
       const leadId = meta?.leadIdRaw
       const payment = paymentByKey.get(appNo) || paymentByKey.get(leadId) || null
+      const sentList = templatesSentByNorm.get(norm) || []
       return {
         mobile: m,
         leadId: meta?.leadIdRaw || appNo || null,
+        leadName: meta?.leadName ?? null,
+        applicationNumber: appNo ? String(appNo).trim() : null,
+        courseOrProgram: meta?.courseOrProgram ?? null,
+        email: meta?.email ?? null,
+        applicationExtras: meta?.applicationExtras ?? null,
+        templatesSentCount: sentList.length,
+        templatesSent: sentList,
         applicationStage: meta?.applicationStage || null,
         formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
         formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',
@@ -1810,6 +2042,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         clickedPhoneDedup,
         normalisedClickedMobiles,
         waCol,
+        nativeDatePreStages,
+        waDateStages,
       })
       formSubmittedCount = paymentConversion.formSubmitted
     } else if (cfg.isuAppsCollection) {
@@ -1821,12 +2055,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         waCol,
         waResolvedFields,
         nativeDatePreStages,
+        waDateStages,
         startDate,
         endDate,
         isuAppsDb: cfg.isuAppsDb,
         isuAppsCollection: cfg.isuAppsCollection,
         isuAppsPhoneField: cfg.isuAppsPhoneField,
         isuPaymentCollection: cfg.isuPaymentCollection,
+        crmSnapshotEnrich:
+          cfg.crmSnapshotCollection != null
+            ? { db: cfg.leadFilterDataDb ?? cfg.dataDb, collection: cfg.crmSnapshotCollection }
+            : null,
       })
       formSubmittedCount = paymentConversion.formSubmitted
     } else {
@@ -1903,6 +2142,28 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
                 { $ifNull: ['$npfData.lead_id', '$npfData.leadId'] },
               ],
             },
+            _leadName: {
+              $cond: [
+                {
+                  $gt: [
+                    { $strLenCP: { $trim: { input: { $ifNull: [{ $toString: '$personal_details.full_name' }, ''] } } } },
+                    0,
+                  ],
+                },
+                { $trim: { input: { $ifNull: [{ $toString: '$personal_details.full_name' }, ''] } } },
+                {
+                  $trim: {
+                    input: {
+                      $concat: [
+                        { $ifNull: [{ $toString: '$personal_details.first_name' }, ''] },
+                        ' ',
+                        { $ifNull: [{ $toString: '$personal_details.last_name' }, ''] },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
           },
         },
         { $sort: { _sortAt: 1 } },
@@ -1912,6 +2173,16 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
             formSubmittedAt: { $max: '$_sortAt' },
             leadIdRaw: { $last: '$_npfLead' },
             applicationNo: { $last: '$application_detail.application_no' },
+            leadNameRaw: { $last: '$_leadName' },
+            courseRaw: {
+              $last: {
+                $ifNull: [
+                  '$application_detail.course',
+                  { $ifNull: ['$application_detail.program', { $ifNull: ['$application_detail.program_name', ''] }] },
+                ],
+              },
+            },
+            emailRaw: { $last: { $ifNull: ['$personal_details.email', ''] } },
           },
         },
       ]).toArray()
@@ -1942,22 +2213,27 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     ...waPhoneVariantsForMatch(convertedMobiles),
     ...knownRawPhones,
   ])]
-  const clickAttrResult = convertedMobiles.length > 0
-    ? await waCol.aggregate([
-        { $match: CLICKED_PRE_MATCH },
-        { $addFields: waResolvedFields },
-        { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
-        { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
-        { $addFields: { _ctaKey: ctaKeyExpr() } },
-        {
-          $group: {
-            _id: '$_waPhone',
-            templates: { $addToSet: '$_waTemplate' },
-            buttons: { $addToSet: '$_ctaKey' },
-          },
-        },
-      ]).toArray()
-    : []
+  const [clickAttrResult, templatesSentByNorm] = await Promise.all([
+    convertedMobiles.length > 0
+      ? waCol
+          .aggregate([
+            { $match: CLICKED_PRE_MATCH },
+            { $addFields: waResolvedFields },
+            { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
+            { $match: { _waStage: 'clicked', _waPhone: { $in: convertedPhoneVariants } } },
+            { $addFields: { _ctaKey: ctaKeyExpr() } },
+            {
+              $group: {
+                _id: '$_waPhone',
+                templates: { $addToSet: '$_waTemplate' },
+                buttons: { $addToSet: '$_ctaKey' },
+              },
+            },
+          ])
+          .toArray()
+      : [],
+    aggregateTemplatesSentByNormMap(waCol, waResolvedFields, nativeDatePreStages, convertedPhoneVariants, waDateStages),
+  ])
 
   const clickAttrMap = new Map()
   for (const r of clickAttrResult) {
@@ -2098,6 +2374,9 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
         : '—',
       leadIdFromNpf: stringifyLeadId(row.leadIdRaw),
       applicationNo: row.applicationNo ? String(row.applicationNo).trim() : null,
+      leadName: tidyDetailStr(row.leadNameRaw),
+      courseOrProgram: tidyDetailStr(row.courseRaw),
+      email: tidyDetailStr(row.emailRaw),
     })
   }
 
@@ -2224,9 +2503,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       const crmLead = leadByNormMobile.get(norm)
       const appNo = meta?.applicationNo
       const payment = appNo ? mbaPaymentByAppNo.get(appNo) : null
+      const sentList = templatesSentByNorm.get(norm) || []
       return {
         mobile: m,
         leadId: npfLead || crmLead || null,
+        leadName: meta?.leadName ?? null,
+        applicationNumber: appNo || null,
+        courseOrProgram: meta?.courseOrProgram ?? null,
+        email: meta?.email ?? null,
+        applicationExtras: null,
+        templatesSentCount: sentList.length,
+        templatesSent: sentList,
         applicationStage: appNo ? (mbaStageByAppNo.get(appNo) || null) : null,
         formSubmittedAtIso: meta?.formSubmittedAtIso ?? null,
         formSubmittedAtDisplay: meta?.formSubmittedAtDisplay ?? '—',

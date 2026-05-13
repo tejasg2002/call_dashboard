@@ -1,0 +1,977 @@
+﻿workspace,bucket,field_path,source_value
+mba,crm_leadSourceExpr_aggregate,,default_source
+mba,crm_leadSourceExpr_aggregate,,Telephony
+mba,crm_leadSourceExpr_aggregate,,organic
+mba,crm_leadSourceExpr_aggregate,,Agents
+mba,crm_leadSourceExpr_aggregate,,Organic
+mba,crm_leadSourceExpr_aggregate,,agents
+mba,crm_leadSourceExpr_aggregate,,website
+mba,crm_leadSourceExpr_aggregate,,Blog
+mba,crm_leadSourceExpr_aggregate,,partner150
+mba,crm_leadSourceExpr_aggregate,,partner30
+mba,crm_leadSourceExpr_aggregate,,Incoming call
+mba,crm_leadSourceExpr_aggregate,,Web
+mba,crm_leadSourceExpr_aggregate,,partner240
+mba,crm_leadSourceExpr_aggregate,,partner89
+mba,crm_leadSourceExpr_aggregate,,partner82
+mba,crm_leadSourceExpr_aggregate,,partner121
+mba,crm_leadSourceExpr_aggregate,,whatsapp
+mba,crm_leadSourceExpr_aggregate,,bing
+mba,crm_leadSourceExpr_aggregate,,partner37
+mba,crm_leadSourceExpr_aggregate,,Walk In
+mba,crm_leadSourceExpr_aggregate,,partner230
+mba,crm_leadSourceExpr_aggregate,,careers360
+mba,crm_leadSourceExpr_aggregate,,partner167
+mba,crm_leadSourceExpr_aggregate,,Google
+mba,crm_leadSourceExpr_aggregate,,flyer
+mba,crm_leadSourceExpr_aggregate,,partner74
+mba,crm_leadSourceExpr_aggregate,,partner51
+mba,crm_leadSourceExpr_aggregate,,Website
+mba,crm_leadSourceExpr_aggregate,,BTL
+mba,crm_leadSourceExpr_aggregate,,partner54
+mba,crm_leadSourceExpr_aggregate,,partner96
+mba,crm_leadSourceExpr_aggregate,,perplexity
+mba,crm_leadSourceExpr_aggregate,,partner225
+mba,crm_leadSourceExpr_aggregate,,Inbound Call
+mba,crm_leadSourceExpr_aggregate,,Twigz
+mba,crm_leadSourceExpr_aggregate,,whatsappleadnurturing_medium=imba_1
+mba,crm_leadSourceExpr_aggregate,,partner100
+mba,crm_leadSourceExpr_aggregate,,Incoming Calls
+mba,crm_leadSourceExpr_aggregate,,blog
+mba,crm_leadSourceExpr_aggregate,,Walk-in
+mba,crm_leadSourceExpr_aggregate,,BTL Activity IHM Oshiwara
+mba,crm_leadSourceExpr_aggregate,,partner34
+mba,crm_leadSourceExpr_aggregate,,Chat
+mba,crm_leadSourceExpr_aggregate,,visitingCard
+mba,crm_leadSourceExpr_aggregate,,collegedunia
+mba,crm_leadSourceExpr_aggregate,,partner66
+mba,crm_leadSourceExpr_aggregate,,twigznetwork
+mba,crm_leadSourceExpr_aggregate,,partner164
+mba,crm_leadSourceExpr_aggregate,,Database
+mba,crm_leadSourceExpr_aggregate,,college_direct
+mba,crm_leadSourceExpr_aggregate,,partner33
+mba,crm_leadSourceExpr_aggregate,,Direct Walk-in
+mba,crm_leadSourceExpr_aggregate,,partner241
+mba,crm_leadSourceExpr_aggregate,,Shiksha
+mba,crm_leadSourceExpr_aggregate,,social
+mba,crm_leadSourceExpr_aggregate,,shiksha
+mba,crm_leadSourceExpr_aggregate,,partner186
+mba,crm_leadSourceExpr_aggregate,,direct
+mba,crm_leadSourceExpr_aggregate,,referral
+mba,crm_leadSourceExpr_aggregate,,facebook
+mba,crm_leadSourceExpr_aggregate,,partner10
+mba,crm_leadSourceExpr_aggregate,,BTL Activity IHM Nerul
+mba,crm_leadSourceExpr_aggregate,,partner223
+mba,crm_leadSourceExpr_aggregate,,Widget
+mba,crm_leadSourceExpr_aggregate,,letsupgrade
+mba,crm_leadSourceExpr_aggregate,,Offline
+mba,crm_leadSourceExpr_aggregate,,btl
+mba,crm_leadSourceExpr_aggregate,,Calendly
+mba,crm_leadSourceExpr_aggregate,,Facebook
+mba,crm_leadSourceExpr_aggregate,,chat
+mba,crm_leadSourceExpr_aggregate,,google
+mba,crm_leadSourceExpr_aggregate,,partner166
+mba,crm_leadSourceExpr_aggregate,,remarketing
+mba,crm_leadSourceExpr_aggregate,,database
+mba,crm_leadSourceExpr_aggregate,,btl rom
+mba,crm_leadSourceExpr_aggregate,,chatgpt.com
+mba,crm_leadSourceExpr_aggregate,,btl activity ihm oshiwara
+mba,crm_leadSourceExpr_aggregate,,BTL ROM
+mba,crm_leadSourceExpr_aggregate,,partner4
+mba,crm_leadSourceExpr_aggregate,,Referral
+mba,crm_leadSourceExpr_aggregate,,websitepyq
+mba,crm_leadSourceExpr_aggregate,,Online
+mba,crm_leadSourceExpr_aggregate,,Walkin
+mba,crm_leadSourceExpr_aggregate,,partner78
+mba,crm_leadSourceExpr_aggregate,,gdn
+mba,crm_leadSourceExpr_aggregate,,partner2
+mba,crm_leadSourceExpr_aggregate,,partner196
+mba,crm_leadSourceExpr_aggregate,,btl activity ihm nerul
+mba,crm_leadSourceExpr_aggregate,,partner140
+mba,crm_leadSourceExpr_aggregate,,other
+mba,crm_leadSourceExpr_aggregate,,API
+mba,crm_leadSourceExpr_aggregate,,Outbound Call
+mba,crm_leadSourceExpr_aggregate,,chatgpt.com?utm_source=web
+mba,crm_leadSourceExpr_aggregate,,wa
+mba,crm_leadSourceExpr_aggregate,,partner137
+mba,crm_leadSourceExpr_aggregate,,Inhouse Social Media
+mba,crm_leadSourceExpr_aggregate,,kollegeapply
+mba,crm_leadSourceExpr_aggregate,,test
+mba,crm_leadSourceExpr_aggregate,,web
+mba,crm_leadSourceExpr_aggregate,,partner12
+mba,crm_leadSourceExpr_aggregate,,Bing
+mba,crm_leadSourceExpr_aggregate,,lead nurturing
+mba,crm_distinct_field,source.channel,API
+mba,crm_distinct_field,source.channel,Agents
+mba,crm_distinct_field,source.channel,BTL
+mba,crm_distinct_field,source.channel,BTL Activity IHM Nerul
+mba,crm_distinct_field,source.channel,BTL Activity IHM Oshiwara
+mba,crm_distinct_field,source.channel,BTL ROM
+mba,crm_distinct_field,source.channel,Bing
+mba,crm_distinct_field,source.channel,Blog
+mba,crm_distinct_field,source.channel,Calendly
+mba,crm_distinct_field,source.channel,Chat
+mba,crm_distinct_field,source.channel,Database
+mba,crm_distinct_field,source.channel,Direct Walk-in
+mba,crm_distinct_field,source.channel,Facebook
+mba,crm_distinct_field,source.channel,Google
+mba,crm_distinct_field,source.channel,Inbound Call
+mba,crm_distinct_field,source.channel,Incoming Calls
+mba,crm_distinct_field,source.channel,Incoming call
+mba,crm_distinct_field,source.channel,Inhouse Social Media
+mba,crm_distinct_field,source.channel,Offline
+mba,crm_distinct_field,source.channel,Online
+mba,crm_distinct_field,source.channel,Organic
+mba,crm_distinct_field,source.channel,Outbound Call
+mba,crm_distinct_field,source.channel,Referral
+mba,crm_distinct_field,source.channel,Shiksha
+mba,crm_distinct_field,source.channel,Telephony
+mba,crm_distinct_field,source.channel,Twigz
+mba,crm_distinct_field,source.channel,Walk In
+mba,crm_distinct_field,source.channel,Walk-in
+mba,crm_distinct_field,source.channel,Walkin
+mba,crm_distinct_field,source.channel,Web
+mba,crm_distinct_field,source.channel,Website
+mba,crm_distinct_field,source.channel,Widget
+mba,crm_distinct_field,source.channel,agents
+mba,crm_distinct_field,source.channel,bing
+mba,crm_distinct_field,source.channel,blog
+mba,crm_distinct_field,source.channel,btl
+mba,crm_distinct_field,source.channel,btl activity ihm nerul
+mba,crm_distinct_field,source.channel,btl activity ihm oshiwara
+mba,crm_distinct_field,source.channel,btl rom
+mba,crm_distinct_field,source.channel,careers360
+mba,crm_distinct_field,source.channel,chat
+mba,crm_distinct_field,source.channel,chatgpt.com
+mba,crm_distinct_field,source.channel,chatgpt.com?utm_source=web
+mba,crm_distinct_field,source.channel,college_direct
+mba,crm_distinct_field,source.channel,collegedunia
+mba,crm_distinct_field,source.channel,database
+mba,crm_distinct_field,source.channel,default_source
+mba,crm_distinct_field,source.channel,direct
+mba,crm_distinct_field,source.channel,facebook
+mba,crm_distinct_field,source.channel,flyer
+mba,crm_distinct_field,source.channel,gdn
+mba,crm_distinct_field,source.channel,google
+mba,crm_distinct_field,source.channel,kollegeapply
+mba,crm_distinct_field,source.channel,lead nurturing
+mba,crm_distinct_field,source.channel,letsupgrade
+mba,crm_distinct_field,source.channel,organic
+mba,crm_distinct_field,source.channel,other
+mba,crm_distinct_field,source.channel,partner10
+mba,crm_distinct_field,source.channel,partner100
+mba,crm_distinct_field,source.channel,partner12
+mba,crm_distinct_field,source.channel,partner121
+mba,crm_distinct_field,source.channel,partner137
+mba,crm_distinct_field,source.channel,partner140
+mba,crm_distinct_field,source.channel,partner150
+mba,crm_distinct_field,source.channel,partner164
+mba,crm_distinct_field,source.channel,partner166
+mba,crm_distinct_field,source.channel,partner167
+mba,crm_distinct_field,source.channel,partner186
+mba,crm_distinct_field,source.channel,partner196
+mba,crm_distinct_field,source.channel,partner2
+mba,crm_distinct_field,source.channel,partner223
+mba,crm_distinct_field,source.channel,partner225
+mba,crm_distinct_field,source.channel,partner230
+mba,crm_distinct_field,source.channel,partner240
+mba,crm_distinct_field,source.channel,partner241
+mba,crm_distinct_field,source.channel,partner30
+mba,crm_distinct_field,source.channel,partner33
+mba,crm_distinct_field,source.channel,partner34
+mba,crm_distinct_field,source.channel,partner37
+mba,crm_distinct_field,source.channel,partner4
+mba,crm_distinct_field,source.channel,partner51
+mba,crm_distinct_field,source.channel,partner54
+mba,crm_distinct_field,source.channel,partner66
+mba,crm_distinct_field,source.channel,partner74
+mba,crm_distinct_field,source.channel,partner78
+mba,crm_distinct_field,source.channel,partner82
+mba,crm_distinct_field,source.channel,partner89
+mba,crm_distinct_field,source.channel,partner96
+mba,crm_distinct_field,source.channel,perplexity
+mba,crm_distinct_field,source.channel,referral
+mba,crm_distinct_field,source.channel,remarketing
+mba,crm_distinct_field,source.channel,shiksha
+mba,crm_distinct_field,source.channel,social
+mba,crm_distinct_field,source.channel,test
+mba,crm_distinct_field,source.channel,twigznetwork
+mba,crm_distinct_field,source.channel,visitingCard
+mba,crm_distinct_field,source.channel,wa
+mba,crm_distinct_field,source.channel,web
+mba,crm_distinct_field,source.channel,website
+mba,crm_distinct_field,source.channel,websitepyq
+mba,crm_distinct_field,source.channel,whatsapp
+mba,crm_distinct_field,source.channel,whatsappleadnurturing_medium=imba_1
+mba,crm_distinct_field,_source.source,Adwords
+mba,crm_distinct_field,_source.source,Agents
+mba,crm_distinct_field,_source.source,BTL
+mba,crm_distinct_field,_source.source,BTL Activity IHM Nerul
+mba,crm_distinct_field,_source.source,BTL Activity IHM Oshiwara
+mba,crm_distinct_field,_source.source,BTL ROM
+mba,crm_distinct_field,_source.source,Bing
+mba,crm_distinct_field,_source.source,Blog
+mba,crm_distinct_field,_source.source,Btl
+mba,crm_distinct_field,_source.source,Calendly
+mba,crm_distinct_field,_source.source,Database
+mba,crm_distinct_field,_source.source,Direct Walk-in
+mba,crm_distinct_field,_source.source,Facebook
+mba,crm_distinct_field,_source.source,Google
+mba,crm_distinct_field,_source.source,Inbound Call
+mba,crm_distinct_field,_source.source,Incoming Calls
+mba,crm_distinct_field,_source.source,Incoming call
+mba,crm_distinct_field,_source.source,Inhouse Social Media
+mba,crm_distinct_field,_source.source,Organic
+mba,crm_distinct_field,_source.source,Outbound Call
+mba,crm_distinct_field,_source.source,Referral
+mba,crm_distinct_field,_source.source,Shiksha
+mba,crm_distinct_field,_source.source,Twigz
+mba,crm_distinct_field,_source.source,Walk In
+mba,crm_distinct_field,_source.source,Walk-in
+mba,crm_distinct_field,_source.source,Walkin
+mba,crm_distinct_field,_source.source,Web
+mba,crm_distinct_field,_source.source,Website
+mba,crm_distinct_field,_source.source,agents
+mba,crm_distinct_field,_source.source,bing
+mba,crm_distinct_field,_source.source,blog
+mba,crm_distinct_field,_source.source,btl
+mba,crm_distinct_field,_source.source,btl activity ihm nerul
+mba,crm_distinct_field,_source.source,btl activity ihm oshiwara
+mba,crm_distinct_field,_source.source,btl rom
+mba,crm_distinct_field,_source.source,btlmm
+mba,crm_distinct_field,_source.source,careers360
+mba,crm_distinct_field,_source.source,chat
+mba,crm_distinct_field,_source.source,chatgpt.com
+mba,crm_distinct_field,_source.source,chatgpt.com?utm_source=web
+mba,crm_distinct_field,_source.source,college_direct
+mba,crm_distinct_field,_source.source,collegedunia
+mba,crm_distinct_field,_source.source,database
+mba,crm_distinct_field,_source.source,default_source
+mba,crm_distinct_field,_source.source,direct
+mba,crm_distinct_field,_source.source,facebook
+mba,crm_distinct_field,_source.source,flyer
+mba,crm_distinct_field,_source.source,gdn
+mba,crm_distinct_field,_source.source,google
+mba,crm_distinct_field,_source.source,ig
+mba,crm_distinct_field,_source.source,itm
+mba,crm_distinct_field,_source.source,kollegeapply
+mba,crm_distinct_field,_source.source,lead nurturing
+mba,crm_distinct_field,_source.source,letsupgrade
+mba,crm_distinct_field,_source.source,organic
+mba,crm_distinct_field,_source.source,other
+mba,crm_distinct_field,_source.source,partner10
+mba,crm_distinct_field,_source.source,partner100
+mba,crm_distinct_field,_source.source,partner114
+mba,crm_distinct_field,_source.source,partner12
+mba,crm_distinct_field,_source.source,partner121
+mba,crm_distinct_field,_source.source,partner131
+mba,crm_distinct_field,_source.source,partner137
+mba,crm_distinct_field,_source.source,partner140
+mba,crm_distinct_field,_source.source,partner142
+mba,crm_distinct_field,_source.source,partner143
+mba,crm_distinct_field,_source.source,partner150
+mba,crm_distinct_field,_source.source,partner154
+mba,crm_distinct_field,_source.source,partner157
+mba,crm_distinct_field,_source.source,partner164
+mba,crm_distinct_field,_source.source,partner166
+mba,crm_distinct_field,_source.source,partner167
+mba,crm_distinct_field,_source.source,partner174
+mba,crm_distinct_field,_source.source,partner186
+mba,crm_distinct_field,_source.source,partner187
+mba,crm_distinct_field,_source.source,partner188
+mba,crm_distinct_field,_source.source,partner189
+mba,crm_distinct_field,_source.source,partner196
+mba,crm_distinct_field,_source.source,partner2
+mba,crm_distinct_field,_source.source,partner210
+mba,crm_distinct_field,_source.source,partner222
+mba,crm_distinct_field,_source.source,partner223
+mba,crm_distinct_field,_source.source,partner225
+mba,crm_distinct_field,_source.source,partner230
+mba,crm_distinct_field,_source.source,partner24
+mba,crm_distinct_field,_source.source,partner240
+mba,crm_distinct_field,_source.source,partner241
+mba,crm_distinct_field,_source.source,partner28
+mba,crm_distinct_field,_source.source,partner30
+mba,crm_distinct_field,_source.source,partner33
+mba,crm_distinct_field,_source.source,partner34
+mba,crm_distinct_field,_source.source,partner37
+mba,crm_distinct_field,_source.source,partner4
+mba,crm_distinct_field,_source.source,partner49
+mba,crm_distinct_field,_source.source,partner51
+mba,crm_distinct_field,_source.source,partner52
+mba,crm_distinct_field,_source.source,partner54
+mba,crm_distinct_field,_source.source,partner6
+mba,crm_distinct_field,_source.source,partner66
+mba,crm_distinct_field,_source.source,partner7
+mba,crm_distinct_field,_source.source,partner70
+mba,crm_distinct_field,_source.source,partner74
+mba,crm_distinct_field,_source.source,partner77
+mba,crm_distinct_field,_source.source,partner78
+mba,crm_distinct_field,_source.source,partner82
+mba,crm_distinct_field,_source.source,partner85
+mba,crm_distinct_field,_source.source,partner86
+mba,crm_distinct_field,_source.source,partner89
+mba,crm_distinct_field,_source.source,partner96
+mba,crm_distinct_field,_source.source,perplexity
+mba,crm_distinct_field,_source.source,referral
+mba,crm_distinct_field,_source.source,remarketing
+mba,crm_distinct_field,_source.source,shiksha
+mba,crm_distinct_field,_source.source,social
+mba,crm_distinct_field,_source.source,test
+mba,crm_distinct_field,_source.source,twigznetwork
+mba,crm_distinct_field,_source.source,visitingCard
+mba,crm_distinct_field,_source.source,wa
+mba,crm_distinct_field,_source.source,web
+mba,crm_distinct_field,_source.source,website
+mba,crm_distinct_field,_source.source,websitepyq
+mba,crm_distinct_field,_source.source,whatsapp
+mba,crm_distinct_field,_source.source,whatsappleadnurturing_medium=imba_1
+mba,crm_distinct_field,source.utmSource,Agents
+mba,crm_distinct_field,source.utmSource,BTL
+mba,crm_distinct_field,source.utmSource,BTL MM
+mba,crm_distinct_field,source.utmSource,Bing
+mba,crm_distinct_field,source.utmSource,Blogs
+mba,crm_distinct_field,source.utmSource,Calendly
+mba,crm_distinct_field,source.utmSource,Careers360
+mba,crm_distinct_field,source.utmSource,Chat
+mba,crm_distinct_field,source.utmSource,Chatgpt
+mba,crm_distinct_field,source.utmSource,Collegedunia
+mba,crm_distinct_field,source.utmSource,Database
+mba,crm_distinct_field,source.utmSource,Direct
+mba,crm_distinct_field,source.utmSource,Facebook
+mba,crm_distinct_field,source.utmSource,GDN
+mba,crm_distinct_field,source.utmSource,Google Ads
+mba,crm_distinct_field,source.utmSource,Inhouse Social
+mba,crm_distinct_field,source.utmSource,Kollegeapply
+mba,crm_distinct_field,source.utmSource,Lead Nurturing
+mba,crm_distinct_field,source.utmSource,Not Mapped
+mba,crm_distinct_field,source.utmSource,Organic
+mba,crm_distinct_field,source.utmSource,Others
+mba,crm_distinct_field,source.utmSource,Partner 114
+mba,crm_distinct_field,source.utmSource,Partner 131
+mba,crm_distinct_field,source.utmSource,Partner 142
+mba,crm_distinct_field,source.utmSource,Partner 150
+mba,crm_distinct_field,source.utmSource,Partner 154
+mba,crm_distinct_field,source.utmSource,Partner 164
+mba,crm_distinct_field,source.utmSource,Partner 166
+mba,crm_distinct_field,source.utmSource,Partner 167
+mba,crm_distinct_field,source.utmSource,Partner 187
+mba,crm_distinct_field,source.utmSource,Partner 189
+mba,crm_distinct_field,source.utmSource,Partner 2
+mba,crm_distinct_field,source.utmSource,Partner 23
+mba,crm_distinct_field,source.utmSource,Partner 24
+mba,crm_distinct_field,source.utmSource,Partner 28
+mba,crm_distinct_field,source.utmSource,Partner 33
+mba,crm_distinct_field,source.utmSource,Partner 34
+mba,crm_distinct_field,source.utmSource,Partner 37
+mba,crm_distinct_field,source.utmSource,Partner 4
+mba,crm_distinct_field,source.utmSource,Partner 44
+mba,crm_distinct_field,source.utmSource,Partner 49
+mba,crm_distinct_field,source.utmSource,Partner 6
+mba,crm_distinct_field,source.utmSource,Partner 7
+mba,crm_distinct_field,source.utmSource,Partner 70
+mba,crm_distinct_field,source.utmSource,Partner 75
+mba,crm_distinct_field,source.utmSource,Partner 89
+mba,crm_distinct_field,source.utmSource,Referral
+mba,crm_distinct_field,source.utmSource,Remarketing
+mba,crm_distinct_field,source.utmSource,Shiksha
+mba,crm_distinct_field,source.utmSource,Social
+mba,crm_distinct_field,source.utmSource,Telephony Inbound
+mba,crm_distinct_field,source.utmSource,Telephony Outbound
+mba,crm_distinct_field,source.utmSource,Twigz Network
+mba,crm_distinct_field,source.utmSource,Visiting Card
+mba,crm_distinct_field,source.utmSource,Walk In
+mba,crm_distinct_field,source.utmSource,Webinar USA SA
+mba,crm_distinct_field,source.utmSource,Website
+mba,crm_distinct_field,source.utmSource,WhatsApp
+mba,crm_distinct_field,source.utmSource,itmpartner100
+mba,crm_distinct_field,source.utmSource,itmpartner117
+mba,crm_distinct_field,source.utmSource,itmpartner121
+mba,crm_distinct_field,source.utmSource,itmpartner143
+mba,crm_distinct_field,source.utmSource,itmpartner51
+mba,crm_distinct_field,source.utmSource,itmpartner66
+mba,crm_distinct_field,source.utmSource,itmpartner74
+mba,crm_distinct_field,source.utmSource,itmpartner77
+mba,crm_distinct_field,source.utmSource,itmpartner78
+mba,crm_distinct_field,source.utmSource,itmpartner85
+mba,crm_distinct_field,source.utmSource,itmpartner86
+mba,crm_distinct_field,source.utmSource,itmpartner96
+bba,crm_leadSourceExpr_aggregate,,fb
+bba,crm_leadSourceExpr_aggregate,,perplexity
+bba,crm_leadSourceExpr_aggregate,,websitepyq
+bba,crm_leadSourceExpr_aggregate,,other
+bba,crm_leadSourceExpr_aggregate,,justdial
+bba,crm_leadSourceExpr_aggregate,,wa
+bba,crm_leadSourceExpr_aggregate,,blog
+bba,crm_leadSourceExpr_aggregate,,chatgpt.com?utm_source=web
+bba,crm_leadSourceExpr_aggregate,,kollegeapply
+bba,crm_leadSourceExpr_aggregate,,web
+bba,crm_leadSourceExpr_aggregate,,collegedunia
+bba,crm_leadSourceExpr_aggregate,,default_source
+bba,crm_leadSourceExpr_aggregate,,inhouse social media
+bba,crm_leadSourceExpr_aggregate,,facebook
+bba,crm_leadSourceExpr_aggregate,,website
+bba,crm_leadSourceExpr_aggregate,,referral
+bba,crm_leadSourceExpr_aggregate,,offline
+bba,crm_leadSourceExpr_aggregate,,direct
+bba,crm_leadSourceExpr_aggregate,,organic
+bba,crm_leadSourceExpr_aggregate,,letsupgrade
+bba,crm_leadSourceExpr_aggregate,,shiksha
+bba,crm_leadSourceExpr_aggregate,,agents
+bba,crm_leadSourceExpr_aggregate,,ig
+bba,crm_leadSourceExpr_aggregate,,careers360
+bba,crm_leadSourceExpr_aggregate,,google
+bba,crm_leadSourceExpr_aggregate,,chat
+bba,crm_leadSourceExpr_aggregate,,chatgpt.com#cuet-ug-previous-year-question-papers-year-wise-pdf-access-plan
+bba,crm_leadSourceExpr_aggregate,,btl
+bba,crm_leadSourceExpr_aggregate,,chatgpt.com
+bba,crm_leadSourceExpr_aggregate,,walk-in
+bba,webhook_leadSourceExpr_aggregate,,website
+bba,webhook_leadSourceExpr_aggregate,,facebook
+bba,webhook_leadSourceExpr_aggregate,,direct
+bba,webhook_leadSourceExpr_aggregate,,shiksha
+bba,webhook_leadSourceExpr_aggregate,,agents
+bba,webhook_leadSourceExpr_aggregate,,organic
+bba,webhook_leadSourceExpr_aggregate,,referral
+bba,webhook_leadSourceExpr_aggregate,,offline
+bba,webhook_leadSourceExpr_aggregate,,letsupgrade
+bba,webhook_leadSourceExpr_aggregate,,ig
+bba,webhook_leadSourceExpr_aggregate,,chat
+bba,webhook_leadSourceExpr_aggregate,,careers360
+bba,webhook_leadSourceExpr_aggregate,,google
+bba,webhook_leadSourceExpr_aggregate,,btl
+bba,webhook_leadSourceExpr_aggregate,,chatgpt.com#cuet-ug-previous-year-question-papers-year-wise-pdf-access-plan
+bba,webhook_leadSourceExpr_aggregate,,chatgpt.com
+bba,webhook_leadSourceExpr_aggregate,,walk-in
+bba,webhook_leadSourceExpr_aggregate,,fb
+bba,webhook_leadSourceExpr_aggregate,,perplexity
+bba,webhook_leadSourceExpr_aggregate,,blank
+bba,webhook_leadSourceExpr_aggregate,,websitepyq
+bba,webhook_leadSourceExpr_aggregate,,justdial
+bba,webhook_leadSourceExpr_aggregate,,wa
+bba,webhook_leadSourceExpr_aggregate,,api
+bba,webhook_leadSourceExpr_aggregate,,other
+bba,webhook_leadSourceExpr_aggregate,,chatgpt.com?utm_source=web
+bba,webhook_leadSourceExpr_aggregate,,blog
+bba,webhook_leadSourceExpr_aggregate,,web
+bba,webhook_leadSourceExpr_aggregate,,collegedunia
+bba,webhook_leadSourceExpr_aggregate,,kollegeapply
+bba,webhook_leadSourceExpr_aggregate,,default_source
+bba,webhook_leadSourceExpr_aggregate,,inhouse social media
+bba,crm_distinct_field,latest_traffic_channel,Chat
+bba,crm_distinct_field,latest_traffic_channel,Direct
+bba,crm_distinct_field,latest_traffic_channel,Lets Upgrade
+bba,crm_distinct_field,latest_traffic_channel,Offline
+bba,crm_distinct_field,latest_traffic_channel,Organic
+bba,crm_distinct_field,latest_traffic_channel,Other Campaigns
+bba,crm_distinct_field,latest_traffic_channel,Paid Ads
+bba,crm_distinct_field,latest_traffic_channel,Previous Year Paper
+bba,crm_distinct_field,latest_traffic_channel,Publisher Campaign
+bba,crm_distinct_field,latest_traffic_channel,Referral
+bba,crm_distinct_field,latest_traffic_channel,Social
+bba,crm_distinct_field,primary_traffic_channel,Chat
+bba,crm_distinct_field,primary_traffic_channel,Direct
+bba,crm_distinct_field,primary_traffic_channel,Lets Upgrade
+bba,crm_distinct_field,primary_traffic_channel,Offline
+bba,crm_distinct_field,primary_traffic_channel,Organic
+bba,crm_distinct_field,primary_traffic_channel,Other Campaigns
+bba,crm_distinct_field,primary_traffic_channel,Paid Ads
+bba,crm_distinct_field,primary_traffic_channel,Previous Year Paper
+bba,crm_distinct_field,primary_traffic_channel,Publisher Campaign
+bba,crm_distinct_field,primary_traffic_channel,Referral
+bba,crm_distinct_field,primary_traffic_channel,Social
+bba,crm_distinct_field,publisher_name,Agents
+bba,crm_distinct_field,publisher_name,BTL
+bba,crm_distinct_field,publisher_name,Careers360
+bba,crm_distinct_field,publisher_name,Chat
+bba,crm_distinct_field,publisher_name,Chatgpt
+bba,crm_distinct_field,publisher_name,Collegedunia
+bba,crm_distinct_field,publisher_name,Direct
+bba,crm_distinct_field,publisher_name,Facebook
+bba,crm_distinct_field,publisher_name,Google Ads
+bba,crm_distinct_field,publisher_name,Kollegeapply
+bba,crm_distinct_field,publisher_name,Lets Upgrade
+bba,crm_distinct_field,publisher_name,Not Mapped
+bba,crm_distinct_field,publisher_name,Organic
+bba,crm_distinct_field,publisher_name,Others
+bba,crm_distinct_field,publisher_name,Previous Year Paper
+bba,crm_distinct_field,publisher_name,Referral
+bba,crm_distinct_field,publisher_name,Shiksha
+bba,crm_distinct_field,publisher_name,Social
+bba,crm_distinct_field,publisher_name,Walk In
+bba,crm_distinct_field,publisher_name,Webinar USA SA
+bba,crm_distinct_field,publisher_name,Website
+bba,webhook_distinct_field,Publisher_Name,Agents
+bba,webhook_distinct_field,Publisher_Name,BTL
+bba,webhook_distinct_field,Publisher_Name,Careers360
+bba,webhook_distinct_field,Publisher_Name,Chat
+bba,webhook_distinct_field,Publisher_Name,Chatgpt
+bba,webhook_distinct_field,Publisher_Name,Collegedunia
+bba,webhook_distinct_field,Publisher_Name,Direct
+bba,webhook_distinct_field,Publisher_Name,Facebook
+bba,webhook_distinct_field,Publisher_Name,Google Ads
+bba,webhook_distinct_field,Publisher_Name,Kollegeapply
+bba,webhook_distinct_field,Publisher_Name,Not Mapped
+bba,webhook_distinct_field,Publisher_Name,Organic
+bba,webhook_distinct_field,Publisher_Name,Others
+bba,webhook_distinct_field,Publisher_Name,Previous Year Paper
+bba,webhook_distinct_field,Publisher_Name,Referral
+bba,webhook_distinct_field,Publisher_Name,Shiksha
+bba,webhook_distinct_field,Publisher_Name,Social
+bba,webhook_distinct_field,Publisher_Name,Source Not Set
+bba,webhook_distinct_field,Publisher_Name,Walk In
+bba,webhook_distinct_field,Publisher_Name,Webinar USA SA
+bba,webhook_distinct_field,Publisher_Name,Website
+bba,webhook_distinct_field,Traffic_Channel,Chat
+bba,webhook_distinct_field,Traffic_Channel,Direct
+bba,webhook_distinct_field,Traffic_Channel,Offline
+bba,webhook_distinct_field,Traffic_Channel,Organic
+bba,webhook_distinct_field,Traffic_Channel,Other Campaigns
+bba,webhook_distinct_field,Traffic_Channel,Paid Ads
+bba,webhook_distinct_field,Traffic_Channel,Previous Year Paper
+bba,webhook_distinct_field,Traffic_Channel,Publisher Campaign
+bba,webhook_distinct_field,Traffic_Channel,Referral
+bba,webhook_distinct_field,Traffic_Channel,Social
+bba,webhook_distinct_field,Registration_Channel,email
+bba,webhook_distinct_field,Registration_Channel,fb
+bba,webhook_distinct_field,Registration_Channel,npf
+idm,crm_leadSourceExpr_aggregate,,direct
+idm,crm_leadSourceExpr_aggregate,,organic
+idm,crm_leadSourceExpr_aggregate,,social
+idm,crm_leadSourceExpr_aggregate,,default_source
+idm,crm_leadSourceExpr_aggregate,,lead nurturing
+idm,crm_leadSourceExpr_aggregate,,singinglines
+idm,crm_leadSourceExpr_aggregate,,idm_qr_code
+idm,crm_leadSourceExpr_aggregate,,agents
+idm,crm_leadSourceExpr_aggregate,,kollegeapply
+idm,crm_leadSourceExpr_aggregate,,coachinginstitute
+idm,crm_leadSourceExpr_aggregate,,collegedunia
+idm,crm_leadSourceExpr_aggregate,,web
+idm,crm_leadSourceExpr_aggregate,,whatsappleadnurturing_medium=i_ux_1
+idm,crm_leadSourceExpr_aggregate,,designifffa
+idm,crm_leadSourceExpr_aggregate,,consultant
+idm,crm_leadSourceExpr_aggregate,,s15302604
+idm,crm_leadSourceExpr_aggregate,,outbound call
+idm,crm_leadSourceExpr_aggregate,,alagangle
+idm,crm_leadSourceExpr_aggregate,,blog
+idm,crm_leadSourceExpr_aggregate,,chatgpt.com#professional-certification
+idm,crm_leadSourceExpr_aggregate,,archilearn
+idm,crm_leadSourceExpr_aggregate,,beyondees
+idm,crm_leadSourceExpr_aggregate,,fs
+idm,crm_leadSourceExpr_aggregate,,websitepyq
+idm,crm_leadSourceExpr_aggregate,,d2
+idm,crm_leadSourceExpr_aggregate,,chatgpt.com
+idm,crm_leadSourceExpr_aggregate,,database
+idm,crm_leadSourceExpr_aggregate,,brds
+idm,crm_leadSourceExpr_aggregate,,google
+idm,crm_leadSourceExpr_aggregate,,careers360
+idm,crm_leadSourceExpr_aggregate,,chat
+idm,crm_leadSourceExpr_aggregate,,creativeedge
+idm,crm_leadSourceExpr_aggregate,,liveform
+idm,crm_leadSourceExpr_aggregate,,btl
+idm,crm_leadSourceExpr_aggregate,,inbound call
+idm,crm_leadSourceExpr_aggregate,,adwords
+idm,crm_leadSourceExpr_aggregate,,educon
+idm,crm_leadSourceExpr_aggregate,,urmisarts
+idm,crm_leadSourceExpr_aggregate,,idm2026
+idm,crm_leadSourceExpr_aggregate,,desizncircle
+idm,crm_leadSourceExpr_aggregate,,facebook
+idm,crm_leadSourceExpr_aggregate,,twigz_network
+idm,crm_leadSourceExpr_aggregate,,website
+idm,crm_leadSourceExpr_aggregate,,walk ins
+idm,crm_leadSourceExpr_aggregate,,referral
+idm,crm_leadSourceExpr_aggregate,,shiksha
+idm,webhook_leadSourceExpr_aggregate,,beyondees
+idm,webhook_leadSourceExpr_aggregate,,liveform
+idm,webhook_leadSourceExpr_aggregate,,database
+idm,webhook_leadSourceExpr_aggregate,,brds
+idm,webhook_leadSourceExpr_aggregate,,chatgpt.com
+idm,webhook_leadSourceExpr_aggregate,,inbound call
+idm,webhook_leadSourceExpr_aggregate,,btl
+idm,webhook_leadSourceExpr_aggregate,,careers360
+idm,webhook_leadSourceExpr_aggregate,,creativeedge
+idm,webhook_leadSourceExpr_aggregate,,google
+idm,webhook_leadSourceExpr_aggregate,,chat
+idm,webhook_leadSourceExpr_aggregate,,desizncircle
+idm,webhook_leadSourceExpr_aggregate,,idm2026
+idm,webhook_leadSourceExpr_aggregate,,urmisarts
+idm,webhook_leadSourceExpr_aggregate,,adwords
+idm,webhook_leadSourceExpr_aggregate,,referral
+idm,webhook_leadSourceExpr_aggregate,,social
+idm,webhook_leadSourceExpr_aggregate,,direct
+idm,webhook_leadSourceExpr_aggregate,,shiksha
+idm,webhook_leadSourceExpr_aggregate,,organic
+idm,webhook_leadSourceExpr_aggregate,,facebook
+idm,webhook_leadSourceExpr_aggregate,,twigz_network
+idm,webhook_leadSourceExpr_aggregate,,website
+idm,webhook_leadSourceExpr_aggregate,,walk ins
+idm,webhook_leadSourceExpr_aggregate,,whatsappleadnurturing_medium=i_ux_1
+idm,webhook_leadSourceExpr_aggregate,,singinglines
+idm,webhook_leadSourceExpr_aggregate,,educon
+idm,webhook_leadSourceExpr_aggregate,,lead nurturing
+idm,webhook_leadSourceExpr_aggregate,,agents
+idm,webhook_leadSourceExpr_aggregate,,default_source
+idm,webhook_leadSourceExpr_aggregate,,idm_qr_code
+idm,webhook_leadSourceExpr_aggregate,,lead nururing
+idm,webhook_leadSourceExpr_aggregate,,designifffa
+idm,webhook_leadSourceExpr_aggregate,,kollegeapply
+idm,webhook_leadSourceExpr_aggregate,,web
+idm,webhook_leadSourceExpr_aggregate,,collegedunia
+idm,webhook_leadSourceExpr_aggregate,,blog
+idm,webhook_leadSourceExpr_aggregate,,coachinginstitute
+idm,webhook_leadSourceExpr_aggregate,,chatgpt.com#professional-certification
+idm,webhook_leadSourceExpr_aggregate,,s15302604
+idm,webhook_leadSourceExpr_aggregate,,consultant
+idm,webhook_leadSourceExpr_aggregate,,outbound call
+idm,webhook_leadSourceExpr_aggregate,,alagangle
+idm,webhook_leadSourceExpr_aggregate,,websitepyq
+idm,webhook_leadSourceExpr_aggregate,,d2
+idm,webhook_leadSourceExpr_aggregate,,samartheducares
+idm,webhook_leadSourceExpr_aggregate,,archilearn
+idm,webhook_leadSourceExpr_aggregate,,fs
+idm,crm_distinct_field,latest_traffic_channel,Chat
+idm,crm_distinct_field,latest_traffic_channel,Consultant
+idm,crm_distinct_field,latest_traffic_channel,Direct
+idm,crm_distinct_field,latest_traffic_channel,Offline
+idm,crm_distinct_field,latest_traffic_channel,Organic
+idm,crm_distinct_field,latest_traffic_channel,Other Campaigns
+idm,crm_distinct_field,latest_traffic_channel,Paid Ads
+idm,crm_distinct_field,latest_traffic_channel,Publisher Campaign
+idm,crm_distinct_field,latest_traffic_channel,Referral
+idm,crm_distinct_field,latest_traffic_channel,Social
+idm,crm_distinct_field,latest_traffic_channel,Telephony
+idm,crm_distinct_field,primary_traffic_channel,Chat
+idm,crm_distinct_field,primary_traffic_channel,Consultant
+idm,crm_distinct_field,primary_traffic_channel,Direct
+idm,crm_distinct_field,primary_traffic_channel,Offline
+idm,crm_distinct_field,primary_traffic_channel,Organic
+idm,crm_distinct_field,primary_traffic_channel,Other Campaigns
+idm,crm_distinct_field,primary_traffic_channel,Paid Ads
+idm,crm_distinct_field,primary_traffic_channel,Publisher Campaign
+idm,crm_distinct_field,primary_traffic_channel,Referral
+idm,crm_distinct_field,primary_traffic_channel,Social
+idm,crm_distinct_field,primary_traffic_channel,Telephony
+idm,crm_distinct_field,publisher_name,Agents
+idm,crm_distinct_field,publisher_name,Alag Angle
+idm,crm_distinct_field,publisher_name,Archi Learn
+idm,crm_distinct_field,publisher_name,BRDS
+idm,crm_distinct_field,publisher_name,BTL
+idm,crm_distinct_field,publisher_name,Beyondees
+idm,crm_distinct_field,publisher_name,Careers360
+idm,crm_distinct_field,publisher_name,Chat
+idm,crm_distinct_field,publisher_name,Chatgpt
+idm,crm_distinct_field,publisher_name,Coaching Institute
+idm,crm_distinct_field,publisher_name,Collegedunia
+idm,crm_distinct_field,publisher_name,Consultant
+idm,crm_distinct_field,publisher_name,Database
+idm,crm_distinct_field,publisher_name,Design Ifffa
+idm,crm_distinct_field,publisher_name,Desizn Circle
+idm,crm_distinct_field,publisher_name,Direct
+idm,crm_distinct_field,publisher_name,Educon
+idm,crm_distinct_field,publisher_name,Facebook
+idm,crm_distinct_field,publisher_name,Google Ads
+idm,crm_distinct_field,publisher_name,ITM Website
+idm,crm_distinct_field,publisher_name,KollegeApply
+idm,crm_distinct_field,publisher_name,Lead Nurturing
+idm,crm_distinct_field,publisher_name,MYCIVA
+idm,crm_distinct_field,publisher_name,Not Mapped
+idm,crm_distinct_field,publisher_name,Organic
+idm,crm_distinct_field,publisher_name,Referral
+idm,crm_distinct_field,publisher_name,SINGING LINES
+idm,crm_distinct_field,publisher_name,Shiksha
+idm,crm_distinct_field,publisher_name,Silica
+idm,crm_distinct_field,publisher_name,Social
+idm,crm_distinct_field,publisher_name,Telephony Inbound
+idm,crm_distinct_field,publisher_name,Telephony Outbound
+idm,crm_distinct_field,publisher_name,Top Rankers
+idm,crm_distinct_field,publisher_name,Urmis Arts
+idm,crm_distinct_field,publisher_name,Walk In
+idm,crm_distinct_field,publisher_name,Website
+idm,crm_distinct_field,publisher_name,twigz network
+idm,webhook_distinct_field,medium,02265867145
+idm,webhook_distinct_field,medium,147
+idm,webhook_distinct_field,medium,181
+idm,webhook_distinct_field,medium,182
+idm,webhook_distinct_field,medium,186
+idm,webhook_distinct_field,medium,186_RV
+idm,webhook_distinct_field,medium,192
+idm,webhook_distinct_field,medium,195
+idm,webhook_distinct_field,medium,195_RV
+idm,webhook_distinct_field,medium,196
+idm,webhook_distinct_field,medium,196_RV
+idm,webhook_distinct_field,medium,198
+idm,webhook_distinct_field,medium,198_RV
+idm,webhook_distinct_field,medium,199
+idm,webhook_distinct_field,medium,199_RV
+idm,webhook_distinct_field,medium,208
+idm,webhook_distinct_field,medium,208_RV
+idm,webhook_distinct_field,medium,211
+idm,webhook_distinct_field,medium,211_RV
+idm,webhook_distinct_field,medium,214
+idm,webhook_distinct_field,medium,214_RV
+idm,webhook_distinct_field,medium,220
+idm,webhook_distinct_field,medium,220_RV
+idm,webhook_distinct_field,medium,223
+idm,webhook_distinct_field,medium,223_RV
+idm,webhook_distinct_field,medium,225
+idm,webhook_distinct_field,medium,227
+idm,webhook_distinct_field,medium,227_RV
+idm,webhook_distinct_field,medium,229
+idm,webhook_distinct_field,medium,229_RV
+idm,webhook_distinct_field,medium,230
+idm,webhook_distinct_field,medium,230_RV
+idm,webhook_distinct_field,medium,240
+idm,webhook_distinct_field,medium,241
+idm,webhook_distinct_field,medium,243
+idm,webhook_distinct_field,medium,259
+idm,webhook_distinct_field,medium,260
+idm,webhook_distinct_field,medium,262
+idm,webhook_distinct_field,medium,264
+idm,webhook_distinct_field,medium,278_RV
+idm,webhook_distinct_field,medium,279
+idm,webhook_distinct_field,medium,37
+idm,webhook_distinct_field,medium,90Ta
+idm,webhook_distinct_field,medium,918634127518
+idm,webhook_distinct_field,medium,A10
+idm,webhook_distinct_field,medium,AMU01
+idm,webhook_distinct_field,medium,B10
+idm,webhook_distinct_field,medium,BRDS
+idm,webhook_distinct_field,medium,Blog
+idm,webhook_distinct_field,medium,C10_3
+idm,webhook_distinct_field,medium,CAARREERS360
+idm,webhook_distinct_field,medium,CDC
+idm,webhook_distinct_field,medium,CJ003
+idm,webhook_distinct_field,medium,Chat
+idm,webhook_distinct_field,medium,Colleges/Schools
+idm,webhook_distinct_field,medium,Colourking
+idm,webhook_distinct_field,medium,Demand-Gen
+idm,webhook_distinct_field,medium,Design Ifffa
+idm,webhook_distinct_field,medium,Forms
+idm,webhook_distinct_field,medium,G31
+idm,webhook_distinct_field,medium,G310
+idm,webhook_distinct_field,medium,G31_V
+idm,webhook_distinct_field,medium,G32
+idm,webhook_distinct_field,medium,G33
+idm,webhook_distinct_field,medium,G39
+idm,webhook_distinct_field,medium,G47
+idm,webhook_distinct_field,medium,GBP
+idm,webhook_distinct_field,medium,GQ
+idm,webhook_distinct_field,medium,GQ_V
+idm,webhook_distinct_field,medium,ITM Alumnus
+idm,webhook_distinct_field,medium,Instagram
+idm,webhook_distinct_field,medium,Interest-AI-PROOF-Mumbai
+idm,webhook_distinct_field,medium,Interest-IOS-Mumbai
+idm,webhook_distinct_field,medium,Interest-UCEED-Mumbai
+idm,webhook_distinct_field,medium,Isu
+idm,webhook_distinct_field,medium,Itm
+idm,webhook_distinct_field,medium,JZ2
+idm,webhook_distinct_field,medium,K1059
+idm,webhook_distinct_field,medium,KA100
+idm,webhook_distinct_field,medium,KWA24
+idm,webhook_distinct_field,medium,KWA75
+idm,webhook_distinct_field,medium,KWA82
+idm,webhook_distinct_field,medium,KWV24
+idm,webhook_distinct_field,medium,LG
+idm,webhook_distinct_field,medium,LTM01
+idm,webhook_distinct_field,medium,Lat1
+idm,webhook_distinct_field,medium,Lat1_d
+idm,webhook_distinct_field,medium,Lead-Gen
+idm,webhook_distinct_field,medium,LeadAd
+idm,webhook_distinct_field,medium,MI331
+idm,webhook_distinct_field,medium,Mobile App
+idm,webhook_distinct_field,medium,NA
+idm,webhook_distinct_field,medium,New ITM Student
+idm,webhook_distinct_field,medium,Nopaperforms
+idm,webhook_distinct_field,medium,PNP85
+idm,webhook_distinct_field,medium,PNP89
+idm,webhook_distinct_field,medium,Premium Database
+idm,webhook_distinct_field,medium,Prospect Data
+idm,webhook_distinct_field,medium,RD5
+idm,webhook_distinct_field,medium,Sarvgyan
+idm,webhook_distinct_field,medium,Silica
+idm,webhook_distinct_field,medium,TQi1
+idm,webhook_distinct_field,medium,VD_10
+idm,webhook_distinct_field,medium,VJ38d
+idm,webhook_distinct_field,medium,VJ38e
+idm,webhook_distinct_field,medium,VJ38zp
+idm,webhook_distinct_field,medium,VJ398a
+idm,webhook_distinct_field,medium,VJ62
+idm,webhook_distinct_field,medium,Web
+idm,webhook_distinct_field,medium,Website
+idm,webhook_distinct_field,medium,Website Chat
+idm,webhook_distinct_field,medium,Zin3
+idm,webhook_distinct_field,medium,admission
+idm,webhook_distinct_field,medium,admissionpage
+idm,webhook_distinct_field,medium,bm03
+idm,webhook_distinct_field,medium,bm100
+idm,webhook_distinct_field,medium,bm49
+idm,webhook_distinct_field,medium,bm51
+idm,webhook_distinct_field,medium,bm54
+idm,webhook_distinct_field,medium,bm62
+idm,webhook_distinct_field,medium,bm67
+idm,webhook_distinct_field,medium,bm68
+idm,webhook_distinct_field,medium,bm75
+idm,webhook_distinct_field,medium,bm81
+idm,webhook_distinct_field,medium,bm88
+idm,webhook_distinct_field,medium,bm91
+idm,webhook_distinct_field,medium,brds
+idm,webhook_distinct_field,medium,brochure
+idm,webhook_distinct_field,medium,ca147 comp
+idm,webhook_distinct_field,medium,ca55 KA91
+idm,webhook_distinct_field,medium,ca55 kapp01
+idm,webhook_distinct_field,medium,cad90 VJ38zp
+idm,webhook_distinct_field,medium,cap1000
+idm,webhook_distinct_field,medium,cap1002
+idm,webhook_distinct_field,medium,careeer360
+idm,webhook_distinct_field,medium,career360
+idm,webhook_distinct_field,medium,careers360
+idm,webhook_distinct_field,medium,chatbot
+idm,webhook_distinct_field,medium,cidco event
+idm,webhook_distinct_field,medium,colleges/schools
+idm,webhook_distinct_field,medium,com.google.android.googlequicksearchbox
+idm,webhook_distinct_field,medium,consultant
+idm,webhook_distinct_field,medium,cv55 PNP28
+idm,webhook_distinct_field,medium,default_medium
+idm,webhook_distinct_field,medium,digitalbrochure
+idm,webhook_distinct_field,medium,direct
+idm,webhook_distinct_field,medium,exhibition banner
+idm,webhook_distinct_field,medium,flyer
+idm,webhook_distinct_field,medium,google
+idm,webhook_distinct_field,medium,idmbachelorofdesigninanimationandvfxpage
+idm,webhook_distinct_field,medium,idmbachelorofdesigninfashiondesignpage
+idm,webhook_distinct_field,medium,idmbachelorofdesignininteriordesignpage
+idm,webhook_distinct_field,medium,instituteofdesignandmediapage
+idm,webhook_distinct_field,medium,k100
+idm,webhook_distinct_field,medium,last year data
+idm,webhook_distinct_field,medium,m14
+idm,webhook_distinct_field,medium,m15
+idm,webhook_distinct_field,medium,m16
+idm,webhook_distinct_field,medium,ma11
+idm,webhook_distinct_field,medium,ma53
+idm,webhook_distinct_field,medium,ma69
+idm,webhook_distinct_field,medium,ma70
+idm,webhook_distinct_field,medium,ma72
+idm,webhook_distinct_field,medium,online_content
+idm,webhook_distinct_field,medium,others
+idm,webhook_distinct_field,medium,paid
+idm,webhook_distinct_field,medium,placementpage
+idm,webhook_distinct_field,medium,pop_socket
+idm,webhook_distinct_field,medium,prospect data
+idm,webhook_distinct_field,medium,response
+idm,webhook_distinct_field,medium,sarvgyan
+idm,webhook_distinct_field,medium,search
+idm,webhook_distinct_field,medium,standbanner
+idm,webhook_distinct_field,medium,thankyoupage
+idm,webhook_distinct_field,medium,uceed
+idm,webhook_distinct_field,medium,urmis arts
+idm,webhook_distinct_field,medium,website
+idm,webhook_distinct_field,medium,whatsapp
+idm,webhook_distinct_field,medium,yahoo
+idm,webhook_distinct_field,source_value,Adwords
+idm,webhook_distinct_field,source_value,Agents
+idm,webhook_distinct_field,source_value,BTL
+idm,webhook_distinct_field,source_value,Blog
+idm,webhook_distinct_field,source_value,Chat
+idm,webhook_distinct_field,source_value,Consultant
+idm,webhook_distinct_field,source_value,Database
+idm,webhook_distinct_field,source_value,Facebook
+idm,webhook_distinct_field,source_value,Inbound Call
+idm,webhook_distinct_field,source_value,Organic
+idm,webhook_distinct_field,source_value,Outbound Call
+idm,webhook_distinct_field,source_value,Referral
+idm,webhook_distinct_field,source_value,S15302604
+idm,webhook_distinct_field,source_value,Walk Ins
+idm,webhook_distinct_field,source_value,Web
+idm,webhook_distinct_field,source_value,Website
+idm,webhook_distinct_field,source_value,alagangle
+idm,webhook_distinct_field,source_value,archilearn
+idm,webhook_distinct_field,source_value,beyondees
+idm,webhook_distinct_field,source_value,brds
+idm,webhook_distinct_field,source_value,btl
+idm,webhook_distinct_field,source_value,careers360
+idm,webhook_distinct_field,source_value,chat
+idm,webhook_distinct_field,source_value,chatgpt.com
+idm,webhook_distinct_field,source_value,chatgpt.com#professional-certification
+idm,webhook_distinct_field,source_value,coachinginstitute
+idm,webhook_distinct_field,source_value,collegedunia
+idm,webhook_distinct_field,source_value,consultant
+idm,webhook_distinct_field,source_value,creativeedge
+idm,webhook_distinct_field,source_value,d2
+idm,webhook_distinct_field,source_value,database
+idm,webhook_distinct_field,source_value,default_source
+idm,webhook_distinct_field,source_value,designifffa
+idm,webhook_distinct_field,source_value,desizncircle
+idm,webhook_distinct_field,source_value,direct
+idm,webhook_distinct_field,source_value,educon
+idm,webhook_distinct_field,source_value,fs
+idm,webhook_distinct_field,source_value,google
+idm,webhook_distinct_field,source_value,idm2026
+idm,webhook_distinct_field,source_value,idm_qr_code
+idm,webhook_distinct_field,source_value,kollegeapply
+idm,webhook_distinct_field,source_value,lead nurturing
+idm,webhook_distinct_field,source_value,lead nururing
+idm,webhook_distinct_field,source_value,liveform
+idm,webhook_distinct_field,source_value,organic
+idm,webhook_distinct_field,source_value,referral
+idm,webhook_distinct_field,source_value,s15302604
+idm,webhook_distinct_field,source_value,samartheducares
+idm,webhook_distinct_field,source_value,shiksha
+idm,webhook_distinct_field,source_value,singinglines
+idm,webhook_distinct_field,source_value,social
+idm,webhook_distinct_field,source_value,twigz_network
+idm,webhook_distinct_field,source_value,urmisarts
+idm,webhook_distinct_field,source_value,web
+idm,webhook_distinct_field,source_value,website
+idm,webhook_distinct_field,source_value,websitepyq
+idm,webhook_distinct_field,source_value,whatsappleadnurturing_medium=i_ux_1
+idm,webhook_distinct_field,publisher_id,Agents
+idm,webhook_distinct_field,publisher_id,Alag Angle
+idm,webhook_distinct_field,publisher_id,Archi Learn
+idm,webhook_distinct_field,publisher_id,BRDS
+idm,webhook_distinct_field,publisher_id,BTL
+idm,webhook_distinct_field,publisher_id,Beyondees
+idm,webhook_distinct_field,publisher_id,Careers360
+idm,webhook_distinct_field,publisher_id,Chat
+idm,webhook_distinct_field,publisher_id,Chatgpt
+idm,webhook_distinct_field,publisher_id,Coaching Institute
+idm,webhook_distinct_field,publisher_id,Collegedunia
+idm,webhook_distinct_field,publisher_id,Consultant
+idm,webhook_distinct_field,publisher_id,Database
+idm,webhook_distinct_field,publisher_id,Design Ifffa
+idm,webhook_distinct_field,publisher_id,Desizn Circle
+idm,webhook_distinct_field,publisher_id,Direct
+idm,webhook_distinct_field,publisher_id,Educon
+idm,webhook_distinct_field,publisher_id,Facebook
+idm,webhook_distinct_field,publisher_id,Google Ads
+idm,webhook_distinct_field,publisher_id,ITM Website
+idm,webhook_distinct_field,publisher_id,KollegeApply
+idm,webhook_distinct_field,publisher_id,Lead Nurturing
+idm,webhook_distinct_field,publisher_id,MYCIVA
+idm,webhook_distinct_field,publisher_id,Not Mapped
+idm,webhook_distinct_field,publisher_id,Organic
+idm,webhook_distinct_field,publisher_id,Previous Year Paper
+idm,webhook_distinct_field,publisher_id,Referral
+idm,webhook_distinct_field,publisher_id,SINGING LINES
+idm,webhook_distinct_field,publisher_id,Samarth Educares
+idm,webhook_distinct_field,publisher_id,Shiksha
+idm,webhook_distinct_field,publisher_id,Silica
+idm,webhook_distinct_field,publisher_id,Social
+idm,webhook_distinct_field,publisher_id,Telephony Inbound
+idm,webhook_distinct_field,publisher_id,Telephony Outbound
+idm,webhook_distinct_field,publisher_id,Top Rankers
+idm,webhook_distinct_field,publisher_id,Urmis Arts
+idm,webhook_distinct_field,publisher_id,Walk In
+idm,webhook_distinct_field,publisher_id,Website
+idm,webhook_distinct_field,publisher_id,twigz network
+idm,webhook_distinct_field,traffic_channel,Chat
+idm,webhook_distinct_field,traffic_channel,Consultant
+idm,webhook_distinct_field,traffic_channel,Direct
+idm,webhook_distinct_field,traffic_channel,Offline
+idm,webhook_distinct_field,traffic_channel,Organic
+idm,webhook_distinct_field,traffic_channel,Other Campaigns
+idm,webhook_distinct_field,traffic_channel,Paid Ads
+idm,webhook_distinct_field,traffic_channel,Previous Year Paper
+idm,webhook_distinct_field,traffic_channel,Publisher Campaign
+idm,webhook_distinct_field,traffic_channel,Referral
+idm,webhook_distinct_field,traffic_channel,Social
+idm,webhook_distinct_field,traffic_channel,Telephony

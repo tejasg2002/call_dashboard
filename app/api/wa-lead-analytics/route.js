@@ -8,6 +8,7 @@
 import clientPromise from '../../../src/lib/mongodb'
 import { waWorkspaceConfig, normalizeWAWorkspace } from '../../../src/lib/waWorkspace'
 import { waPhoneVariantsForMatch, normaliseMobile } from '../../../src/lib/waPhoneMatch'
+import { expandLeadFilterSourcePicksForMatch } from '../../../src/lib/leadFilterSourcePrimary.js'
 import {
   buildLeadPhoneExpr,
   leadPhoneStringExpr,
@@ -121,6 +122,7 @@ export async function GET(request) {
     const workspace = normalizeWAWorkspace(searchParams.get('workspace'))
     const pickedLeadStages = normalizeLeadFilterList(searchParams.getAll('leadStage'))
     const pickedSources = normalizeLeadFilterList(searchParams.getAll('source'))
+    const expandedSources = expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
     const startDate = (searchParams.get('startDate') || '').trim()
     const endDate = (searchParams.get('endDate') || '').trim()
 
@@ -146,8 +148,8 @@ export async function GET(request) {
     const matchExtras = isMbaItmCrm ? mbaItmCrmLeadFilterMatchExtras() : null
 
     const [crmPhones, webhookPhones] = await Promise.all([
-      crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, pickedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
-      webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, pickedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
+      crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, expandedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
+      webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, expandedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
     ])
 
     const phones = mergePhonesForWaJoin(crmPhones, webhookPhones)

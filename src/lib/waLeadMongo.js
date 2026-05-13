@@ -294,6 +294,61 @@ export const MBA_ITM_CRM_STAGE_DISTINCT_PATHS = Object.freeze([
   "_source.lead_stage",
 ]);
 
+/**
+ * Junk / internal numeric codes that appear in CRM `stage.current` / `_source.lead_stage`
+ * but should not appear in the MBA lead-stage filter dropdown.
+ */
+export const MBA_LEAD_STAGE_DROPDOWN_EXCLUDE = Object.freeze(
+  new Set([
+    "0",
+    "1500530",
+    "1500531",
+    "1500532",
+    "600304",
+    "600308",
+    "600309",
+    "99122",
+  ]),
+);
+
+/** True if this value should be hidden from MBA lead-stage options only (DB rows unchanged). */
+export function isExcludedMbaLeadStageDropdownValue(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  return MBA_LEAD_STAGE_DROPDOWN_EXCLUDE.has(s);
+}
+
+/**
+ * Junk / internal numeric codes on IDM `lead_stage` (CRM + webhook) — hide from filter dropdown only.
+ */
+export const IDM_LEAD_STAGE_DROPDOWN_EXCLUDE = Object.freeze(
+  new Set(["1500473", "1500474", "1500475"]),
+);
+
+/** True if this value should be hidden from IDM lead-stage options only. */
+export function isExcludedIdmLeadStageDropdownValue(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  return IDM_LEAD_STAGE_DROPDOWN_EXCLUDE.has(s);
+}
+
+/**
+ * IHM: junk numeric strings mistaken for traffic "source" — hide from lead source dropdown only.
+ * Matches `02271775144` and `2271775144` (leading-zero variant).
+ */
+export const IHM_LEAD_SOURCE_DROPDOWN_EXCLUDE = Object.freeze(
+  new Set(["02271775144", "2271775144"]),
+);
+
+/** @param {unknown} v */
+export function isExcludedIhmLeadSourceDropdownValue(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return false;
+  if (IHM_LEAD_SOURCE_DROPDOWN_EXCLUDE.has(s)) return true;
+  const noLeadingZeros = s.replace(/^0+(?=\d)/, "");
+  return IHM_LEAD_SOURCE_DROPDOWN_EXCLUDE.has(noLeadingZeros);
+}
+
 export const MBA_ITM_CRM_SOURCE_DISTINCT_PATHS = Object.freeze([
   "source.channel",
   "_source.source",
