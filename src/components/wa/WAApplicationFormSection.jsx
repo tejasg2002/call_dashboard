@@ -61,7 +61,7 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
         description={
           isPayment
             ? 'Converted users with lead ID, how many distinct templates were sent/delivered to their number, and click context.'
-            : 'Submitted applications with lead ID, name, application number, course/email where available, templates sent (sent/delivered), and templates clicked.'
+            : 'Submitted applications with lead ID, name, application number, templates sent (sent/delivered), and templates clicked.'
         }
         isDark={isDark}
       />
@@ -72,7 +72,7 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
           </p>
         </div>
         <div className="max-h-[min(70vh,520px)] overflow-x-auto overflow-y-auto">
-          <table className="w-full text-[11px] min-w-[1100px]">
+          <table className="w-full text-[11px] min-w-[900px]">
             <thead className={isDark ? 'bg-slate-800 sticky top-0 z-[1]' : 'bg-slate-50 sticky top-0 z-[1]'}>
               <tr>
                 <th className={`px-2 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>#</th>
@@ -81,8 +81,6 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
                 <th className={`px-2 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Application no.</th>
                 <th className={`px-2 py-2 text-left font-medium whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Templates sent</th>
                 <th className={`px-2 py-2 text-left font-medium min-w-[160px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Sent (names)</th>
-                <th className={`px-2 py-2 text-left font-medium min-w-[120px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Course / program</th>
-                <th className={`px-2 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Email</th>
                 <th className={`px-2 py-2 text-left font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Mobile</th>
                 <th className={`px-2 py-2 text-left font-medium whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {isPayment ? 'Completed' : 'Submitted'}
@@ -121,12 +119,6 @@ export default function WAApplicationFormSection({ paymentConversion, theme, dat
                         color={isDark ? 'bg-emerald-900/35 text-emerald-300' : 'bg-emerald-50 text-emerald-800'}
                         isDark={isDark}
                       />
-                    </td>
-                    <td className={`px-2 py-2 align-top max-w-[160px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {u.courseOrProgram ? <span className="line-clamp-2" title={u.courseOrProgram}>{u.courseOrProgram}</span> : '—'}
-                    </td>
-                    <td className={`px-2 py-2 align-top font-mono text-[10px] max-w-[160px] truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {u.email || '—'}
                     </td>
                     <td className={`px-2 py-2 align-top font-mono text-[10px] ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{mp(u.mobile)}</td>
                     <td className={`px-2 py-2 align-top font-mono text-[10px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>

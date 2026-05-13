@@ -7,6 +7,8 @@ import {
 } from '../../../src/lib/waWorkspace'
 
 const ITM_DB = 'itm'
+const ITM_CRM_DB = 'itm-crm'
+const ITM_CRM_LEADS_COL = 'leads'
 const APPS_COL = 'npfMbaApplications'
 const CRM_SNAPSHOT_COL = 'crmSnapshotMarch23'
 /** Cached snapshots in itm.wa_dashboard_cache — MBA + one doc per entry in ANALYTICS_WA_DEFINITIONS (see waWorkspace.js). */
@@ -276,7 +278,7 @@ async function aggregateTemplatesSentByNormMap(
         ...(waDateStages || []),
         {
           $match: {
-            _waStage: { $in: ['sent', 'delivered'] },
+            _waStage: { $in: ['sent', 'delivered', 'read'] },
             _waPhone: { $in: phoneVariants },
             _waTemplate: { $nin: [null, ''] },
           },
@@ -299,6 +301,98 @@ async function aggregateTemplatesSentByNormMap(
     map.set(norm, [...new Set([...prev, ...templates])])
   }
   return map
+}
+
+/** Distinct template names for Application Form: sent/delivered/read WA rows + clicked (Interakt often omits template on send-only docs). */
+function mergeTemplatesSentForRow(norm, templatesSentByNorm, clickAttrMap) {
+  const fromWa = templatesSentByNorm.get(norm) || []
+  const fromClick = clickAttrMap.get(norm)?.templates || []
+  const set = new Set()
+  for (const t of [...fromWa, ...fromClick]) {
+    if (t == null) continue
+    const s = String(t).trim()
+    if (s) set.add(s)
+  }
+  return [...set]
+}
+
+/**
+ * Fill missing name / email / application no. on MBA form rows from ITM CRM `leads`
+ * (NPF `npfMbaApplications` is sometimes sparse; CRM is keyed by phone).
+ */
+async function enrichMbaFormMetaFromItmCrmLeads(client, formMetaByNorm) {
+  if (!formMetaByNorm?.size) return
+  const norms = [...formMetaByNorm.keys()].filter(Boolean)
+  const variants = waPhoneVariantsForMatch(norms)
+  if (variants.length === 0) return
+  try {
+    const col = client.db(ITM_CRM_DB).collection(ITM_CRM_LEADS_COL)
+    const docs = await col
+      .find({
+        $or: [
+          { 'personal.phone': { $in: variants } },
+          { mobile: { $in: variants } },
+          { '_source.mobile': { $in: variants } },
+        ],
+      })
+      .project({
+        personal: 1,
+        mobile: 1,
+        _source: 1,
+        email: 1,
+        applicationNumber: 1,
+        application_no: 1,
+      })
+      .limit(8000)
+      .toArray()
+
+    const byNorm = new Map()
+    for (const doc of docs) {
+      const phones = [doc?.personal?.phone, doc?.mobile, doc?._source?.mobile]
+      const name = tidyDetailStr(
+        doc?.personal?.fullName ||
+          doc?.personal?.full_name ||
+          [doc?.personal?.firstName, doc?.personal?.first_name, doc?.personal?.lastName, doc?.personal?.last_name]
+            .filter(Boolean)
+            .join(' ')
+            .trim() ||
+          doc?._source?.name ||
+          doc?.name,
+      )
+      const email = tidyDetailStr(doc?.personal?.email || doc?.email || doc?._source?.email)
+      const appNo = tidyDetailStr(
+        doc?.applicationNumber ||
+          doc?.application_no ||
+          doc?._source?.application_number ||
+          doc?._source?.application_no,
+      )
+      const entry = { name, email, appNo }
+      for (const p of phones) {
+        const n = normaliseMobile(p)
+        if (!n) continue
+        const prev = byNorm.get(n)
+        if (!prev) {
+          byNorm.set(n, { ...entry })
+          continue
+        }
+        byNorm.set(n, {
+          name: prev.name || entry.name,
+          email: prev.email || entry.email,
+          appNo: prev.appNo || entry.appNo,
+        })
+      }
+    }
+
+    for (const [norm, meta] of formMetaByNorm) {
+      const row = byNorm.get(norm)
+      if (!row) continue
+      if (!meta.leadName && row.name) meta.leadName = row.name
+      if (!meta.email && row.email) meta.email = row.email
+      if (!meta.applicationNo && row.appNo) meta.applicationNo = row.appNo
+    }
+  } catch (e) {
+    console.warn('[computeWADashboard] MBA ITM CRM lead enrich skipped:', e?.message || e)
+  }
 }
 
 /**
@@ -1209,7 +1303,7 @@ async function buildIhmPaymentConversion({
       const norm = normaliseMobile(m)
       const attr = clickAttrMap.get(norm)
       const meta = formMetaByNorm.get(norm)
-      const sentList = templatesSentByNorm.get(norm) || []
+      const sentList = mergeTemplatesSentForRow(norm, templatesSentByNorm, clickAttrMap)
       return {
         mobile: m,
         leadId: meta?.leadIdFromNpf || null,
@@ -1644,7 +1738,7 @@ async function buildIsuFormConversion({
       const appNo = meta?.applicationNo
       const leadId = meta?.leadIdRaw
       const payment = paymentByKey.get(appNo) || paymentByKey.get(leadId) || null
-      const sentList = templatesSentByNorm.get(norm) || []
+      const sentList = mergeTemplatesSentForRow(norm, templatesSentByNorm, clickAttrMap)
       return {
         mobile: m,
         leadId: meta?.leadIdRaw || appNo || null,
@@ -2380,6 +2474,8 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     })
   }
 
+  await enrichMbaFormMetaFromItmCrmLeads(client, formMetaByNorm)
+
   const clickTimelineByNorm = new Map()
   const MAX_TIMELINE_EVENTS = 40
   if (convertedMobiles.length > 0) {
@@ -2503,7 +2599,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
       const crmLead = leadByNormMobile.get(norm)
       const appNo = meta?.applicationNo
       const payment = appNo ? mbaPaymentByAppNo.get(appNo) : null
-      const sentList = templatesSentByNorm.get(norm) || []
+      const sentList = mergeTemplatesSentForRow(norm, templatesSentByNorm, clickAttrMap)
       return {
         mobile: m,
         leadId: npfLead || crmLead || null,
