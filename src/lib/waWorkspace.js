@@ -52,7 +52,8 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     leadFunnelStageField: "lead_stage",
     isuAppsDb: ITM_IDM_DB,
     isuAppsCollection: "npfApplicationsWebhookEvents",
-    isuAppsPhoneField: "Mobile_No_Alt",
+    /** Primary NPF phone field (Mobile_No_Alt is often empty; Mobile_Number matches WA). */
+    isuAppsPhoneField: "Mobile_Number",
     isuPaymentCollection: "npfPaymentWebhookEvents",
   },
   // BBA/BTECH: all WA + NPF + CRM snapshot + lead webhooks use DB ITM_ISU.

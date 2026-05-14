@@ -10,6 +10,9 @@ import {
   waWorkspaceConfig,
   normalizeWAWorkspace,
   WA_WORKSPACE_MBA,
+  WA_WORKSPACE_BTECH,
+  WA_WORKSPACE_IDM,
+  WA_WORKSPACE_IHM,
 } from '../../../src/lib/waWorkspace'
 import { normaliseMobile, waPhoneVariantsForMatch } from '../../../src/lib/waPhoneMatch'
 import {
@@ -18,6 +21,10 @@ import {
   resolveWaTemplateName,
   resolveWaTimelineDisplayName,
 } from '../../../src/lib/waInteraktTemplate'
+import { ihmWaConversionRowQualifies } from '../../../src/lib/ihmFormConversionRules'
+import { idmWaConversionRowQualifies } from '../../../src/lib/idmFormConversionRules'
+import { btechWaConversionRowQualifies } from '../../../src/lib/btechFormConversionRules'
+import { fetchIsuPaymentByKeyMap } from '../../../src/lib/isuPaymentWebhookLookup'
 
 const APPS_COL = 'npfMbaApplications'
 const MBA_LEADS_WEBHOOK_COL = 'npfLeadsWebhookEvents'
@@ -126,17 +133,29 @@ async function lookupIsuFormSubmissions(client, cfg, workspace, norm10) {
   const phoneField = cfg.isuAppsPhoneField || 'Mobile_Number'
   const variants = [...new Set([...waPhoneVariantsForMatch([norm10]), `+91-${norm10}`])]
   const submittedWhere = isuSubmittedWhere(workspace, cfg)
+  const isuAppPhoneOr = [
+    { [phoneField]: { $in: variants } },
+    { Mobile_Number: { $in: variants } },
+    { Mobile_No_Alt: { $in: variants } },
+    { mobile_number: { $in: variants } },
+    { Registered_Mobile: { $in: variants } },
+    { registered_mobile: { $in: variants } },
+  ]
 
   const rows = await appsCol
     .aggregate([
       {
         $match: {
-          [phoneField]: { $in: variants },
-          $or: [
-            { Application_Number_Auto_Generated: { $nin: [null, ''] } },
-            { Application_Number: { $nin: [null, ''] } },
-            { application_stage: { $nin: [null, ''] } },
-            { Application_Stage: { $nin: [null, ''] } },
+          $and: [
+            { $or: isuAppPhoneOr },
+            {
+              $or: [
+                { Application_Number_Auto_Generated: { $nin: [null, ''] } },
+                { Application_Number: { $nin: [null, ''] } },
+                { application_stage: { $nin: [null, ''] } },
+                { Application_Stage: { $nin: [null, ''] } },
+              ],
+            },
           ],
         },
       },
@@ -171,7 +190,7 @@ async function lookupIsuFormSubmissions(client, cfg, workspace, norm10) {
     ])
     .toArray()
 
-  return rows
+  const mapped = rows
     .map((row) => {
       const at = toIso(row._sortAt)
       if (!at) return null
@@ -186,6 +205,63 @@ async function lookupIsuFormSubmissions(client, cfg, workspace, norm10) {
       }
     })
     .filter(Boolean)
+
+  if (workspace === WA_WORKSPACE_IHM && cfg.isuPaymentCollection && mapped.length > 0) {
+    const paymentByKey = await fetchIsuPaymentByKeyMap(
+      client,
+      cfg.isuAppsDb,
+      cfg.isuPaymentCollection,
+      mapped.map((r) => ({ applicationNo: r.applicationNo, leadIdRaw: r.leadId })),
+    )
+    return mapped.filter((r) =>
+      ihmWaConversionRowQualifies(
+        {
+          applicationStage: r.applicationStage,
+          applicationNo: r.applicationNo,
+          leadIdRaw: r.leadId,
+        },
+        paymentByKey,
+      ),
+    )
+  }
+
+  if (workspace === WA_WORKSPACE_IDM && cfg.isuPaymentCollection && mapped.length > 0) {
+    const paymentByKey = await fetchIsuPaymentByKeyMap(
+      client,
+      cfg.isuAppsDb,
+      cfg.isuPaymentCollection,
+      mapped.map((r) => ({ applicationNo: r.applicationNo, leadIdRaw: r.leadId })),
+    )
+    return mapped.filter((r) =>
+      idmWaConversionRowQualifies(
+        { applicationNo: r.applicationNo, leadIdRaw: r.leadId },
+        paymentByKey,
+      ),
+    )
+  }
+
+  if (workspace === WA_WORKSPACE_BTECH && mapped.length > 0) {
+    const paymentByKey = cfg.isuPaymentCollection
+      ? await fetchIsuPaymentByKeyMap(
+          client,
+          cfg.isuAppsDb,
+          cfg.isuPaymentCollection,
+          mapped.map((r) => ({ applicationNo: r.applicationNo, leadIdRaw: r.leadId })),
+        )
+      : new Map()
+    return mapped.filter((r) =>
+      btechWaConversionRowQualifies(
+        {
+          applicationStage: r.applicationStage,
+          applicationNo: r.applicationNo,
+          leadIdRaw: r.leadId,
+        },
+        paymentByKey,
+      ),
+    )
+  }
+
+  return mapped
 }
 
 function mbaMobileMatchClause(norm10) {

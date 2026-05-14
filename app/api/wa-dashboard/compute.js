@@ -2,9 +2,16 @@ import clientPromise from '../../../src/lib/mongodb'
 import { isOnOrAfter, parseOptDate } from '../../../src/lib/conversionAttribution'
 import {
   WA_DASHBOARD_CACHE_ID_MBA_LEGACY,
+  WA_WORKSPACE_BTECH,
+  WA_WORKSPACE_IDM,
+  WA_WORKSPACE_IHM,
   waWorkspaceConfig,
   workspacePayloadMatchesExpected,
 } from '../../../src/lib/waWorkspace'
+import { ihmWaConversionRowQualifies } from '../../../src/lib/ihmFormConversionRules'
+import { idmWaConversionRowQualifies } from '../../../src/lib/idmFormConversionRules'
+import { btechWaConversionRowQualifies } from '../../../src/lib/btechFormConversionRules'
+import { fetchIsuPaymentByKeyMap } from '../../../src/lib/isuPaymentWebhookLookup'
 
 const ITM_DB = 'itm'
 const ITM_CRM_DB = 'itm-crm'
@@ -1125,7 +1132,7 @@ async function buildIhmPaymentConversion({
             {
               $facet: {
                 firstOutbound: [
-                  { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+                  { $match: { _waStage: { $in: ['sent', 'delivered', 'read'] } } },
                   { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
                 ],
                 lastClick: [
@@ -1353,6 +1360,8 @@ async function buildIsuFormConversion({
   isuPaymentCollection = null,
   /** When set, fills missing leadName from CRM snapshot by mobile. */
   crmSnapshotEnrich = null,
+  /** When `ihm`, form conversion counts only qualifying application stages or Payment Approved. */
+  workspace = null,
 }) {
   const isuDb = client.db(isuAppsDb)
   const appsCol = isuDb.collection(isuAppsCollection)
@@ -1367,11 +1376,12 @@ async function buildIsuFormConversion({
     ? await waCol.aggregate([
         { $addFields: waR },
         { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
-        { $match: { _waPhone: { $in: clickedPhoneDedup } } },
+        // Same phone can appear as 10-digit, 91…, +91-… on different events — must match all variants for anchors.
+        { $match: { _waPhone: { $in: clickedPhoneVariants } } },
         {
           $facet: {
             firstOutbound: [
-              { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+              { $match: { _waStage: { $in: ['sent', 'delivered', 'read'] } } },
               { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
             ],
             lastClick: [
@@ -1409,6 +1419,16 @@ async function buildIsuFormConversion({
   const allMobileVariants = waPhoneVariantsForMatch(normalisedClickedMobiles)
   // Also add the "+91-" dash format that these collections use
   const dashVariants = normalisedClickedMobiles.map((n) => `+91-${n}`)
+  const phonesIn = [...new Set([...allMobileVariants, ...dashVariants])]
+  /** IDM/IHM/BBA payloads disagree on which field holds the WA number — match any, group on first non-empty. */
+  const isuAppPhoneOr = [
+    { [phoneField]: { $in: phonesIn } },
+    { Mobile_Number: { $in: phonesIn } },
+    { Mobile_No_Alt: { $in: phonesIn } },
+    { mobile_number: { $in: phonesIn } },
+    { Registered_Mobile: { $in: phonesIn } },
+    { registered_mobile: { $in: phonesIn } },
+  ]
 
   // Application number field: BBA/BTech/IHM/IDM use different field names
   const appNoField = '$Application_Number_Auto_Generated'
@@ -1418,14 +1438,18 @@ async function buildIsuFormConversion({
     ? await appsCol.aggregate([
         {
           $match: {
-            [phoneField]: { $in: [...allMobileVariants, ...dashVariants] },
-            // Include docs that have an application number OR an application stage —
-            // some collections store stage on a separate event without the app number field.
-            $or: [
-              { Application_Number_Auto_Generated: { $nin: [null, ''] } },
-              { Application_Number: { $nin: [null, ''] } },
-              { application_stage: { $nin: [null, ''] } },
-              { Application_Stage: { $nin: [null, ''] } },
+            $and: [
+              { $or: isuAppPhoneOr },
+              {
+                // Include docs that have an application number OR an application stage —
+                // some collections store stage on a separate event without the app number field.
+                $or: [
+                  { Application_Number_Auto_Generated: { $nin: [null, ''] } },
+                  { Application_Number: { $nin: [null, ''] } },
+                  { application_stage: { $nin: [null, ''] } },
+                  { Application_Stage: { $nin: [null, ''] } },
+                ],
+              },
             ],
           },
         },
@@ -1451,6 +1475,16 @@ async function buildIsuFormConversion({
             _hasStage: {
               $cond: [{ $ifNull: ['$application_stage', { $ifNull: ['$Application_Stage', false] }] }, 1, 0],
             },
+            _groupPhone: {
+              $ifNull: [
+                `$${phoneField}`,
+                '$Mobile_Number',
+                '$Mobile_No_Alt',
+                '$mobile_number',
+                '$Registered_Mobile',
+                '$registered_mobile',
+              ],
+            },
           },
         },
         // Sort: docs with a stage first (desc), then most-recent date first.
@@ -1458,7 +1492,7 @@ async function buildIsuFormConversion({
         { $sort: { _hasStage: -1, _sortAt: -1 } },
         {
           $group: {
-            _id: `$${phoneField}`,
+            _id: '$_groupPhone',
             formSubmittedAt: { $max: '$_sortAt' },
             applicationNo: { $first: '$_appNo' },
             leadIdRaw: { $first: { $ifNull: ['$Lead_ID', '$lead_id'] } },
@@ -1541,7 +1575,7 @@ async function buildIsuFormConversion({
   // Step 3: filter to apps submitted on/after firstOutbound AND lastClick,
   // then deduplicate by normalised mobile (some docs store Mobile_No_Alt with/without +91- prefix).
   const seenNormsStep3 = new Set()
-  const formSubmittedResult = formSubmittedAgg.filter((r) => {
+  let formSubmittedResult = formSubmittedAgg.filter((r) => {
     const norm = normaliseMobile(r._id)
     const outboundAnchor = firstOutboundByNorm.get(norm)
     const lastClick = lastClickByNorm.get(norm)
@@ -1552,6 +1586,23 @@ async function buildIsuFormConversion({
     seenNormsStep3.add(norm)
     return true
   })
+
+  const paymentByKey = await fetchIsuPaymentByKeyMap(
+    client,
+    isuAppsDb,
+    isuPaymentCollection,
+    formSubmittedResult.map((r) => ({ applicationNo: r.applicationNo, leadIdRaw: r.leadIdRaw })),
+  )
+
+  if (workspace === WA_WORKSPACE_IHM) {
+    formSubmittedResult = formSubmittedResult.filter((r) => ihmWaConversionRowQualifies(r, paymentByKey))
+  }
+  if (workspace === WA_WORKSPACE_IDM) {
+    formSubmittedResult = formSubmittedResult.filter((r) => idmWaConversionRowQualifies(r, paymentByKey))
+  }
+  if (workspace === WA_WORKSPACE_BTECH) {
+    formSubmittedResult = formSubmittedResult.filter((r) => btechWaConversionRowQualifies(r, paymentByKey))
+  }
 
   const formSubmittedMobiles = formSubmittedResult.map((r) => r._id)
   const convertedMobiles = [...new Set(formSubmittedMobiles)]
@@ -1674,52 +1725,6 @@ async function buildIsuFormConversion({
 
   if (crmSnapshotEnrich?.db && crmSnapshotEnrich?.collection) {
     await enrichFormMetaLeadNamesFromCrm(client, crmSnapshotEnrich, formMetaByNorm)
-  }
-
-  // Step 7: payment lookup — BBA/BTech by Application_Number, IDM by application_number (lowercase), IHM by lead_id
-  const paymentByKey = new Map()
-  if (isuPaymentCollection && formSubmittedResult.length > 0) {
-    const appNos   = formSubmittedResult.map((r) => r.applicationNo).filter(Boolean)
-    const leadIds  = formSubmittedResult.map((r) => r.leadIdRaw).filter(Boolean)
-
-    if (appNos.length > 0 || leadIds.length > 0) {
-      const payCol = client.db(isuAppsDb).collection(isuPaymentCollection)
-      const payDocs = await payCol.find({
-        $or: [
-          // BBA / BTech
-          ...(appNos.length  > 0 ? [{ Application_Number: { $in: appNos } }]   : []),
-          // IDM (lowercase field)
-          ...(appNos.length  > 0 ? [{ application_number: { $in: appNos } }]   : []),
-          // BBA / BTech Lead_ID (uppercase)
-          ...(leadIds.length > 0 ? [{ Lead_ID: { $in: leadIds } }]             : []),
-          // IHM lead_id (lowercase)
-          ...(leadIds.length > 0 ? [{ lead_id: { $in: leadIds } }]             : []),
-        ],
-      }).toArray()
-
-      for (const p of payDocs) {
-        // Resolve the link key — try every possible field
-        const key = p.Application_Number || p.application_number || p.Lead_ID || p.lead_id
-        if (!key) continue
-        const existing = paymentByKey.get(key)
-        // Prefer paymentStatus (NPF completion flag: "Complete") over Payment_Status
-        // (stage tracker: "Pre Payment" / "Payment Approved") to avoid false negatives.
-        const rawStatus = p.paymentStatus || p.Payment_Status || ''
-        const paidAt = parseOptDate(p.Payment_Approved_Date) || parseOptDate(p.createdAt)
-        if (!existing || (paidAt && existing.paidAt && paidAt.getTime() > existing.paidAt.getTime())) {
-          paymentByKey.set(key, {
-            paymentDone: /approved|success|complete/i.test(rawStatus),
-            paymentStatus: p.paymentStatus || p.Payment_Status || null,
-            paymentAmount: p.Payment_Amount || null,
-            transactionId: p.Transaction_ID || null,
-            paidAt,
-            paidAtDisplay: paidAt
-              ? paidAt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-              : '—',
-          })
-        }
-      }
-    }
   }
 
   const n = formSubmittedResult.length
@@ -2160,6 +2165,7 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
           cfg.crmSnapshotCollection != null
             ? { db: cfg.leadFilterDataDb ?? cfg.dataDb, collection: cfg.crmSnapshotCollection }
             : null,
+        workspace: cfg.workspace,
       })
       formSubmittedCount = paymentConversion.formSubmitted
     } else {
@@ -2173,16 +2179,17 @@ export async function computeWADashboard({ mode = 'cached', startDate, endDate, 
     }
   } else {
   // MBA: firstOutbound + lastClick share the same phone $in filter → one $facet scan
+  const mbaClickedPhoneVariants = waPhoneVariantsForMatch(clickedPhoneDedup)
   const mbaAnchorRaw = clickedPhoneDedup.length > 0
     ? await waCol.aggregate(
         [
           { $addFields: waResolvedFields },
           { $addFields: { _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] } } },
-          { $match: { _waPhone: { $in: clickedPhoneDedup } } },
+          { $match: { _waPhone: { $in: mbaClickedPhoneVariants } } },
           {
             $facet: {
               firstOutbound: [
-                { $match: { _waStage: { $in: ['sent', 'delivered'] } } },
+                { $match: { _waStage: { $in: ['sent', 'delivered', 'read'] } } },
                 { $group: { _id: '$_waPhone', firstOutbound: { $min: '$_waEventTs' } } },
               ],
               lastClick: [

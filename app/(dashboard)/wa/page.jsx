@@ -651,13 +651,13 @@ export default function WAApiPage() {
                 }
                 description={
                   workspace === WA_WORKSPACE_IHM
-                    ? 'Clicked users who submitted an IHM application (ITM_IHM.npfApplicationsWebhookEvents) after template send and last click'
+                    ? 'Clicked users who reached Submitted, SRF Paid, or Enrolled on IHM NPF apps — or Payment Approved on IHM payment webhooks — after first WA send and last click (ITM_IHM.npfApplicationsWebhookEvents + npfPaymentWebhookEvents).'
                     : workspace === WA_WORKSPACE_IDM
-                    ? 'Clicked users who submitted an IDM application (ITM_IDM.npfApplicationsWebhookEvents) after template send and last click'
+                    ? 'Clicked users with an IDM application (ITM_IDM.npfApplicationsWebhookEvents) after first WA send and last click, where NPF payment status is Complete (ITM_IDM.npfPaymentWebhookEvents).'
                     : workspace === WA_WORKSPACE_BBA
                     ? 'Clicked users who submitted a BBA application (ITM_ISU.npfApplicationsWebhookEventsBBA) after template send and last click'
                     : workspace === WA_WORKSPACE_BTECH
-                    ? 'Clicked users who submitted a BTech application (ITM_ISU.npfApplicationsWebhookEventsBTech) after template send and last click'
+                    ? 'Clicked users with a BTech application (ITM_ISU.npfApplicationsWebhookEventsBTech) after first WA send and last click, where stage is Submitted, B.Tech Offer Letter with Scholarship, or Enrolled — or NPF payment is Payment Approved (npfPaymentWebhookEventsBTech).'
                     : 'Clicked users who submitted an MBA application after template send'
                 }
                 isDark={isDark}
