@@ -8,6 +8,7 @@ import {
   WA_WORKSPACE_MBA,
   WA_WORKSPACE_BBA,
   WA_WORKSPACE_BTECH,
+  WA_WORKSPACE_MBA_AI,
   normalizeWAWorkspace,
   workspacePayloadMatchesExpected,
 } from '../../../src/lib/waWorkspace'
@@ -284,21 +285,12 @@ export default function WAApiPage() {
       if (f.startDate) analyticsParams.set('startDate', f.startDate)
       if (f.endDate) analyticsParams.set('endDate', f.endDate)
 
-      const phoneParams = new URLSearchParams({ workspace: ws, mode: 'phones' })
-      for (const v of pickedStages) phoneParams.append('leadStage', v)
-      for (const v of pickedSrcs) phoneParams.append('source', v)
-
       try {
-        const [aRes, pRes] = await Promise.all([
-          fetch(`/api/wa-lead-analytics?${analyticsParams.toString()}`),
-          fetch(`/api/wa-lead-filter?${phoneParams.toString()}`),
-        ])
+        const aRes = await fetch(`/api/wa-lead-analytics?${analyticsParams.toString()}`)
         const data = await aRes.json()
-        const phonesPayload = await pRes.json()
         if (!aRes.ok || data.error) throw new Error(data.error || 'Lead analytics failed')
-        if (!pRes.ok || phonesPayload.error) throw new Error(phonesPayload.error || 'Lead phones lookup failed')
         setLeadAnalytics(data)
-        setLeadFilterPhoneNormals(Array.isArray(phonesPayload.phones) ? phonesPayload.phones : [])
+        setLeadFilterPhoneNormals(Array.isArray(data.phones) ? data.phones : [])
         setToast(`Lead filter: ${data.totalLeads.toLocaleString('en-IN')} leads matched`)
         setTimeout(() => setToast(null), 5000)
       } catch (err) {
@@ -647,6 +639,8 @@ export default function WAApiPage() {
                     ? 'Form conversion (BBA)'
                     : workspace === WA_WORKSPACE_BTECH
                     ? 'Form conversion (BTech)'
+                    : workspace === WA_WORKSPACE_MBA_AI
+                    ? 'Form conversion (MBA AI)'
                     : 'Form conversion'
                 }
                 description={
@@ -658,6 +652,8 @@ export default function WAApiPage() {
                     ? 'Clicked users who submitted a BBA application (ITM_ISU.npfApplicationsWebhookEventsBBA) after template send and last click'
                     : workspace === WA_WORKSPACE_BTECH
                     ? 'Clicked users with a BTech application (ITM_ISU.npfApplicationsWebhookEventsBTech) after first WA send and last click, where stage is Submitted, B.Tech Offer Letter with Scholarship, or Enrolled — or NPF payment is Payment Approved (npfPaymentWebhookEventsBTech).'
+                    : workspace === WA_WORKSPACE_MBA_AI
+                    ? 'Clicked users with an MBA AI application row in ITM_BS.npfApplicationsWebhookEvents_mba_ai after first WA send/deliver/read and last click (same timing rules as BBA/BTech). Lead stage/source filters use npfLeadsWebhookEvents_mba_ai when configured.'
                     : 'Clicked users who submitted an MBA application after template send'
                 }
                 isDark={isDark}
@@ -667,6 +663,7 @@ export default function WAApiPage() {
                   data={paymentConversionForDisplay ?? snapshot.paymentConversion}
                   theme={theme}
                   dataMasked={dataMasked}
+                  workspace={workspace}
                 />
               </LazySection>
             </div>

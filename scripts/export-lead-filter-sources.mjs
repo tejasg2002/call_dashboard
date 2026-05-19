@@ -29,7 +29,7 @@ if (!uri) {
   process.exit(1)
 }
 
-const WORKSPACES = ['mba', 'bba', 'btech', 'idm', 'ihm']
+const WORKSPACES = ['mba', 'mba_ai', 'bba', 'btech', 'idm', 'ihm']
 
 function parseOutDir() {
   const arg = process.argv.find((a) => a.startsWith('--out='))

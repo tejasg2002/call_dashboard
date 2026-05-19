@@ -3,6 +3,8 @@
 /** `itm.wa_dashboard_cache` document _id per workspace. */
 export const WA_DASHBOARD_CACHE_ID_MBA = "wa_latest_mba";
 export const WA_DASHBOARD_CACHE_ID_MBA_LEGACY = "wa_latest";
+/** MBA AI vertical (ITM_BS Interakt + NPF webhooks). */
+export const WA_DASHBOARD_CACHE_ID_MBA_AI = "wa_latest_mba_ai";
 
 const ITM_DB = "itm";
 const ANALYTICS_DB = "analytics";
@@ -87,6 +89,34 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     leadWebhookCollection: "npfLeadsWebhookEventsBTech",
     leadPhoneField: "registered_mobile",
   },
+  // MBA AI: same ITM_BS Interakt + NPF webhook family as MBA, separate collections.
+  {
+    workspace: "mba_ai",
+    collection: "interaktWhatsappWebhookEvents_mba_ai",
+    cacheKey: WA_DASHBOARD_CACHE_ID_MBA_AI,
+    label: "MBA AI",
+    dataDb: ITM_BS_DB,
+    leadFilterDataDb: ITM_BS_DB,
+    leadWebhookCollection: "npfLeadsWebhookEvents_mba_ai",
+    leadPhoneField: "Registered_Mobile",
+    isuAppsDb: ITM_BS_DB,
+    isuAppsCollection: "npfApplicationsWebhookEvents_mba_ai",
+    isuAppsPhoneField: "Mobile_Number",
+    isuPaymentCollection: "npfPaymentWebhookEvents_mba_ai",
+  },
+]);
+
+/**
+ * Call-only workspaces (Mongo call logs + SmartPing webhooks; no WhatsApp dashboard).
+ * @type {ReadonlyArray<{ workspace: string, label: string, callLogsCollection: string, smartpingCollection: string }>}
+ */
+export const CALL_ONLY_WORKSPACE_DEFINITIONS = Object.freeze([
+  {
+    workspace: "mca",
+    label: "MCA",
+    callLogsCollection: "call_logs_mca",
+    smartpingCollection: "smartpingCallsWebhookEventsMCA",
+  },
 ]);
 
 /** @type {ReadonlySet<string>} */
@@ -94,11 +124,18 @@ const ANALYTICS_WORKSPACE_SLUGS = new Set(
   ANALYTICS_WA_DEFINITIONS.map((d) => d.workspace),
 );
 
+/** @type {ReadonlySet<string>} */
+const CALL_ONLY_WORKSPACE_SLUGS = new Set(
+  CALL_ONLY_WORKSPACE_DEFINITIONS.map((d) => d.workspace),
+);
+
 export const WA_WORKSPACE_MBA = "mba";
 export const WA_WORKSPACE_IHM = "ihm";
 export const WA_WORKSPACE_IDM = "idm";
 export const WA_WORKSPACE_BBA = "bba";
 export const WA_WORKSPACE_BTECH = "btech";
+export const WA_WORKSPACE_MBA_AI = "mba_ai";
+export const WA_WORKSPACE_MCA = "mca";
 
 export const WA_DASHBOARD_CACHE_ID_IHM = "wa_latest_ihm";
 export const WA_DASHBOARD_CACHE_ID_IDM = "wa_latest_idm";
@@ -109,6 +146,7 @@ export const WA_DASHBOARD_CACHE_ID_BTECH = "wa_latest_btech";
 export const ALL_BU_WORKSPACE_SLUGS = Object.freeze([
   WA_WORKSPACE_MBA,
   ...ANALYTICS_WA_DEFINITIONS.map((d) => d.workspace),
+  ...CALL_ONLY_WORKSPACE_DEFINITIONS.map((d) => d.workspace),
 ]);
 
 /**
@@ -150,7 +188,9 @@ export function firstAllowedBuWorkspace(allowedBuWorkspaces) {
 export function buWorkspaceLabel(slug) {
   if (!slug || slug === WA_WORKSPACE_MBA) return "MBA";
   const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === slug);
-  return def?.label ?? String(slug).toUpperCase();
+  if (def) return def.label;
+  const callOnly = CALL_ONLY_WORKSPACE_DEFINITIONS.find((d) => d.workspace === slug);
+  return callOnly?.label ?? String(slug).toUpperCase();
 }
 
 export function normalizeWAWorkspace(raw) {
@@ -158,7 +198,22 @@ export function normalizeWAWorkspace(raw) {
     .toLowerCase()
     .trim();
   if (ANALYTICS_WORKSPACE_SLUGS.has(w)) return w;
+  if (CALL_ONLY_WORKSPACE_SLUGS.has(w)) return w;
   return WA_WORKSPACE_MBA;
+}
+
+/** MCA and future call-only verticals (no WhatsApp analytics). */
+export function isCallsOnlyWorkspace(workspace) {
+  return CALL_ONLY_WORKSPACE_SLUGS.has(normalizeWAWorkspace(workspace));
+}
+
+/** Mongo `analytics` collection for call logs / call review. */
+export function callLogsCollectionForWorkspace(workspace) {
+  const w = normalizeWAWorkspace(workspace);
+  if (w === WA_WORKSPACE_BBA) return "call_logs_bba";
+  if (w === WA_WORKSPACE_BTECH) return "call_logs_btech";
+  if (w === WA_WORKSPACE_MCA) return "call_logs_mca";
+  return null;
 }
 
 /**
@@ -179,10 +234,9 @@ export function isNonMbaWaWorkspace(workspace) {
   return ANALYTICS_WORKSPACE_SLUGS.has(normalizeWAWorkspace(workspace));
 }
 
-/** BBA / BTECH: call analytics + call review use Mongo analytics.call_logs_isu (not Firestore Call_logs). */
+/** BBA / BTECH / MCA: call analytics + call review from Mongo `analytics.call_logs_*`. */
 export function workspaceUsesIsuCallLogs(workspace) {
-  const w = normalizeWAWorkspace(workspace);
-  return w === WA_WORKSPACE_BBA || w === WA_WORKSPACE_BTECH;
+  return callLogsCollectionForWorkspace(workspace) != null;
 }
 
 /**
@@ -192,6 +246,7 @@ export function workspaceUsesIsuCallLogs(workspace) {
 export function hideGlobalNavExceptWhatsApp(workspace) {
   const w = normalizeWAWorkspace(workspace);
   if (w === WA_WORKSPACE_MBA) return false;
+  if (isCallsOnlyWorkspace(w)) return false;
   if (workspaceUsesIsuCallLogs(workspace)) return false;
   return true;
 }
@@ -218,6 +273,10 @@ export function isRouteAllowedForBuWorkspace(pathname, workspace) {
   if (p === "/wa/user-journey") return true;
   if (p === "/wa/application-form") return true;
   if (p.startsWith("/wa/templates/")) return true;
+  if (isCallsOnlyWorkspace(w)) {
+    if (p === "/" || p === "/call-review") return true;
+    return false;
+  }
   if (workspaceUsesIsuCallLogs(w)) {
     if (p === "/" || p === "/call-review") return true;
     return false;
@@ -229,15 +288,13 @@ export function isRouteAllowedForBuWorkspace(pathname, workspace) {
 export function nonMbaWaHomePath(workspace) {
   const w = normalizeWAWorkspace(workspace);
   if (w === WA_WORKSPACE_MBA) return "/wa";
+  if (isCallsOnlyWorkspace(w)) return withWorkspaceQuery("/", w);
   return `/wa?workspace=${encodeURIComponent(w)}`;
 }
 
 /** Human label for the workspace switcher. */
 export function workspaceDisplayLabel(workspace) {
-  const w = normalizeWAWorkspace(workspace);
-  if (w === WA_WORKSPACE_MBA) return "MBA";
-  const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === w);
-  return def?.label ?? w.toUpperCase();
+  return buWorkspaceLabel(normalizeWAWorkspace(workspace));
 }
 
 /** Append ?workspace=<slug> for analytics workspaces so refreshes and links stay on the right BU. */
@@ -256,6 +313,18 @@ export function withWorkspaceQuery(href, workspace) {
 
 export function waWorkspaceConfig(workspace) {
   const w = normalizeWAWorkspace(workspace);
+  const callOnly = CALL_ONLY_WORKSPACE_DEFINITIONS.find((d) => d.workspace === w);
+  if (callOnly) {
+    return {
+      workspace: callOnly.workspace,
+      dataDb: ANALYTICS_DB,
+      waCollection: null,
+      cacheKey: null,
+      callsOnly: true,
+      callLogsCollection: callOnly.callLogsCollection,
+      smartpingCollection: callOnly.smartpingCollection,
+    };
+  }
   const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === w);
   if (def) {
     return {
@@ -293,5 +362,7 @@ export function waWorkspaceConfig(workspace) {
     leadFilterDataDb: ITM_CRM_DB,
     crmSnapshotCollection: "leads",
     crmLeadFilterSchema: "itm_crm_leads",
+    /** Lead stage dropdown + stage filter use WA callback_data (template CSV stages). */
+    leadFilterUsesWaCallbackData: true,
   };
 }

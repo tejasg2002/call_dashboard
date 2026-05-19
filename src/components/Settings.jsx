@@ -15,6 +15,7 @@ import {
 import {
   ALL_BU_WORKSPACE_SLUGS,
   ANALYTICS_WA_DEFINITIONS,
+  CALL_ONLY_WORKSPACE_DEFINITIONS,
   buWorkspaceLabel,
   normalizeAllowedBuWorkspaces,
 } from '../lib/waWorkspace'
@@ -213,7 +214,13 @@ function UserCard({ user: u, isDark, actionStatus, onResetPassword, onDelete, on
                     description={
                       slug === 'mba'
                         ? 'itm.marketingwa'
-                        : `analytics.${ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === slug)?.collection ?? ''}`
+                        : (() => {
+                            const callOnly = CALL_ONLY_WORKSPACE_DEFINITIONS.find((d) => d.workspace === slug)
+                            if (callOnly) {
+                              return `analytics.${callOnly.callLogsCollection} (+ ${callOnly.smartpingCollection})`
+                            }
+                            return `analytics.${ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === slug)?.collection ?? ''}`
+                          })()
                     }
                     checked={buAccessSet.has(slug)}
                     onChange={(v) => { void handleBuToggle(slug, v) }}

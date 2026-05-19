@@ -1,0 +1,160 @@
+mba,MBA,appint_msg1,1333,Application Stage : In process
+mba,MBA,appint_msg2,944,Application Stage : In process
+mba,MBA,appint_msg3,1886,Application Stage : In process
+mba,MBA,appint_msg4,194,Application Stage : In process
+mba,MBA,appint_msg5,166,Application Stage : In process
+mba,MBA,appint_msg6,167,Application Stage : In process
+mba,MBA,appsubmitted_not_interested1,688,Application Stage : Not Interested
+mba,MBA,btl_followup1,509,Follow Up
+mba,MBA,btl_followup2,436,Follow Up
+mba,MBA,btl_followup3,499,Follow Up
+mba,MBA,btl_nc1,527,Not Connected
+mba,MBA,btl_nc2,514,Not Connected
+mba,MBA,btl_nc3,486,Not Connected
+mba,MBA,btl_notelig1,27,Not Eligible
+mba,MBA,btl_notint1,234,Not Interested
+mba,MBA,btl_un1,10,Untouched
+mba,MBA,btl_un2,8,Untouched
+mba,MBA,btl_un3,8,Untouched
+mba,MBA,btl_un4,5,Untouched
+mba,MBA,btl_un5,9,Untouched
+mba,MBA,ie_msg03,1264,Interested & Eligible
+mba,MBA,ie_msg04,1083,Interested & Eligible
+mba,MBA,ie_msg1,3941,Interested & Eligible
+mba,MBA,ie_msg2,4191,Interested & Eligible
+mba,MBA,ie_msg5,1044,Interested & Eligible
+mba,MBA,ie_msg6,1023,Interested & Eligible
+mba,MBA,incomingcalls_un1,30,Untouched
+mba,MBA,incomingcalls_un2,3,Untouched
+mba,MBA,lead_mba_01,106,All Stages
+mba,MBA,lead_mba_02,171,All Stages
+mba,MBA,lead_mba_03,125,All Stages
+mba,MBA,lead_mba_04,184,All Stages
+mba,MBA,lead_mba_05,257,All Stages
+mba,MBA,lead_mba_06,436,All Stages
+mba,MBA,lead_mba_07,655,All Stages
+mba,MBA,lead_mba_10,788,All Stages
+mba,MBA,lead_mba_11,967,All Stages
+mba,MBA,lead_mba_12,11333,All Stages
+mba,MBA,lead_mba_13,11424,All Stages
+mba,MBA,lead_mba_14,17456,All Stages
+mba,MBA,lead_mba_15,9836,All Stages
+mba,MBA,mba_btl_1,10241,All Stages
+mba,MBA,mba_career360_1,13883,All Stages
+mba,MBA,mba_collegedunia_1,30118,All Stages
+mba,MBA,mba_followup_1,661,All Stages
+mba,MBA,mba_kollegeapply_1,6552,All Stages
+mba,MBA,mba_notconnected_1,13780,All Stages
+mba,MBA,mba_organic_1,3235,All Stages
+mba,MBA,mba_performance_1,8012,All Stages
+mba,MBA,mba_retention_1,851,All Stages
+mba,MBA,mba_retention_2,839,All Stages
+mba,MBA,mba_siksha_1,13069,All Stages
+mba,MBA,mbalnf_001,6029,All Stages
+mba,MBA,mbalnf_002,51584,All Stages
+mba,MBA,mbalnf_01,2537,All Stages
+mba,MBA,mbalnf_010,28970,All Stages
+mba,MBA,mbalnf_011,1210,All Stages
+mba,MBA,mbalnf_05,3955,All Stages
+mba,MBA,mbalnf_09,4838,All Stages
+mba,MBA,meta_followup1,541,Follow Up
+mba,MBA,meta_followup2,562,Follow Up
+mba,MBA,meta_followup3,587,Follow Up
+mba,MBA,meta_msg_1,3,All Stages
+mba,MBA,meta_nc1,3071,Not Connected
+mba,MBA,meta_nc2,2955,Not Connected
+mba,MBA,meta_nc3,2129,Not Connected
+mba,MBA,meta_notelig1,842,Not Eligible
+mba,MBA,meta_notint1,287,Not Interested
+mba,MBA,meta_un1,622,Untouched
+mba,MBA,meta_un2,35,Untouched
+mba,MBA,meta_un3,10,Untouched
+mba,MBA,meta_un4,9,Untouched
+mba,MBA,meta_un5,309,Untouched
+mba,MBA,new_applynow_mba1,1454,All Stages
+mba,MBA,new_applynow_mba2,6143,All Stages
+mba,MBA,new_applynow_mba3,5779,All Stages
+mba,MBA,new_applynow_mba4,5052,All Stages
+mba,MBA,new_applynow_mba5,4590,All Stages
+mba,MBA,new_applynow_mba6,1543,All Stages
+mba,MBA,new_applynow_mba7,2246,All Stages
+mba,MBA,new_mbalnf_005,86235,All Stages
+mba,MBA,new_mbalnf_008,2887,All Stages
+mba,MBA,new_mbalnf_01,8908,All Stages
+mba,MBA,new_mbalnf_015,302,All Stages
+mba,MBA,new_mbalnf_02,1103,All Stages
+mba,MBA,new_mbalnf_03,6499,All Stages
+mba,MBA,new_mbalnf_04,4222,All Stages
+mba,MBA,new_mbalnf_05,7906,All Stages
+mba,MBA,new_mbalnf_06,3594,All Stages
+mba,MBA,new_mbalnf_07,2920,All Stages
+mba,MBA,new_mbalnf_08,10943,All Stages
+mba,MBA,new_mbalnf_09,2715,All Stages
+mba,MBA,new_mbalnf_10,2480,All Stages
+mba,MBA,new_mbalnf_11,2195,All Stages
+mba,MBA,new_mbalnf_12,3206,All Stages
+mba,MBA,new_mbalnf_13,1184,All Stages
+mba,MBA,new_mbalnf_14,1143,All Stages
+mba,MBA,new_mbalnf_16,18772,All Stages
+mba,MBA,organic_followup1,3545,Follow Up
+mba,MBA,organic_followup2,2625,Follow Up
+mba,MBA,organic_nc1,1558,Not Connected
+mba,MBA,organic_nc2,1507,Not Connected
+mba,MBA,organic_nc3,1287,Not Connected
+mba,MBA,organic_notelig1,246,Not Eligible
+mba,MBA,organic_notint1,6815,Not Interested
+mba,MBA,organic_un1,208,Untouched
+mba,MBA,organic_un2,10,Untouched
+mba,MBA,organic_un3,11,Untouched
+mba,MBA,organic_un4,6,Untouched
+mba,MBA,organic_un5,2,Untouched
+mba,MBA,pub_msg_4,1,All Stages
+mba,MBA,publisher_followup1,593,Follow Up
+mba,MBA,publisher_followup2,450,Follow Up
+mba,MBA,publisher_nc1,13667,Not Connected
+mba,MBA,publisher_nc2,12577,Not Connected
+mba,MBA,publisher_nc3,11013,Not Connected
+mba,MBA,publisher_notelig1,442,Not Eligible
+mba,MBA,publisher_un1,15512,Untouched
+mba,MBA,publisher_un2,4843,Untouched
+mba,MBA,publisher_un3,2484,Untouched
+mba,MBA,publisher_un4,2181,Untouched
+mba,MBA,publisher_un5,2016,Untouched
+mba,MBA,referral_followup1,50,Follow Up
+mba,MBA,referral_followup2,46,Follow Up
+mba,MBA,referral_followup3,6,Follow Up
+mba,MBA,referral_msg_4,1,All Stages
+mba,MBA,referral_nc1,273,Not Connected
+mba,MBA,referral_nc2,248,Not Connected
+mba,MBA,referral_nc3,45,Not Connected
+mba,MBA,referral_notelig1,54,Not Eligible
+mba,MBA,referral_notint1,174,Not Interested
+mba,MBA,referral_un1,119,Untouched
+mba,MBA,referral_un2,6,Untouched
+mba,MBA,referral_un3,8,Untouched
+mba,MBA,referral_un4,7,Untouched
+mba,MBA,referral_un5,4,Untouched
+mba,MBA,substage_followup1,228,Follow Up
+mba,MBA,substage_followup2,869,Follow Up
+mba,MBA,substage_followup3,761,Follow Up
+mba,MBA,substage_followup4,694,Follow Up
+mba,MBA,substage_followup5,578,Follow Up
+mba,MBA,substage_interested,1014,Interested & Eligible
+mba,MBA,substage_nc1,5115,Not Connected
+mba,MBA,substage_nc2,17571,Not Connected
+mba,MBA,substage_nc3,16049,Not Connected
+mba,MBA,substage_nc4,14493,Not Connected
+mba,MBA,substage_nc5,13404,Not Connected
+mba,MBA,substage_nc6,9879,Not Connected
+mba,MBA,substage_nc7,8155,Not Connected
+mba,MBA,substage_not_eligible,827,Not Eligible
+mba,MBA,substage_not_interested,8884,Not Interested
+mba,MBA,walkin_followup2,20,Follow Up
+mba,MBA,walkin_followup3,20,Follow Up
+mba,MBA,walkin_nc1,27,Not Connected
+mba,MBA,walkin_nc2,23,Not Connected
+mba,MBA,walkin_nc3,2,Not Connected
+mba,MBA,walkin_notelig1,2,Not Eligible
+mba,MBA,walkin_notint1,14,Not Interested
+mba,MBA,walkin_un1,26,Untouched
+mba,MBA,walkin_un2,2,Untouched

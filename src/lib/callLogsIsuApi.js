@@ -1,5 +1,5 @@
 /**
- * BBA/BTECH: call logs from Mongo analytics.call_logs_isu (see /api/call-logs-isu).
+ * BBA / BTECH / MCA: call logs from Mongo analytics.call_logs_* (see /api/call-logs-isu).
  */
 
 export async function fetchCallLogsIsu(workspace, { startDate, endDate } = {}) {

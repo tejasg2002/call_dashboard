@@ -45,6 +45,9 @@ const TARGETS = [
   { db: 'analytics', collection: 'BTECHmarketingwa', indexes: WA_INDEXES },
   { db: 'itm', collection: 'npfPaymentWebhookEvents', indexes: IHM_PAYMENT_INDEXES },
   { db: 'analytics', collection: 'call_logs_isu', indexes: CALL_LOGS_ISU_INDEXES },
+  { db: 'analytics', collection: 'call_logs_bba', indexes: CALL_LOGS_ISU_INDEXES },
+  { db: 'analytics', collection: 'call_logs_btech', indexes: CALL_LOGS_ISU_INDEXES },
+  { db: 'analytics', collection: 'call_logs_mca', indexes: CALL_LOGS_ISU_INDEXES },
 ]
 
 async function main() {

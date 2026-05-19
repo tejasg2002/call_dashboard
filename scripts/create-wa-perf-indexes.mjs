@@ -39,13 +39,32 @@ async function ensureIndex(col, spec, options = {}) {
   }
 }
 
-async function indexWaCol(db, col) {
+async function indexWaCol(db, col, { mbaCallback = false } = {}) {
   const c = client.db(db).collection(col)
   console.log(`\n=== ${db}.${col} ===`)
   await ensureIndex(c, { stage: 1 })
   await ensureIndex(c, { type: 1 })
   await ensureIndex(c, { event_timestamp: 1 })
   await ensureIndex(c, { stage: 1, event_timestamp: 1 })
+  await ensureIndex(c, { createdAt: 1 })
+  await ensureIndex(c, { template_name: 1 })
+  await ensureIndex(c, { phone_number: 1 })
+  if (mbaCallback) {
+    await ensureIndex(c, { 'data.message.meta_data.source_data.callback_data': 1 })
+    await ensureIndex(c, {
+      'data.message.meta_data.source_data.callback_data': 1,
+      createdAt: 1,
+    })
+    await ensureIndex(c, { 'data.customer.phone_number': 1 })
+  }
+}
+
+async function indexCrmLeads() {
+  const c = client.db('itm-crm').collection('leads')
+  console.log('\n=== itm-crm.leads (MBA lead filter) ===')
+  await ensureIndex(c, { 'source.channel': 1 })
+  await ensureIndex(c, { '_source.source': 1 })
+  await ensureIndex(c, { 'source.utmSource': 1 })
 }
 
 // 1. itm.marketingwa — firestore_id (used by fetchMarketingwaButtonsByFirestoreId)
@@ -58,11 +77,12 @@ if (args.waDb) {
   await indexWaCol(args.waDb, args.waCollection ?? 'interaktWhatsappWebhookEvents')
 } else {
   // Index all known WA event collections
-  await indexWaCol('ITM_BS',  'interaktWhatsappWebhookEvents')         // MBA
+  await indexWaCol('ITM_BS', 'interaktWhatsappWebhookEvents', { mbaCallback: true }) // MBA
   await indexWaCol('ITM_IHM', 'interaktWhatsappWebhookEvents')         // IHM
   await indexWaCol('ITM_IDM', 'interaktWhatsappWebhookEvents')         // IDM
   await indexWaCol('ITM_ISU', 'interaktWhatsappWebhookEventsBBA')      // BBA
   await indexWaCol('ITM_ISU', 'interaktWhatsappWebhookEventsBTech')    // BTECH
+  await indexCrmLeads()
 }
 
 await client.close()

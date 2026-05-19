@@ -1,13 +1,11 @@
 import clientPromise from '../../../src/lib/mongodb'
-import { normalizeWAWorkspace, workspaceUsesIsuCallLogs } from '../../../src/lib/waWorkspace'
+import {
+  callLogsCollectionForWorkspace,
+  normalizeWAWorkspace,
+  workspaceUsesIsuCallLogs,
+} from '../../../src/lib/waWorkspace'
 
 const DB = 'analytics'
-const COL_BBA   = 'call_logs_bba'
-const COL_BTECH = 'call_logs_btech'
-
-function collectionForWorkspace(workspace) {
-  return workspace === 'btech' ? COL_BTECH : COL_BBA
-}
 
 function toDate(raw) {
   if (!raw) return null
@@ -215,15 +213,16 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    if (!workspaceUsesIsuCallLogs(workspace)) {
+    const collection = callLogsCollectionForWorkspace(workspace)
+    if (!workspaceUsesIsuCallLogs(workspace) || !collection) {
       return Response.json(
-        { error: 'workspace must be bba or btech' },
+        { error: 'workspace must be bba, btech, or mca' },
         { status: 400 },
       )
     }
 
     const client = await clientPromise
-    const col = client.db(DB).collection(collectionForWorkspace(workspace))
+    const col = client.db(DB).collection(collection)
 
     let docs = await col.find({}).maxTimeMS(120000).toArray()
 

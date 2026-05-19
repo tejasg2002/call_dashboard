@@ -7,6 +7,7 @@ import {
   WA_WORKSPACE_MBA,
   firstAllowedBuWorkspace,
   isBuWorkspaceAllowed,
+  isCallsOnlyWorkspace,
   isNonMbaWaWorkspace,
   isRouteAllowedForBuWorkspace,
   nonMbaWaHomePath,
@@ -113,7 +114,10 @@ function BuWorkspaceProviderInner({ children }) {
       } catch {}
 
       const pathOnly = pathname.split('?')[0] || pathname
-      if (isNonMbaWaWorkspace(w) && !isRouteAllowedForBuWorkspace(pathOnly, w)) {
+      if (
+        (isNonMbaWaWorkspace(w) || isCallsOnlyWorkspace(w)) &&
+        !isRouteAllowedForBuWorkspace(pathOnly, w)
+      ) {
         router.replace(nonMbaWaHomePath(w), { scroll: false })
         return
       }

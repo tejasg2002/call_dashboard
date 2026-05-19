@@ -10,6 +10,7 @@
     "check-form-conversion": "node scripts/check-form-conversion.mjs",
     "export:sources-by-course": "node scripts/export-sources-by-course.mjs",
     "export:lead-filter-sources": "node scripts/export-lead-filter-sources.mjs",
+    "export:wa-templates": "node scripts/export-wa-templates.mjs",
     "build:lead-source-primary-map": "node scripts/build-lead-filter-source-primary-map.mjs"
   },
   "dependencies": {

@@ -26,6 +26,12 @@ import {
   WA_WORKSPACE_IHM,
 } from './waWorkspace.js'
 import { mapLeadSourcesToPrimaryOptions } from './leadFilterSourcePrimary.js'
+import { loadMbaLeadFilterOptionsFast } from './waLeadFilterMba.js'
+import {
+  getLeadFilterCache,
+  setLeadFilterCache,
+  leadFilterOptionsCacheKey,
+} from './waLeadFilterCache.js'
 
 const LATEST_SORT = { createdAt: -1, Updated_Date: -1, updatedAt: -1, _id: -1 }
 
@@ -116,8 +122,19 @@ export async function loadLeadFilterOptions(client, workspace, opts = {}) {
   const ws = normalizeWAWorkspace(workspace)
   const cfg = waWorkspaceConfig(ws)
   const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
+  const isMbaWaCallback = cfg.leadFilterUsesWaCallbackData === true
 
-  if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection) {
+  if (isMbaWaCallback && !includeSourceProvenance) {
+    return loadMbaLeadFilterOptionsFast()
+  }
+
+  const optionsCacheKey = leadFilterOptionsCacheKey(ws)
+  const cached = getLeadFilterCache(optionsCacheKey)
+  if (cached && !includeSourceProvenance) {
+    return cached
+  }
+
+  if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection && !isMbaWaCallback) {
     return {
       leadStages: [],
       sources: [],
@@ -155,7 +172,7 @@ export async function loadLeadFilterOptions(client, workspace, opts = {}) {
   const crmSourcesDist = [...new Set(crmSourcesDistRows.map((r) => r.value))]
   const whSourcesDist = [...new Set(whSourcesDistRows.map((r) => r.value))]
 
-  const leadStagesRaw = [
+  let leadStagesRaw = [
     ...new Set([
       ...crmOpts.stages,
       ...webhookOpts.stages,
@@ -165,7 +182,7 @@ export async function loadLeadFilterOptions(client, workspace, opts = {}) {
   ].sort((a, b) => String(a).localeCompare(String(b)))
 
   let leadStages = leadStagesRaw
-  if (isMbaItmCrm) {
+  if (isMbaItmCrm && !isMbaWaCallback) {
     leadStages = leadStagesRaw.filter((s) => !isExcludedMbaLeadStageDropdownValue(s))
   } else if (ws === WA_WORKSPACE_IDM) {
     leadStages = leadStagesRaw.filter((s) => !isExcludedIdmLeadStageDropdownValue(s))
@@ -206,9 +223,15 @@ export async function loadLeadFilterOptions(client, workspace, opts = {}) {
     }
   }
 
-  return {
+  const result = {
     leadStages,
     sources,
     ...(includeSourceProvenance ? { sourceProvenance } : {}),
   }
+
+  if (!includeSourceProvenance) {
+    setLeadFilterCache(optionsCacheKey, result)
+  }
+
+  return result
 }

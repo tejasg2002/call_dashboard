@@ -25,16 +25,20 @@ import {
   mbaItmCrmLeadFilterMatchExtras,
 } from '../../../src/lib/waLeadMongo'
 import { normaliseMobile } from '../../../src/lib/waPhoneMatch'
+import { runMbaLeadFilterApply, LEAD_FILTER_AGG_OPTS } from '../../../src/lib/waLeadFilterMba.js'
 
 async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields, matchExtras) {
   const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields, matchExtras)
   const rows = await col
-    .aggregate([
-      ...(Object.keys(match).length ? [{ $match: match }] : []),
-      { $project: { phone: phoneStrExpr } },
-      { $match: { phone: { $nin: [null, ''] } } },
-      { $group: { _id: '$phone' } },
-    ])
+    .aggregate(
+      [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        { $project: { phone: phoneStrExpr } },
+        { $match: { phone: { $nin: [null, ''] } } },
+        { $group: { _id: '$phone' } },
+      ],
+      LEAD_FILTER_AGG_OPTS,
+    )
     .toArray()
   return rows.map((r) => r._id).filter(Boolean)
 }
@@ -83,12 +87,15 @@ export async function GET(request) {
 
     const cfg = waWorkspaceConfig(workspace)
     const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
+    const isMbaWaCallback = cfg.leadFilterUsesWaCallbackData === true
 
-    if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection) {
+    if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection && !isMbaWaCallback) {
       return Response.json({ error: 'Lead stage filter is not available for this workspace' }, { status: 400 })
     }
 
     const client = await clientPromise
+    const waCol =
+      isMbaWaCallback ? client.db(cfg.dataDb).collection(cfg.waCollection) : null
     const leadDb = client.db(cfg.leadFilterDataDb ?? cfg.dataDb)
     const crmCol = cfg.crmSnapshotCollection ? leadDb.collection(cfg.crmSnapshotCollection) : null
     const webhookCol = cfg.leadWebhookCollection ? leadDb.collection(cfg.leadWebhookCollection) : null
@@ -109,6 +116,22 @@ export async function GET(request) {
     }
 
     if (mode === 'phones') {
+      if (isMbaWaCallback && waCol) {
+        const mbaResult = await runMbaLeadFilterApply({
+          waCol,
+          crmCol,
+          pickedLeadStages,
+          expandedSources,
+          startDate: '',
+          endDate: '',
+          fetchCrmPhones,
+          phoneStrExpr,
+          stageMatchFields,
+          matchExtras,
+        })
+        return Response.json({ phones: mbaResult.phones, count: mbaResult.phones.length })
+      }
+
       const [crmPhones, webhookPhones] = await Promise.all([
         crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, expandedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
         webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, expandedSources, phoneStrExpr, stageExpr, sourceExpr) : [],

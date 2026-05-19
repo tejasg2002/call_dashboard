@@ -13,6 +13,13 @@ import {
 /** @type {Record<string, Array<[string, string]>>} */
 const BY_WS = ROWS
 
+/** Raw CRM/NPF sources → Primary; merged into MBA index (not always in export CSV yet). */
+const MBA_SOURCE_PRIMARY_EXTRAS = Object.freeze([
+  ['partner102', 'Agents'],
+  ['partner41', 'Agents'],
+  ['partner75', 'Agents'],
+])
+
 /**
  * @param {string} workspace
  * @returns {boolean}
@@ -37,7 +44,10 @@ function buildIndex(workspace) {
   const ws = String(workspace || '')
     .toLowerCase()
     .trim()
-  const rows = BY_WS[ws] || []
+  const rows = [
+    ...(BY_WS[ws] || []),
+    ...(ws === 'mba' ? MBA_SOURCE_PRIMARY_EXTRAS : []),
+  ]
   const exactRawToPrimary = new Map()
   const canonRawToPrimary = new Map()
   const primaryCanonToLabel = new Map()

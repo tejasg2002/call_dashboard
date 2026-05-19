@@ -1,6 +1,7 @@
 'use client'
 
 import { maskPhone } from '../../lib/userManagement'
+import { WA_WORKSPACE_MBA_AI } from '../../lib/waWorkspace'
 import { useClientPagination } from '../../hooks/useClientPagination'
 import PaginationBar from '../PaginationBar'
 
@@ -63,7 +64,7 @@ function ClickTimeline({ events, isDark }) {
   )
 }
 
-export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
+export default function WAPaymentConversionServer({ data, theme, dataMasked, workspace }) {
   const isDark = theme === 'dark'
   const mp = (phone) => (dataMasked ? maskPhone(phone) : phone)
 
@@ -248,7 +249,15 @@ export default function WAPaymentConversionServer({ data, theme, dataMasked }) {
           </>
         ) : isIsuForm ? (
           <>
-            Form counts use <code className="font-mono">ITM_ISU.npfApplicationsWebhookEventsBBA/BTech</code> matched by <code className="font-mono">Mobile_Number</code>. Only applications with completion date on or after first WA send and last click are counted.
+            {workspace === WA_WORKSPACE_MBA_AI ? (
+              <>
+                Form counts use <code className="font-mono">ITM_BS.npfApplicationsWebhookEvents_mba_ai</code> matched by <code className="font-mono">Mobile_Number</code> (and variants). Payment context may load from <code className="font-mono">npfPaymentWebhookEvents_mba_ai</code>. Only applications with completion on or after first WA send/deliver/read and last click are counted.
+              </>
+            ) : (
+              <>
+                Form counts use <code className="font-mono">ITM_ISU.npfApplicationsWebhookEventsBBA/BTech</code> matched by <code className="font-mono">Mobile_Number</code>. Only applications with completion date on or after first WA send and last click are counted.
+              </>
+            )}
           </>
         ) : (
           <>
