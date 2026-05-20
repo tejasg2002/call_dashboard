@@ -321,10 +321,111 @@ What this means for you:
 
 ---
 
+## 11. Future roadmap (planned)
+
+This section describes features that are **requested and planned** but **not yet live** in the dashboard. Timelines will be confirmed with product and leadership. The list below is the current implementation direction.
+
+### 11.1 Customer.io journey analytics
+
+**Business need:** Marketing runs multi-step journeys in Customer.io (email, in-app, and related automations). Today it is hard to see which **journey** actually moves leads forward versus which journeys only generate opens or clicks without outcomes.
+
+**Planned capability:**
+
+- A dedicated view showing **journey performance** — entry volume, completion rate, drop-off by step, and conversion to application or payment where data is available.
+- Side-by-side comparison of journeys (for example: welcome series vs re-engagement vs payment reminder).
+- Ability to filter by program, source, and date range so teams can answer: *“Which journey should we scale, pause, or rewrite?”*
+
+**Who benefits:** Growth marketing, lifecycle marketing, and admissions leadership.
+
+---
+
+### 11.2 Manager-level analytics (role-based views)
+
+**Business need:** A counselor, team lead, regional manager, and head of admissions do not need the same screen. Today everyone largely sees the same layout; leaders want **summaries**, while frontline users need **operational detail**.
+
+**Planned capability:**
+
+| Level (example) | What they would see |
+|-----------------|---------------------|
+| **Counselor / agent** | Own calls, own leads, own follow-ups — no team-wide financial or strategic KPIs |
+| **Team lead** | Team totals, rankings, coaching list (low scores, missed follow-ups) |
+| **Program manager** | Program-wide funnel, source mix, channel performance for one workspace |
+| **Senior leadership** | Cross-program scorecard, trends, conversion and cost summaries |
+
+**How it would work (conceptually):** Login determines the **default dashboard** — menus, KPIs, and drill-down depth change by role. Admins would assign a user’s level in Settings.
+
+**Who benefits:** Entire admissions hierarchy — less noise for counselors, faster decisions for managers.
+
+---
+
+### 11.3 Template performance hub (visual comparison)
+
+**Business need:** Template tables are useful but dense. Stakeholders want a **single page** that answers *“Which templates win?”* at a glance — especially for WhatsApp and, over time, email subjects and SMS copy.
+
+**Planned capability:**
+
+- One **Template Performance** page with bar charts and ranked lists: sent, delivered, read, clicked, and conversion where available.
+- Compare templates within a campaign or across sources.
+- Highlight top performers and underperformers with simple colour cues (green / amber / red).
+- Optional export for leadership slides.
+
+**Who benefits:** WhatsApp teams, creative agencies, and program managers preparing weekly reviews.
+
+---
+
+### 11.4 AI analytics
+
+**Business need:** The dashboard already surfaces AI **call summaries** and transcripts in Call Review. The next step is **analytics built on AI** — patterns across many calls and messages, not one lead at a time.
+
+**Planned capability (examples):**
+
+- **Themes and objections** — what prospects say most often (fees, placement, hostel, scholarships).
+- **Sentiment and tone** — share of positive, neutral, and negative conversations by team or source.
+- **Coaching insights** — recurring gaps (e.g. not asking for application, weak closing).
+- **Message effectiveness** — which template topics correlate with interested vs not-interested outcomes (where AI labels exist).
+
+**Who benefits:** Quality teams, training leads, and marketing teams refining scripts and templates.
+
+---
+
+### 11.5 Other high-value features (recommended backlog)
+
+These are not yet scheduled but are important for a complete admissions intelligence platform:
+
+| Feature | Business value |
+|---------|----------------|
+| **Unified funnel (all channels)** | One view from first touch (WhatsApp / email / call) to application and payment — see where the funnel leaks regardless of channel |
+| **Alerts and thresholds** | Notify managers when delivery rate drops, call volume falls, or conversion dips vs last week |
+| **Scheduled reports** | Weekly PDF or email digest to leadership — no need to log in every Monday |
+| **Cost and ROI view** | WhatsApp spend, cost per click, cost per application — tie spend to outcomes by source |
+| **Response-time SLAs** | How fast counselors call or message new leads; breach reports by team |
+| **Cohort / A–B comparison** | Compare two sources, two campaigns, or two time periods on the same chart |
+| **Publisher and partner scorecards** | Dedicated views for B2B partners (aggregators, agents) with agreed KPIs |
+| **Campaign health (live)** | During a big send, a simple “traffic light” status: delivering, engaging, converting |
+| **Data quality dashboard** | Flag missing phone numbers, duplicate leads, or templates without stage mapping — so ops fixes data before decisions |
+| **Mobile-friendly summary** | A lightweight view for managers on phone — KPIs only, no heavy tables |
+
+---
+
+### 11.6 How the roadmap fits what exists today
+
+```text
+Today (live)          →  Planned next
+─────────────────────────────────────────────────────────
+Calls + WA + Email/SMS  →  Customer.io journeys
+Same view for all roles →  Manager-level dashboards
+Tables + KPI cards      →  Template bar-chart page
+AI per call (review)    →  AI analytics (patterns)
+Program workspaces      →  Cross-channel funnel + alerts
+```
+
+---
+
 ## Document control
 
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | May 2026 | Business overview covering all current programs, including MCA |
+| 1.1 | May 2026 | Added Section 11 — future roadmap (Customer.io, role-based views, template hub, AI analytics) |
 
-*Update this document when a new program is added or when sidebar / module rules change.*
+*Update this document when a new program is added, when sidebar / module rules change, or when roadmap items go live (move them to Section 4).*

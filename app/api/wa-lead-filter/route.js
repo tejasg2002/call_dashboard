@@ -10,6 +10,7 @@ import clientPromise from '../../../src/lib/mongodb'
 import { waWorkspaceConfig, normalizeWAWorkspace } from '../../../src/lib/waWorkspace'
 import { loadLeadFilterOptions } from '../../../src/lib/waLeadFilterOptions.js'
 import { expandLeadFilterSourcePicksForMatch } from '../../../src/lib/leadFilterSourcePrimary.js'
+import { normalizeMbaWaSourcePicks } from '../../../src/lib/mbaWaCallbackLeadFilter.js'
 import {
   buildLeadPhoneExpr,
   leadPhoneStringExpr,
@@ -25,7 +26,8 @@ import {
   mbaItmCrmLeadFilterMatchExtras,
 } from '../../../src/lib/waLeadMongo'
 import { normaliseMobile } from '../../../src/lib/waPhoneMatch'
-import { runMbaLeadFilterApply, LEAD_FILTER_AGG_OPTS } from '../../../src/lib/waLeadFilterMba.js'
+import { runMbaLeadFilterApply } from '../../../src/lib/waLeadFilterMba.js'
+import { LEAD_FILTER_AGG_OPTS } from '../../../src/lib/waLeadFilterAggOpts.js'
 
 async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields, matchExtras) {
   const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields, matchExtras)
@@ -83,11 +85,15 @@ export async function GET(request) {
     const mode = searchParams.get('mode') || 'options'
     const pickedLeadStages = normalizeLeadFilterList(searchParams.getAll('leadStage'))
     const pickedSources = normalizeLeadFilterList(searchParams.getAll('source'))
-    const expandedSources = expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
-
+    const pickedCities = normalizeLeadFilterList(searchParams.getAll('city'))
+    const pickedStates = normalizeLeadFilterList(searchParams.getAll('state'))
     const cfg = waWorkspaceConfig(workspace)
     const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
     const isMbaWaCallback = cfg.leadFilterUsesWaCallbackData === true
+    const mbaSourcesOnWa = cfg.leadFilterSourcesOnWaEvents === true
+    const expandedSources = mbaSourcesOnWa
+      ? normalizeMbaWaSourcePicks(pickedSources)
+      : expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
 
     if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection && !isMbaWaCallback) {
       return Response.json({ error: 'Lead stage filter is not available for this workspace' }, { status: 400 })
@@ -108,28 +114,27 @@ export async function GET(request) {
     const matchExtras = isMbaItmCrm ? mbaItmCrmLeadFilterMatchExtras() : null
 
     if (mode === 'options') {
-      const { leadStages, sources, unavailable } = await loadLeadFilterOptions(client, workspace)
+      const { leadStages, sources, cities = [], states = [], unavailable } =
+        await loadLeadFilterOptions(client, workspace)
       if (unavailable) {
         return Response.json({ error: unavailable }, { status: 400 })
       }
-      return Response.json({ leadStages, sources })
+      return Response.json({ leadStages, sources, cities, states })
     }
 
     if (mode === 'phones') {
       if (isMbaWaCallback && waCol) {
         const mbaResult = await runMbaLeadFilterApply({
+          client,
           waCol,
-          crmCol,
           pickedLeadStages,
-          expandedSources,
+          waSourcePicks: expandedSources,
+          waCityPicks: pickedCities,
+          waStatePicks: pickedStates,
           startDate: '',
           endDate: '',
-          fetchCrmPhones,
-          phoneStrExpr,
-          stageMatchFields,
-          matchExtras,
         })
-        return Response.json({ phones: mbaResult.phones, count: mbaResult.phones.length })
+        return Response.json({ count: mbaResult.totalLeads })
       }
 
       const [crmPhones, webhookPhones] = await Promise.all([

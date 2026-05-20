@@ -2,11 +2,14 @@
 
 import { cn } from '../lib/utils'
 
-const PerformanceCharts = ({ ownerStats }) => {
-  if (!ownerStats || ownerStats.length === 0) return null
+const PerformanceCharts = ({ ownerStats, callsStats, scoreStats }) => {
+  const callData = callsStats?.length ? callsStats : ownerStats
+  const scoreData = scoreStats?.length ? scoreStats : ownerStats
 
-  const topByCalls = ownerStats.slice(0, 5)
-  const sortedByScore = [...ownerStats].sort((a, b) => b.avgScore - a.avgScore)
+  if ((!callData || callData.length === 0) && (!scoreData || scoreData.length === 0)) return null
+
+  const topByCalls = (callData || []).slice(0, 5)
+  const sortedByScore = [...(scoreData || [])].sort((a, b) => b.avgScore - a.avgScore)
   const topByScore = sortedByScore.slice(0, 5)
 
   const maxCalls = topByCalls[0]?.totalCalls || 1
@@ -64,22 +67,24 @@ const PerformanceCharts = ({ ownerStats }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-      {chartCard(
-        'Calls by Counselor',
-        topByCalls,
-        maxCalls,
-        (item) => item.totalCalls,
-        (item) => `${item.totalCalls} calls`,
-        'bg-brand-600'
-      )}
-      {chartCard(
-        'Score by Counselor',
-        topByScore,
-        maxScore,
-        (item) => item.avgScore,
-        (item) => `${item.avgScore} avg`,
-        'bg-blue-500'
-      )}
+      {topByCalls.length > 0 &&
+        chartCard(
+          'Calls by Counselor',
+          topByCalls,
+          maxCalls,
+          (item) => item.totalCalls,
+          (item) => `${item.totalCalls} calls`,
+          'bg-brand-600',
+        )}
+      {topByScore.length > 0 &&
+        chartCard(
+          'Score by Counselor',
+          topByScore,
+          maxScore,
+          (item) => item.avgScore,
+          (item) => `${item.avgScore} avg`,
+          'bg-blue-500',
+        )}
     </div>
   )
 }

@@ -26,7 +26,7 @@ import {
   WA_WORKSPACE_IHM,
 } from './waWorkspace.js'
 import { mapLeadSourcesToPrimaryOptions } from './leadFilterSourcePrimary.js'
-import { loadMbaLeadFilterOptionsFast } from './waLeadFilterMba.js'
+import { loadMbaLeadFilterOptionsFromDb } from './waLeadFilterMba.js'
 import {
   getLeadFilterCache,
   setLeadFilterCache,
@@ -125,7 +125,8 @@ export async function loadLeadFilterOptions(client, workspace, opts = {}) {
   const isMbaWaCallback = cfg.leadFilterUsesWaCallbackData === true
 
   if (isMbaWaCallback && !includeSourceProvenance) {
-    return loadMbaLeadFilterOptionsFast()
+    const waCol = client.db(cfg.dataDb).collection(cfg.waCollection)
+    return loadMbaLeadFilterOptionsFromDb(waCol)
   }
 
   const optionsCacheKey = leadFilterOptionsCacheKey(ws)

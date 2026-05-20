@@ -1,5 +1,5 @@
 /**
- * Fast MBA lead-filter: static options, single-pass WA analytics ($facet), TTL caches.
+ * Fast MBA lead-filter: static options, batched WA analytics, TTL caches.
  */
 
 import ROWS from './leadFilterSourcePrimaryRows.json'
@@ -13,19 +13,31 @@ import {
 } from './waLeadFilterCache.js'
 import {
   MBA_DB_LEAD_STAGE_ORDER,
-  buildMbaWaLeadStageMatch,
+  fetchMbaWaPhonesByCallbackStages,
+  fetchMbaWaPhonesByWaLocation,
+  fetchMbaWaPhonesByWaSource,
+  intersectPhoneLists,
+  loadMbaInteraktCityOptions,
+  loadMbaInteraktSourceOptions,
+  loadMbaInteraktStateOptions,
   loadMbaLeadStageFilterOptions,
   normalizeMbaCallbackStageKey,
 } from './mbaWaCallbackLeadFilter.js'
-import { waStageExpr } from './waLeadAnalyticsExpr.js'
-import { normaliseMobile, waPhoneVariantsForMatch } from './waPhoneMatch.js'
+import { normaliseMobile } from './waPhoneMatch.js'
+import {
+  aggregateWaByPhoneCohort,
+  filterPaymentConversionForCohort,
+  loadMbaDashboardPaymentSlice,
+} from './waLeadCohortPhones.js'
+import { LEAD_FILTER_AGG_OPTS } from './waLeadFilterAggOpts.js'
+import { buildWaEventDatePreStages } from './waLeadAnalyticsExpr.js'
 
-/** @type {import('mongodb').AggregateOptions} */
-export const LEAD_FILTER_AGG_OPTS = { allowDiskUse: true, maxTimeMS: 45_000 }
+export { LEAD_FILTER_AGG_OPTS } from './waLeadFilterAggOpts.js'
 
-const MBA_ANALYTICS_CACHE_TTL_MS = 3 * 60 * 1000
+const MBA_ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000
+/** Default window when user does not pick dates (keeps scans under Mongo time limit). */
+const DEFAULT_LOOKBACK_DAYS = 14
 
-/** Primary source labels for MBA dropdown (from mapping JSON — no CRM scan). */
 export function getMbaPrimarySourceOptions() {
   const set = new Set()
   for (const pair of ROWS.mba || []) {
@@ -45,194 +57,140 @@ export function buildStaticMbaStageGroups() {
   return stageGroups
 }
 
-function mbaAnalyticsCacheKey(stageKey, sourceKey, startDate, endDate) {
-  return `mba_analytics:${stageKey}:${sourceKey}:${startDate}:${endDate}`
+function mbaAnalyticsCacheKey(stageKey, sourceKey, cityKey, stateKey, startDate, endDate) {
+  return `mba_analytics:v6:${stageKey}:${sourceKey}:${cityKey}:${stateKey}:${startDate}:${endDate}`
 }
 
-/**
- * Dropdown options — instant (no Mongo).
- */
 export function loadMbaLeadFilterOptionsFast() {
   const cacheKey = leadFilterOptionsCacheKey('mba')
   const hit = getLeadFilterCache(cacheKey)
   if (hit) return hit
 
   const result = {
-    leadStages: [...MBA_DB_LEAD_STAGE_ORDER],
+    leadStages: [],
     sources: getMbaPrimarySourceOptions(),
   }
   setLeadFilterCache(cacheKey, result)
   return result
 }
 
-/**
- * Stage alias groups: static map immediately; optional background refresh from DB.
- */
-export function getMbaStageGroupsCached(waCol) {
+/** Load stageGroups from Mongo callback_data (cached); fallback to static CSV labels. */
+export async function resolveMbaStageGroups(waCol) {
   const key = mbaStageGroupsCacheKey()
   const hit = getLeadFilterCache(key)
-  if (hit) return deserializeStageGroups(hit)
+  if (hit) {
+    const groups = deserializeStageGroups(hit)
+    if (groups.size > 0) return groups
+  }
+
+  if (waCol) {
+    const { stageGroups } = await loadMbaLeadStageFilterOptions(waCol)
+    if (stageGroups.size > 0) {
+      setLeadFilterCache(key, serializeStageGroups(stageGroups))
+      return stageGroups
+    }
+  }
 
   const staticGroups = buildStaticMbaStageGroups()
   setLeadFilterCache(key, serializeStageGroups(staticGroups))
-
-  if (waCol) {
-    void loadMbaLeadStageFilterOptions(waCol)
-      .then(({ stageGroups }) => {
-        if (stageGroups.size > 0) {
-          setLeadFilterCache(key, serializeStageGroups(stageGroups))
-        }
-      })
-      .catch(() => {})
-  }
-
   return staticGroups
 }
 
-function buildDatePreStages(startDate, endDate) {
-  if (!startDate && !endDate) return []
-  const f = {}
-  if (startDate) f.$gte = new Date(startDate)
-  if (endDate) {
-    const end = new Date(endDate)
-    end.setDate(end.getDate() + 1)
-    f.$lt = end
-  }
-  return [{ $match: { $or: [{ event_timestamp: f }, { createdAt: f }] } }]
+/** @deprecated Use resolveMbaStageGroups (async). */
+export function getMbaStageGroupsCached(waCol) {
+  void resolveMbaStageGroups(waCol).catch(() => {})
+  return buildStaticMbaStageGroups()
 }
 
-/**
- * One Mongo round-trip: template KPI rows + distinct phones for cohort.
- * @param {import('mongodb').Collection} waCol
- * @param {{ callbackStagePreMatch?: object, phoneVariants?: string[], startDate?: string, endDate?: string, stageKey?: string, sourceKey?: string }} opts
- */
-export async function runMbaLeadFilteredAnalytics(waCol, opts = {}) {
+/** MBA dropdown: stages that exist in WA callback_data + sources list. */
+export async function loadMbaLeadFilterOptionsFromDb(waCol) {
+  const cacheKey = leadFilterOptionsCacheKey('mba')
+  const hit = getLeadFilterCache(cacheKey)
+  if (hit) return hit
+
+  const [{ leadStages, stageGroups }, sources, cities, states] = await Promise.all([
+    loadMbaLeadStageFilterOptions(waCol),
+    loadMbaInteraktSourceOptions(waCol),
+    loadMbaInteraktCityOptions(waCol),
+    loadMbaInteraktStateOptions(waCol),
+  ])
+  if (stageGroups.size > 0) {
+    setLeadFilterCache(mbaStageGroupsCacheKey(), serializeStageGroups(stageGroups))
+  }
+  const result = {
+    leadStages: leadStages.length ? leadStages : [...MBA_DB_LEAD_STAGE_ORDER],
+    sources: sources.length ? sources : getMbaPrimarySourceOptions(),
+    cities,
+    states,
+  }
+  setLeadFilterCache(cacheKey, result)
+  return result
+}
+
+/** @see buildWaEventDatePreStages — matches event_timestamp / createdAt like main WA dashboard. */
+export function buildDatePreStages(startDate, endDate) {
+  return buildWaEventDatePreStages(startDate, endDate)
+}
+
+export const TEMPLATE_GROUP_STAGES = [
+  {
+    $group: {
+      _id: { template: '$_templateName', phone: '$_waPhoneNorm' },
+      stages: { $addToSet: '$_waStage' },
+      firstSeen: { $min: { $ifNull: ['$event_timestamp', '$createdAt'] } },
+      lastSeen: { $max: { $ifNull: ['$event_timestamp', '$createdAt'] } },
+    },
+  },
+  {
+    $group: {
+      _id: '$_id.template',
+      sent: { $sum: { $cond: [{ $in: ['sent', '$stages'] }, 1, 0] } },
+      delivered: { $sum: { $cond: [{ $in: ['delivered', '$stages'] }, 1, 0] } },
+      read: { $sum: { $cond: [{ $in: ['read', '$stages'] }, 1, 0] } },
+      clicked: { $sum: { $cond: [{ $in: ['clicked', '$stages'] }, 1, 0] } },
+      failed: { $sum: { $cond: [{ $in: ['failed', '$stages'] }, 1, 0] } },
+      firstSeen: { $min: '$firstSeen' },
+      lastSeen: { $max: '$lastSeen' },
+    },
+  },
+  {
+    $project: {
+      template_name: '$_id',
+      source: { $literal: 'api' },
+      sent: 1,
+      delivered: 1,
+      read: 1,
+      clicked: 1,
+      failed: 1,
+      firstSeen: 1,
+      lastSeen: 1,
+    },
+  },
+]
+
+export async function runMbaLeadFilteredAnalytics(waCol, _client, opts = {}) {
   const {
     callbackStagePreMatch = null,
-    phoneVariants = [],
+    normalizedPhones = [],
     startDate = '',
     endDate = '',
     stageKey = '',
     sourceKey = '',
+    cityKey = '',
+    stateKey = '',
   } = opts
 
-  const cacheKey = mbaAnalyticsCacheKey(stageKey, sourceKey, startDate, endDate)
+  const cacheKey = mbaAnalyticsCacheKey(stageKey, sourceKey, cityKey, stateKey, startDate, endDate)
   const cached = getLeadFilterCache(cacheKey)
   if (cached) return cached
 
-  const preMatch = [
-    ...(callbackStagePreMatch ? [{ $match: callbackStagePreMatch }] : []),
-    ...buildDatePreStages(startDate, endDate),
-    {
-      $addFields: {
-        _waPhone: {
-          $ifNull: [
-            '$phone_number',
-            '$data.customer.phone_number',
-            '$data.customer.channel_phone_number',
-          ],
-        },
-      },
-    },
-    { $match: { _waPhone: { $nin: [null, ''] } } },
-    ...(phoneVariants.length > 0 ? [{ $match: { _waPhone: { $in: phoneVariants } } }] : []),
-    {
-      $addFields: {
-        _waStage: { $ifNull: ['$stage', waStageExpr()] },
-        _templateName: {
-          $ifNull: [
-            '$template_name',
-            {
-              $let: {
-                vars: {
-                  m: {
-                    $regexFind: {
-                      input: { $ifNull: ['$data.message.raw_template', ''] },
-                      regex: '"name"\\s*:\\s*"([^"]+)"',
-                    },
-                  },
-                },
-                in: { $ifNull: [{ $arrayElemAt: ['$$m.captures', 0] }, '(unknown)'] },
-              },
-            },
-          ],
-        },
-      },
-    },
-    { $addFields: { _templateName: { $ifNull: ['$_templateName', '(unknown)'] } } },
-    { $match: { _waStage: { $ne: null } } },
-  ]
-
-  const facetPipeline = [
-    ...preMatch,
-    {
-      $facet: {
-        templates: [
-          {
-            $group: {
-              _id: { template: '$_templateName', phone: '$_waPhone' },
-              stages: { $addToSet: '$_waStage' },
-              firstSeen: { $min: { $ifNull: ['$event_timestamp', '$createdAt'] } },
-              lastSeen: { $max: { $ifNull: ['$event_timestamp', '$createdAt'] } },
-            },
-          },
-          {
-            $group: {
-              _id: '$_id.template',
-              sent: { $sum: { $cond: [{ $in: ['sent', '$stages'] }, 1, 0] } },
-              delivered: { $sum: { $cond: [{ $in: ['delivered', '$stages'] }, 1, 0] } },
-              read: { $sum: { $cond: [{ $in: ['read', '$stages'] }, 1, 0] } },
-              clicked: { $sum: { $cond: [{ $in: ['clicked', '$stages'] }, 1, 0] } },
-              failed: { $sum: { $cond: [{ $in: ['failed', '$stages'] }, 1, 0] } },
-              firstSeen: { $min: '$firstSeen' },
-              lastSeen: { $max: '$lastSeen' },
-            },
-          },
-          {
-            $project: {
-              template_name: '$_id',
-              source: { $literal: 'api' },
-              sent: 1,
-              delivered: 1,
-              read: 1,
-              clicked: 1,
-              failed: 1,
-              firstSeen: 1,
-              lastSeen: 1,
-              ctr: {
-                $cond: [
-                  { $gt: ['$delivered', 0] },
-                  { $multiply: [{ $divide: ['$clicked', '$delivered'] }, 100] },
-                  0,
-                ],
-              },
-              sdr: {
-                $cond: [{ $gt: ['$sent', 0] }, { $multiply: [{ $divide: ['$delivered', '$sent'] }, 100] }, 0],
-              },
-              str: {
-                $cond: [{ $gt: ['$sent', 0] }, { $multiply: [{ $divide: ['$read', '$sent'] }, 100] }, 0],
-              },
-              readRate: {
-                $cond: [
-                  { $gt: ['$delivered', 0] },
-                  { $multiply: [{ $divide: ['$read', '$delivered'] }, 100] },
-                  0,
-                ],
-              },
-            },
-          },
-          { $sort: { sent: -1 } },
-        ],
-        phones: [{ $group: { _id: '$_waPhone' } }, { $limit: 80_000 }],
-      },
-    },
-  ]
-
-  const [facetRow] = await waCol.aggregate(facetPipeline, LEAD_FILTER_AGG_OPTS).toArray()
-  const templateRows = (facetRow?.templates || []).map((r) => ({ ...r, _id: undefined }))
-  const phones = (facetRow?.phones || [])
-    .map((r) => normaliseMobile(r._id))
-    .filter(Boolean)
+  const { templateRows, totalLeads } = await aggregateWaByPhoneCohort(waCol, {
+    normalizedPhones,
+    datePreStages: buildDatePreStages(startDate, endDate),
+    callbackStagePreMatch: null,
+    templateGroupStages: TEMPLATE_GROUP_STAGES,
+    aggOpts: LEAD_FILTER_AGG_OPTS,
+  })
 
   const kpi = templateRows.reduce(
     (acc, r) => ({
@@ -249,75 +207,105 @@ export async function runMbaLeadFilteredAnalytics(waCol, opts = {}) {
   kpi.str = kpi.sent > 0 ? (kpi.read / kpi.sent) * 100 : 0
   kpi.readRate = kpi.delivered > 0 ? (kpi.read / kpi.delivered) * 100 : 0
 
-  const result = { templateRows, kpi, phones }
+  const result = { templateRows, kpi, totalLeads, normalizedPhones }
   setLeadFilterCache(cacheKey, result, MBA_ANALYTICS_CACHE_TTL_MS)
   return result
 }
 
-/**
- * MBA apply path: resolve filters then one analytics query.
- */
 export async function runMbaLeadFilterApply({
+  client,
   waCol,
-  crmCol,
   pickedLeadStages,
-  expandedSources,
+  waSourcePicks = [],
+  waCityPicks = [],
+  waStatePicks = [],
   startDate,
   endDate,
-  fetchCrmPhones,
-  phoneStrExpr,
-  stageMatchFields,
-  matchExtras,
 }) {
-  const mbaStageGroups = getMbaStageGroupsCached(waCol)
-  let callbackStagePreMatch = null
-  if (pickedLeadStages.length > 0) {
-    callbackStagePreMatch = buildMbaWaLeadStageMatch(pickedLeadStages, mbaStageGroups)
-  }
+  const stageKey = pickedLeadStages.join('\x1f')
+  const sourceKey = waSourcePicks.join('\x1f')
+  const cityKey = waCityPicks.join('\x1f')
+  const stateKey = waStatePicks.join('\x1f')
 
-  let phoneVariants = []
-  if (expandedSources.length > 0 && crmCol) {
-    const crmPhones = await fetchCrmPhones(
-      crmCol,
-      [],
-      expandedSources,
-      phoneStrExpr,
-      stageMatchFields,
-      matchExtras,
-    )
-    phoneVariants = waPhoneVariantsForMatch(crmPhones)
-  }
-
-  if (!callbackStagePreMatch && phoneVariants.length === 0) {
-    return {
-      templateRows: [],
-      kpi: { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, ctr: 0, sdr: 0, str: 0, readRate: 0 },
-      phones: [],
-      totalLeads: 0,
-    }
-  }
+  const mbaStageGroups = await resolveMbaStageGroups(waCol)
 
   let effectiveStart = startDate
   let effectiveEnd = endDate
-  if (!effectiveStart && !effectiveEnd) {
+  const userPickedRange = !!(startDate || endDate)
+  if (!userPickedRange) {
     const d = new Date()
-    d.setDate(d.getDate() - 30)
+    d.setDate(d.getDate() - DEFAULT_LOOKBACK_DAYS)
     effectiveStart = d.toISOString().slice(0, 10)
   }
 
-  const { templateRows, kpi, phones } = await runMbaLeadFilteredAnalytics(waCol, {
-    callbackStagePreMatch,
-    phoneVariants,
+  let normalizedPhones = []
+
+  const applyCohort = (phones) => {
+    const norm = [...new Set(phones.map(normaliseMobile).filter(Boolean))]
+    if (normalizedPhones.length > 0) {
+      normalizedPhones = intersectPhoneLists(normalizedPhones, norm)
+    } else {
+      normalizedPhones = norm
+    }
+  }
+
+  if (waSourcePicks.length > 0) {
+    applyCohort(await fetchMbaWaPhonesByWaSource(waCol, waSourcePicks, effectiveStart, effectiveEnd))
+  }
+
+  if (waCityPicks.length > 0 || waStatePicks.length > 0) {
+    applyCohort(
+      await fetchMbaWaPhonesByWaLocation(waCol, waCityPicks, waStatePicks, effectiveStart, effectiveEnd),
+    )
+  }
+
+  if (pickedLeadStages.length > 0) {
+    applyCohort(
+      await fetchMbaWaPhonesByCallbackStages(
+        waCol,
+        pickedLeadStages,
+        mbaStageGroups,
+        effectiveStart,
+        effectiveEnd,
+      ),
+    )
+  }
+
+  if (
+    normalizedPhones.length === 0 &&
+    pickedLeadStages.length === 0 &&
+    waSourcePicks.length === 0 &&
+    waCityPicks.length === 0 &&
+    waStatePicks.length === 0
+  ) {
+    return {
+      templateRows: [],
+      kpi: { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, ctr: 0, sdr: 0, str: 0, readRate: 0 },
+      totalLeads: 0,
+      paymentConversion: null,
+    }
+  }
+
+  const { templateRows, kpi, totalLeads } = await runMbaLeadFilteredAnalytics(waCol, client, {
+    normalizedPhones,
     startDate: effectiveStart,
     endDate: effectiveEnd,
-    stageKey: pickedLeadStages.join('\x1f'),
-    sourceKey: expandedSources.join('\x1f'),
+    stageKey,
+    sourceKey,
+    cityKey,
+    stateKey,
   })
+
+  let paymentConversion = null
+  if (normalizedPhones.length > 0) {
+    const { paymentConversion: pc, clickBreakdown } = await loadMbaDashboardPaymentSlice(client)
+    paymentConversion = filterPaymentConversionForCohort(pc, clickBreakdown, normalizedPhones)
+  }
 
   return {
     templateRows,
     kpi,
-    phones,
-    totalLeads: phones.length,
+    totalLeads,
+    paymentConversion,
   }
 }

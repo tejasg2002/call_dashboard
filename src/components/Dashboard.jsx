@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useBuWorkspace } from '../context/BuWorkspaceProvider'
 import { fetchCalls } from '../firebase'
 import { buildCallDashboardSnapshotFromCalls } from '../lib/buildCallDashboardSnapshot'
-import { fetchCallLogsIsu } from '../lib/callLogsIsuApi'
 import { fetchCallDashboard } from '../lib/callDashboardApi'
+import { fetchUnifiedCallAnalytics } from '../lib/unifiedCallAnalyticsApi'
 import { cn } from '../lib/utils'
 import { workspaceUsesIsuCallLogs } from '../lib/waWorkspace'
 import MetricsCards from './MetricsCards'
@@ -38,11 +38,21 @@ const Dashboard = () => {
       setLoading(true)
 
       if (workspaceUsesIsuCallLogs(workspace)) {
-        const calls = await fetchCallLogsIsu(workspace, {
+        const unified = await fetchUnifiedCallAnalytics(workspace, {
           startDate: sd || undefined,
           endDate: ed || undefined,
         })
-        setSnapshot(buildCallDashboardSnapshotFromCalls(calls, { fallback: false }))
+        setSnapshot({
+          kpi: unified.kpi || {},
+          topPerformer: unified.topPerformer || null,
+          counselorCalls: unified.counselorCalls || [],
+          counselorScores: unified.counselorScores || [],
+          filteredDocCount: unified.filteredDocCount,
+          elapsed: unified.elapsed,
+          isUnified: true,
+          fromCache: false,
+          fallback: false,
+        })
         setLastUpdated(new Date())
         setError(null)
         return
@@ -260,15 +270,30 @@ const Dashboard = () => {
         )}
 
         {/* KPI Cards */}
-        <MetricsCards kpi={snapshot?.kpi} loading={loading} dateLabel={dateLabel} />
+        <MetricsCards
+          kpi={snapshot?.kpi}
+          loading={loading}
+          dateLabel={dateLabel}
+          unified={snapshot?.isUnified}
+        />
 
-        {/* Performance */}
+        {/* Top Performer */}
         <LazySection height="220px">
-          <PerformanceCards ownerStatsToday={snapshot?.ownerStatsToday} ownerStatsMonth={snapshot?.ownerStatsMonth} />
+          <PerformanceCards
+            topPerformer={snapshot?.topPerformer}
+            ownerStatsToday={snapshot?.ownerStatsToday}
+            ownerStatsMonth={snapshot?.ownerStatsMonth}
+            dateLabel={dateLabel}
+          />
         </LazySection>
 
+        {/* Calls by Counselor · Score by Counselor */}
         <LazySection height="340px">
-          <PerformanceCharts ownerStats={snapshot?.ownerStatsOverall} />
+          <PerformanceCharts
+            ownerStats={snapshot?.ownerStatsOverall}
+            callsStats={snapshot?.counselorCalls}
+            scoreStats={snapshot?.counselorScores}
+          />
         </LazySection>
       </div>
     </div>

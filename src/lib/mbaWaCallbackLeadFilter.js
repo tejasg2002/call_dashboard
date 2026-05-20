@@ -5,6 +5,10 @@
 
 import { normalizeLeadFilterList } from './waLeadMongo.js'
 import { normaliseMobile } from './waPhoneMatch.js'
+import { buildWaEventDatePreStages } from './waLeadAnalyticsExpr.js'
+
+/** Legacy Interakt compat values — not NPF traffic channels. */
+const LEGACY_WA_SOURCE_VALUES = new Set(['api', 'campaign'])
 
 /** Mongo path to template-assigned lead stage on ITM_BS Interakt events. */
 export const MBA_WA_CALLBACK_DATA_PATH =
@@ -147,15 +151,184 @@ export async function loadMbaCallbackLeadStages(waCol) {
 }
 
 /**
- * Phones with ≥1 WA event whose callback_data matches picked stages.
+ * Distinct traffic-channel values on top-level `source` (post backfill).
+ * @returns {Promise<string[]>}
  */
-export async function fetchMbaWaPhonesByCallbackStages(waCol, pickedStages, stageGroups) {
+export async function loadMbaInteraktSourceOptions(waCol) {
+  if (!waCol) return []
+  let raw = []
+  try {
+    raw = await waCol.distinct('source', { source: { $nin: [null, ''] } })
+  } catch {
+    return []
+  }
+  return [...new Set(
+    raw
+      .map((s) => String(s ?? '').trim())
+      .filter((s) => s && !LEGACY_WA_SOURCE_VALUES.has(s.toLowerCase())),
+  )].sort((a, b) => a.localeCompare(b))
+}
+
+/** MBA source filter: exact picks match interakt `source` (no CRM primary-map expansion). */
+export function normalizeMbaWaSourcePicks(pickedSources) {
+  return normalizeLeadFilterList(pickedSources)
+}
+
+/**
+ * Phones with ≥1 WA event whose top-level `source` is in picked traffic channels.
+ */
+function buildWaLocationMatch(pickedCities, pickedStates) {
+  const cities = normalizeLeadFilterList(pickedCities)
+  const states = normalizeLeadFilterList(pickedStates)
+  const clauses = []
+  if (cities.length) {
+    clauses.push({ $or: [{ City: { $in: cities } }, { city: { $in: cities } }] })
+  }
+  if (states.length) {
+    clauses.push({ $or: [{ State: { $in: states } }, { state: { $in: states } }] })
+  }
+  if (!clauses.length) return null
+  return clauses.length === 1 ? clauses[0] : { $and: clauses }
+}
+
+async function distinctInteraktField(waCol, fieldCap, fieldLower) {
+  const capPath = '$' + fieldCap
+  const lowerPath = '$' + fieldLower
+  const rows = await waCol
+    .aggregate(
+      [
+        {
+          $match: {
+            $or: [
+              { [fieldCap]: { $nin: [null, ''] } },
+              { [fieldLower]: { $nin: [null, ''] } },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: { $ifNull: [capPath, lowerPath] },
+          },
+        },
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $sort: { _id: 1 } },
+      ],
+      { allowDiskUse: true, maxTimeMS: 60_000 },
+    )
+    .toArray()
+  return rows.map((r) => String(r._id).trim()).filter(Boolean)
+}
+
+/** @returns {Promise<string[]>} */
+export async function loadMbaInteraktCityOptions(waCol) {
+  if (!waCol) return []
+  try {
+    return await distinctInteraktField(waCol, 'City', 'city')
+  } catch {
+    return []
+  }
+}
+
+/** @returns {Promise<string[]>} */
+export async function loadMbaInteraktStateOptions(waCol) {
+  if (!waCol) return []
+  try {
+    return await distinctInteraktField(waCol, 'State', 'state')
+  } catch {
+    return []
+  }
+}
+
+export function normalizeMbaWaLocationPicks(pickedCities, pickedStates) {
+  return {
+    cities: normalizeLeadFilterList(pickedCities),
+    states: normalizeLeadFilterList(pickedStates),
+  }
+}
+
+/**
+ * Phones with ≥1 WA event matching backfilled City / State (AND across dimensions when both set).
+ */
+export async function fetchMbaWaPhonesByWaLocation(
+  waCol,
+  pickedCities,
+  pickedStates,
+  startDate = '',
+  endDate = '',
+) {
+  const locMatch = buildWaLocationMatch(pickedCities, pickedStates)
+  if (!locMatch) return []
+
+  const rows = await waCol
+    .aggregate(
+      [
+        ...buildWaEventDatePreStages(startDate, endDate),
+        { $match: locMatch },
+        {
+          $addFields: {
+            _waPhone: {
+              $ifNull: [
+                '$phone_number',
+                '$data.customer.phone_number',
+                '$data.customer.channel_phone_number',
+              ],
+            },
+          },
+        },
+        { $match: { _waPhone: { $nin: [null, ''] } } },
+        { $group: { _id: '$_waPhone' } },
+      ],
+      { allowDiskUse: true, maxTimeMS: 90_000 },
+    )
+    .toArray()
+
+  return rows.map((r) => r._id).filter(Boolean)
+}
+
+export async function fetchMbaWaPhonesByWaSource(waCol, pickedSources, startDate = '', endDate = '') {
+  const sources = normalizeMbaWaSourcePicks(pickedSources)
+  if (!sources.length) return []
+
+  const rows = await waCol
+    .aggregate(
+      [
+        ...buildWaEventDatePreStages(startDate, endDate),
+        { $match: { source: { $in: sources } } },
+        {
+          $addFields: {
+            _waPhone: {
+              $ifNull: [
+                '$phone_number',
+                '$data.customer.phone_number',
+                '$data.customer.channel_phone_number',
+              ],
+            },
+          },
+        },
+        { $match: { _waPhone: { $nin: [null, ''] } } },
+        { $group: { _id: '$_waPhone' } },
+      ],
+      { allowDiskUse: true, maxTimeMS: 90_000 },
+    )
+    .toArray()
+
+  return rows.map((r) => r._id).filter(Boolean)
+}
+
+export async function fetchMbaWaPhonesByCallbackStages(
+  waCol,
+  pickedStages,
+  stageGroups,
+  startDate = '',
+  endDate = '',
+) {
   const stageMatch = buildMbaWaLeadStageMatch(pickedStages, stageGroups)
   if (!Object.keys(stageMatch).length) return []
 
   const rows = await waCol
     .aggregate(
       [
+      ...buildWaEventDatePreStages(startDate, endDate),
       { $match: stageMatch },
       {
         $addFields: {

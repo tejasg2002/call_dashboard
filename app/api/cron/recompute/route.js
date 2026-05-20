@@ -1,6 +1,6 @@
 /**
- * Vercel Cron Job — recomputes WA + Email dashboard caches every hour.
- * Configured in vercel.json: "schedule": "0 * * * *"
+ * Vercel Cron Job — recomputes WA + Email dashboard caches + MBA lead-filter rollups.
+ * Configure schedule in vercel.json crons (default: every 15 minutes).
  */
 
 import { computeWADashboard } from '../../wa-dashboard/compute'
@@ -9,6 +9,7 @@ import { computeSourceStats } from '../../sourceStats/compute'
 import { computeSmsDashboard } from '../../smsDashboard/compute'
 import { computeCallDashboard } from '../../call-dashboard/compute'
 import { ANALYTICS_WA_DEFINITIONS } from '../../../../src/lib/waWorkspace'
+import { runWaLeadFilterRollupRecompute } from '../../../../src/lib/waLeadFilterRollupJob'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -35,6 +36,14 @@ export async function GET(request) {
       computeCallDashboard({ mode: 'full' }),
     ]
     const results = await Promise.all(waJobs)
+    let leadFilterRollup = null
+    try {
+      leadFilterRollup = await runWaLeadFilterRollupRecompute('mba')
+    } catch (rollupErr) {
+      console.error('[cron/recompute] lead filter rollup', rollupErr)
+      leadFilterRollup = { ok: false, error: rollupErr.message }
+    }
+
     const waMba = results[0]
     const analyticsResults = results.slice(1, 1 + ANALYTICS_WA_DEFINITIONS.length)
     const emailResult = results[1 + ANALYTICS_WA_DEFINITIONS.length]
@@ -61,6 +70,15 @@ export async function GET(request) {
 
     return Response.json({
       ok: true,
+      leadFilterRollup: leadFilterRollup
+        ? {
+            total: leadFilterRollup.total,
+            ok: leadFilterRollup.ok,
+            failed: leadFilterRollup.failed,
+            elapsed: leadFilterRollup.elapsed,
+            completedAt: leadFilterRollup.completedAt,
+          }
+        : null,
       wa,
       email: {
         rawDocCount: emailResult.rawDocCount,

@@ -24,34 +24,12 @@ const METRICS = [
     color: 'brand',
   },
   {
-    key: 'sdr',
-    label: 'Delivery Rate',
-    format: 'percent',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
-      </svg>
-    ),
-    color: 'brand',
-  },
-  {
     key: 'read',
     label: 'Read',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-    color: 'brand',
-  },
-  {
-    key: 'readRate',
-    label: 'Read Rate',
-    format: 'percent',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
       </svg>
     ),
     color: 'brand',
@@ -77,17 +55,6 @@ const METRICS = [
     color: 'amber',
   },
   {
-    key: 'ctr',
-    label: 'CTR',
-    format: 'percent',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
-      </svg>
-    ),
-    color: 'amber',
-  },
-  {
     key: 'failed',
     label: 'Failed',
     icon: (
@@ -97,39 +64,15 @@ const METRICS = [
     ),
     color: 'red',
   },
-  {
-    key: 'failureRate',
-    label: 'Failure Rate',
-    format: 'percent',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-      </svg>
-    ),
-    color: 'red',
-  },
-  {
-    key: 'cost',
-    label: 'Spend',
-    format: 'currency',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    color: 'slate',
-  },
-  {
-    key: 'costPerClick',
-    label: 'Cost / Click',
-    format: 'currency',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-      </svg>
-    ),
-    color: 'slate',
-  },
+]
+
+const RATE_METRICS = [
+  { key: 'sdr', label: 'Delivery Rate', format: 'percent', color: 'brand' },
+  { key: 'readRate', label: 'Read Rate', format: 'percent', color: 'brand' },
+  { key: 'ctr', label: 'CTR', format: 'percent', color: 'amber' },
+  { key: 'failureRate', label: 'Failure Rate', format: 'percent', color: 'red' },
+  { key: 'cost', label: 'Spend', format: 'currency', color: 'slate' },
+  { key: 'costPerClick', label: 'Cost / Click', format: 'currency', color: 'slate' },
 ]
 
 const ICON_STYLES = {
@@ -154,52 +97,56 @@ function fmt(v, format) {
   return typeof v === 'number' ? v.toLocaleString('en-IN') : '0'
 }
 
-export default function WAKpiCards({ kpi, theme }) {
-  const volumeMetrics = METRICS.filter((m) => !m.format)
-  const rateMetrics = METRICS.filter((m) => m.format)
+const rateIcon = (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
+  </svg>
+)
 
+function KpiTile({ icon, label, value, color }) {
   return (
-    <div className="space-y-4">
+    <div
+      className={cn(
+        'rounded-xl border p-4 transition-all duration-200',
+        'bg-white dark:bg-slate-900/60',
+        'border-slate-200/80 dark:border-slate-800',
+        'hover:shadow-card-hover hover:border-slate-300 dark:hover:border-slate-700',
+      )}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', ICON_STYLES[color])}>
+          {icon}
+        </div>
+      </div>
+      <p className={cn('text-xl font-bold font-mono tracking-tight truncate', VALUE_STYLES[color])}>{value}</p>
+      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">{label}</p>
+    </div>
+  )
+}
+
+export default function WAKpiCards({ kpi }) {
+  return (
+    <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-        {volumeMetrics.map((m) => (
-          <div
+        {METRICS.map((m) => (
+          <KpiTile
             key={m.key}
-            className={cn(
-              "rounded-xl border p-4 transition-all duration-200",
-              "bg-white dark:bg-slate-900/60",
-              "border-slate-200/80 dark:border-slate-800",
-              "hover:shadow-card-hover hover:border-slate-300 dark:hover:border-slate-700"
-            )}
-          >
-            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", ICON_STYLES[m.color])}>
-              {m.icon}
-            </div>
-            <p className={cn("text-xl font-bold font-mono tracking-tight", VALUE_STYLES[m.color])}>
-              {fmt(kpi[m.key], m.format)}
-            </p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">{m.label}</p>
-          </div>
+            icon={m.icon}
+            label={m.label}
+            value={fmt(kpi?.[m.key], m.format)}
+            color={m.color}
+          />
         ))}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-        {rateMetrics.map((m) => (
-          <div
+        {RATE_METRICS.map((m) => (
+          <KpiTile
             key={m.key}
-            className={cn(
-              "rounded-xl border p-4 transition-all duration-200",
-              "bg-white dark:bg-slate-900/60",
-              "border-slate-200/80 dark:border-slate-800",
-              "hover:shadow-card-hover hover:border-slate-300 dark:hover:border-slate-700"
-            )}
-          >
-            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", ICON_STYLES[m.color])}>
-              {m.icon}
-            </div>
-            <p className={cn("text-xl font-bold font-mono tracking-tight", VALUE_STYLES[m.color])}>
-              {fmt(kpi[m.key], m.format)}
-            </p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">{m.label}</p>
-          </div>
+            icon={rateIcon}
+            label={m.label}
+            value={fmt(kpi?.[m.key], m.format)}
+            color={m.color}
+          />
         ))}
       </div>
     </div>

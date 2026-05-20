@@ -129,10 +129,55 @@ function computeOverview(calls, { startDate, endDate } = {}) {
   }
 }
 
+/** Only fields used by KPI / counselor stats — avoids multi‑MB Firestore payloads. */
+const CALL_LOG_FIELDS = [
+  'Lead_owner',
+  'scores',
+  'overall_score',
+  'score',
+  'Disposition',
+  'disposition',
+  'lead_stage',
+  'leadStage',
+  'Date',
+  'call_timestamp',
+  'created_at',
+  'createdAt',
+  'call_date',
+  'callDate',
+]
+
 async function fetchAllCallsFromFirestore() {
   const db = getAdminDb()
-  const snapshot = await db.collection(CALLS_COL).get()
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const snapshot = await db.collection(CALLS_COL).select(...CALL_LOG_FIELDS).get()
+  return snapshot.docs.map((doc) => {
+    const data = doc.data()
+    const overall =
+      data.scores?.overall ??
+      (typeof data.overall_score === 'number' ? data.overall_score : null) ??
+      (typeof data.score === 'number' ? data.score : null) ??
+      0
+    const dispositionRaw =
+      data.Disposition?.counselor ?? data.disposition ?? data.counselor_disposition ?? ''
+    return {
+      id: doc.id,
+      Lead_owner: data.Lead_owner,
+      scores: data.scores && typeof data.scores === 'object' ? data.scores : { overall: Number(overall) || 0 },
+      Disposition:
+        data.Disposition && typeof data.Disposition === 'object'
+          ? data.Disposition
+          : dispositionRaw
+            ? { counselor: String(dispositionRaw).toLowerCase().replace(/\s+/g, '_') }
+            : {},
+      lead_stage: data.lead_stage ?? data.leadStage,
+      Date: data.Date,
+      call_timestamp: data.call_timestamp,
+      created_at: data.created_at,
+      createdAt: data.createdAt,
+      call_date: data.call_date,
+      callDate: data.callDate,
+    }
+  })
 }
 
 export async function computeCallDashboard({ mode = 'cached', startDate, endDate } = {}) {

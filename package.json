@@ -11,7 +11,13 @@
     "export:sources-by-course": "node scripts/export-sources-by-course.mjs",
     "export:lead-filter-sources": "node scripts/export-lead-filter-sources.mjs",
     "export:wa-templates": "node scripts/export-wa-templates.mjs",
-    "build:lead-source-primary-map": "node scripts/build-lead-filter-source-primary-map.mjs"
+    "build:lead-source-primary-map": "node scripts/build-lead-filter-source-primary-map.mjs",
+    "backfill:mba-interakt-source": "node scripts/backfill-mba-interakt-source-from-npf-leads.mjs --dry-run",
+    "backfill:mba-interakt-source:apply": "node scripts/backfill-mba-interakt-source-from-npf-leads.mjs --apply",
+    "backfill:mba-interakt-npf": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --dry-run",
+    "backfill:mba-interakt-npf:apply": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --apply",
+    "backfill:mba-interakt-location": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --dry-run --only=city,state",
+    "backfill:mba-interakt-location:apply": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --apply --only=city,state"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

@@ -2,13 +2,14 @@
  * GET /api/wa-lead-analytics
  * Lead-filtered WA template aggregates (MBA / BBA / BTECH / IDM).
  * Phone matching aligns with wa-dashboard/compute.js (_waPhone + variants).
- * Repeat leadStage=… and/or source=… for multi-select (OR within each; AND across dimensions).
+ * Repeat leadStage=…, source=…, city=…, and/or state=… for multi-select (OR within each; AND across dimensions).
  */
 
 import clientPromise from '../../../src/lib/mongodb'
 import { waWorkspaceConfig, normalizeWAWorkspace } from '../../../src/lib/waWorkspace'
-import { waPhoneVariantsForMatch, normaliseMobile } from '../../../src/lib/waPhoneMatch'
+import { normaliseMobile } from '../../../src/lib/waPhoneMatch'
 import { expandLeadFilterSourcePicksForMatch } from '../../../src/lib/leadFilterSourcePrimary.js'
+import { normalizeMbaWaSourcePicks } from '../../../src/lib/mbaWaCallbackLeadFilter.js'
 import {
   buildLeadPhoneExpr,
   leadPhoneStringExpr,
@@ -23,10 +24,16 @@ import {
   MBA_ITM_CRM_STAGE_MATCH_FIELDS,
   mbaItmCrmLeadFilterMatchExtras,
 } from '../../../src/lib/waLeadMongo'
-import { waStageExpr } from '../../../src/lib/waLeadAnalyticsExpr.js'
-import { runMbaLeadFilterApply, LEAD_FILTER_AGG_OPTS } from '../../../src/lib/waLeadFilterMba.js'
+import {
+  runMbaLeadFilterApply,
+  buildDatePreStages,
+  TEMPLATE_GROUP_STAGES,
+} from '../../../src/lib/waLeadFilterMba.js'
+import { LEAD_FILTER_AGG_OPTS } from '../../../src/lib/waLeadFilterAggOpts.js'
+import { aggregateWaByPhoneCohort, fetchCrmPhonesCached } from '../../../src/lib/waLeadCohortPhones.js'
 
 const LATEST_SORT = { createdAt: -1, Updated_Date: -1, updatedAt: -1, _id: -1 }
+const CRM_FETCH_OPTS = { allowDiskUse: true, maxTimeMS: 120_000 }
 
 async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageMatchFields, matchExtras) {
   const match = buildLeadStageSourceMatchInsensitive(leadStagesIn, sourcesIn, stageMatchFields, matchExtras)
@@ -38,26 +45,45 @@ async function fetchCrmPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageM
         { $match: { phone: { $nin: [null, ''] } } },
         { $group: { _id: '$phone' } },
       ],
-      LEAD_FILTER_AGG_OPTS,
+      CRM_FETCH_OPTS,
     )
     .toArray()
   return rows.map((r) => r._id).filter(Boolean)
 }
 
 async function fetchWebhookPhones(col, leadStagesIn, sourcesIn, phoneStrExpr, stageExpr, sourceExpr = leadSourceExpr) {
+  if (leadStagesIn.length === 0 && sourcesIn.length > 0) {
+    const sourceOnlyMatch = buildLeadStageSourceMatchInsensitive([], sourcesIn)
+    const rows = await col
+      .aggregate(
+        [
+          ...(Object.keys(sourceOnlyMatch).length ? [{ $match: sourceOnlyMatch }] : []),
+          { $project: { phone: phoneStrExpr } },
+          { $match: { phone: { $nin: [null, ''] } } },
+          { $group: { _id: '$phone' } },
+        ],
+        LEAD_FILTER_AGG_OPTS,
+      )
+      .toArray()
+    return rows.map((r) => r._id).filter(Boolean)
+  }
+
   const rows = await col
-    .aggregate([
-      { $sort: LATEST_SORT },
-      {
-        $group: {
-          _id: phoneStrExpr,
-          leadStage: { $first: stageExpr },
-          source: { $first: sourceExpr },
+    .aggregate(
+      [
+        { $sort: LATEST_SORT },
+        {
+          $group: {
+            _id: phoneStrExpr,
+            leadStage: { $first: stageExpr },
+            source: { $first: sourceExpr },
+          },
         },
-      },
-      { $match: { _id: { $nin: [null, ''] } } },
-      ...buildGroupedLeadFilterMatch(leadStagesIn, sourcesIn),
-    ])
+        { $match: { _id: { $nin: [null, ''] } } },
+        ...buildGroupedLeadFilterMatch(leadStagesIn, sourcesIn),
+      ],
+      LEAD_FILTER_AGG_OPTS,
+    )
     .toArray()
   return rows.map((r) => r._id).filter(Boolean)
 }
@@ -80,13 +106,17 @@ export async function GET(request) {
     const workspace = normalizeWAWorkspace(searchParams.get('workspace'))
     const pickedLeadStages = normalizeLeadFilterList(searchParams.getAll('leadStage'))
     const pickedSources = normalizeLeadFilterList(searchParams.getAll('source'))
-    const expandedSources = expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
-    let startDate = (searchParams.get('startDate') || '').trim()
-    let endDate = (searchParams.get('endDate') || '').trim()
-
+    const pickedCities = normalizeLeadFilterList(searchParams.getAll('city'))
+    const pickedStates = normalizeLeadFilterList(searchParams.getAll('state'))
     const cfg = waWorkspaceConfig(workspace)
     const isMbaItmCrm = cfg.crmLeadFilterSchema === 'itm_crm_leads'
     const isMbaWaCallback = cfg.leadFilterUsesWaCallbackData === true
+    const mbaSourcesOnWa = cfg.leadFilterSourcesOnWaEvents === true
+    const expandedSources = mbaSourcesOnWa
+      ? normalizeMbaWaSourcePicks(pickedSources)
+      : expandLeadFilterSourcePicksForMatch(workspace, pickedSources)
+    let startDate = (searchParams.get('startDate') || '').trim()
+    let endDate = (searchParams.get('endDate') || '').trim()
 
     if (!cfg.crmSnapshotCollection && !cfg.leadWebhookCollection && !isMbaWaCallback) {
       return Response.json({ error: 'Lead analytics not available for this workspace' }, { status: 400 })
@@ -108,171 +138,80 @@ export async function GET(request) {
 
     if (isMbaWaCallback) {
       const mbaResult = await runMbaLeadFilterApply({
+        client,
         waCol,
-        crmCol,
         pickedLeadStages,
-        expandedSources,
+        waSourcePicks: expandedSources,
+        waCityPicks: pickedCities,
+        waStatePicks: pickedStates,
         startDate,
         endDate,
-        fetchCrmPhones,
-        phoneStrExpr,
-        stageMatchFields,
-        matchExtras,
       })
       return Response.json({
         templateRows: mbaResult.templateRows,
         kpi: mbaResult.kpi,
         totalLeads: mbaResult.totalLeads,
-        phones: mbaResult.phones,
-        filteredBy: { leadStages: pickedLeadStages, sources: pickedSources },
+        paymentConversion: mbaResult.paymentConversion,
+        filteredBy: {
+          leadStages: pickedLeadStages,
+          sources: pickedSources,
+          cities: pickedCities,
+          states: pickedStates,
+        },
       })
     }
 
-    let phones = []
-    let callbackStagePreMatch = null
+    const stageKey = pickedLeadStages.join('\x1f')
+    const sourceKey = expandedSources.join('\x1f')
 
     const [crmPhones, webhookPhones] = await Promise.all([
-      crmCol ? fetchCrmPhones(crmCol, pickedLeadStages, expandedSources, phoneStrExpr, stageMatchFields, matchExtras) : [],
-      webhookCol ? fetchWebhookPhones(webhookCol, pickedLeadStages, expandedSources, phoneStrExpr, stageExpr, sourceExpr) : [],
+      crmCol
+        ? fetchCrmPhonesCached(workspace, stageKey, sourceKey, () =>
+            fetchCrmPhones(crmCol, pickedLeadStages, expandedSources, phoneStrExpr, stageMatchFields, matchExtras),
+          )
+        : [],
+      webhookCol
+        ? fetchWebhookPhones(webhookCol, pickedLeadStages, expandedSources, phoneStrExpr, stageExpr, sourceExpr).then(
+            (raw) => {
+              const seen = new Set()
+              const out = []
+              for (const p of raw) {
+                const n = normaliseMobile(p)
+                if (!n || seen.has(n)) continue
+                seen.add(n)
+                out.push(n)
+              }
+              return out
+            },
+          )
+        : [],
     ])
-    phones = mergePhonesForWaJoin(crmPhones, webhookPhones)
 
-    if (phones.length === 0 && !callbackStagePreMatch) {
+    const normalizedPhones = mergePhonesForWaJoin(crmPhones, webhookPhones)
+
+    if (normalizedPhones.length === 0) {
       const emptyKpi = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, ctr: 0, sdr: 0, str: 0, readRate: 0 }
       return Response.json({
         templateRows: [],
         kpi: emptyKpi,
         totalLeads: 0,
-        phones: [],
         filteredBy: { leadStages: pickedLeadStages, sources: pickedSources },
       })
     }
 
-    const phoneVariants = phones.length > 0 ? waPhoneVariantsForMatch(phones) : []
-    if (phoneVariants.length === 0 && !callbackStagePreMatch) {
-      const emptyKpi = { sent: 0, delivered: 0, read: 0, clicked: 0, failed: 0, ctr: 0, sdr: 0, str: 0, readRate: 0 }
-      return Response.json({
-        templateRows: [],
-        kpi: emptyKpi,
-        totalLeads: phones.length,
-        phones: [],
-        filteredBy: { leadStages: pickedLeadStages, sources: pickedSources },
-      })
+    if (!startDate && !endDate) {
+      const d = new Date()
+      d.setDate(d.getDate() - 14)
+      startDate = d.toISOString().slice(0, 10)
     }
 
-    // Same as wa-dashboard/compute.js nativeDatePreStages: many Interakt rows use createdAt only.
-    const datePreStages = []
-    if (startDate || endDate) {
-      const f = {}
-      if (startDate) f.$gte = new Date(startDate)
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setDate(end.getDate() + 1)
-        f.$lt = end
-      }
-      datePreStages.push({ $match: { $or: [{ event_timestamp: f }, { createdAt: f }] } })
-    }
-
-    const pipeline = [
-      ...(callbackStagePreMatch ? [{ $match: callbackStagePreMatch }] : []),
-      ...datePreStages,
-      {
-        $addFields: {
-          _waPhone: { $ifNull: ['$phone_number', '$data.customer.phone_number'] },
-        },
-      },
-      {
-        $addFields: {
-          _waPhone: { $ifNull: ['$_waPhone', '$data.customer.channel_phone_number'] },
-        },
-      },
-      ...(phoneVariants.length > 0 ? [{ $match: { _waPhone: { $in: phoneVariants } } }] : []),
-      {
-        $addFields: {
-          _waStage: { $ifNull: ['$stage', waStageExpr()] },
-          _templateName: {
-            $ifNull: [
-              '$template_name',
-              {
-                $let: {
-                  vars: {
-                    m: {
-                      $regexFind: {
-                        input: { $ifNull: ['$data.message.raw_template', ''] },
-                        regex: '"name"\\s*:\\s*"([^"]+)"',
-                      },
-                    },
-                  },
-                  in: { $ifNull: [{ $arrayElemAt: ['$$m.captures', 0] }, '(unknown)'] },
-                },
-              },
-            ],
-          },
-        },
-      },
-      {
-        $addFields: {
-          _templateName: { $ifNull: ['$_templateName', '(unknown)'] },
-        },
-      },
-      { $match: { _waStage: { $ne: null } } },
-      {
-        $group: {
-          _id: { template: '$_templateName', phone: '$_waPhone' },
-          stages: { $addToSet: '$_waStage' },
-          firstSeen: { $min: { $ifNull: ['$event_timestamp', '$createdAt'] } },
-          lastSeen: { $max: { $ifNull: ['$event_timestamp', '$createdAt'] } },
-        },
-      },
-      {
-        $group: {
-          _id: '$_id.template',
-          sent: { $sum: { $cond: [{ $in: ['sent', '$stages'] }, 1, 0] } },
-          delivered: { $sum: { $cond: [{ $in: ['delivered', '$stages'] }, 1, 0] } },
-          read: { $sum: { $cond: [{ $in: ['read', '$stages'] }, 1, 0] } },
-          clicked: { $sum: { $cond: [{ $in: ['clicked', '$stages'] }, 1, 0] } },
-          failed: { $sum: { $cond: [{ $in: ['failed', '$stages'] }, 1, 0] } },
-          firstSeen: { $min: '$firstSeen' },
-          lastSeen: { $max: '$lastSeen' },
-        },
-      },
-      {
-        $project: {
-          template_name: '$_id',
-          source: { $literal: 'api' },
-          sent: 1,
-          delivered: 1,
-          read: 1,
-          clicked: 1,
-          failed: 1,
-          firstSeen: 1,
-          lastSeen: 1,
-          ctr: {
-            $cond: [
-              { $gt: ['$delivered', 0] },
-              { $multiply: [{ $divide: ['$clicked', '$delivered'] }, 100] },
-              0,
-            ],
-          },
-          sdr: {
-            $cond: [{ $gt: ['$sent', 0] }, { $multiply: [{ $divide: ['$delivered', '$sent'] }, 100] }, 0],
-          },
-          str: {
-            $cond: [{ $gt: ['$sent', 0] }, { $multiply: [{ $divide: ['$read', '$sent'] }, 100] }, 0],
-          },
-          readRate: {
-            $cond: [
-              { $gt: ['$delivered', 0] },
-              { $multiply: [{ $divide: ['$read', '$delivered'] }, 100] },
-              0,
-            ],
-          },
-        },
-      },
-      { $sort: { sent: -1 } },
-    ]
-
-    const templateRows = await waCol.aggregate(pipeline, LEAD_FILTER_AGG_OPTS).toArray()
+    const { templateRows, totalLeads: cohortLeadCount } = await aggregateWaByPhoneCohort(waCol, {
+      normalizedPhones,
+      datePreStages: buildDatePreStages(startDate, endDate),
+      callbackStagePreMatch: null,
+      templateGroupStages: TEMPLATE_GROUP_STAGES,
+      aggOpts: LEAD_FILTER_AGG_OPTS,
+    })
 
     const kpi = templateRows.reduce(
       (acc, r) => ({
@@ -290,19 +229,10 @@ export async function GET(request) {
     kpi.str = kpi.sent > 0 ? (kpi.read / kpi.sent) * 100 : 0
     kpi.readRate = kpi.delivered > 0 ? (kpi.read / kpi.delivered) * 100 : 0
 
-    const cohortPhoneNormals = [
-      ...new Set(
-        (cohortPhones.length ? cohortPhones : phones)
-          .map((p) => normaliseMobile(p))
-          .filter(Boolean),
-      ),
-    ]
-
     return Response.json({
-      templateRows: templateRows.map((r) => ({ ...r, _id: undefined })),
+      templateRows,
       kpi,
-      totalLeads: cohortPhoneNormals.length || phones.length,
-      phones: cohortPhoneNormals,
+      totalLeads: cohortLeadCount || normalizedPhones.length,
       filteredBy: { leadStages: pickedLeadStages, sources: pickedSources },
     })
   } catch (err) {

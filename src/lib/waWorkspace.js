@@ -73,6 +73,8 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     crmSnapshotCollection: "crmSnapshotBBA",
     leadWebhookCollection: "npfLeadsWebhookEventsBBA",
     leadPhoneField: "registered_mobile",
+    callLogsCollection: "call_logs_bba",
+    smartpingCollection: "smartpingCallsWebhookEventsBBA",
   },
   {
     workspace: "btech",
@@ -88,6 +90,8 @@ export const ANALYTICS_WA_DEFINITIONS = Object.freeze([
     crmSnapshotCollection: "crmSnapshotBTech",
     leadWebhookCollection: "npfLeadsWebhookEventsBTech",
     leadPhoneField: "registered_mobile",
+    callLogsCollection: "call_logs_btech",
+    smartpingCollection: "smartpingCallsWebhookEventsBTech",
   },
   // MBA AI: same ITM_BS Interakt + NPF webhook family as MBA, separate collections.
   {
@@ -213,6 +217,16 @@ export function callLogsCollectionForWorkspace(workspace) {
   if (w === WA_WORKSPACE_BBA) return "call_logs_bba";
   if (w === WA_WORKSPACE_BTECH) return "call_logs_btech";
   if (w === WA_WORKSPACE_MCA) return "call_logs_mca";
+  return null;
+}
+
+/** Mongo `analytics` collection for SmartPing webhook events for this workspace. */
+export function smartpingCollectionForWorkspace(workspace) {
+  const w = normalizeWAWorkspace(workspace);
+  const callOnly = CALL_ONLY_WORKSPACE_DEFINITIONS.find((d) => d.workspace === w);
+  if (callOnly?.smartpingCollection) return callOnly.smartpingCollection;
+  const def = ANALYTICS_WA_DEFINITIONS.find((d) => d.workspace === w);
+  if (def?.smartpingCollection) return def.smartpingCollection;
   return null;
 }
 
@@ -364,5 +378,9 @@ export function waWorkspaceConfig(workspace) {
     crmLeadFilterSchema: "itm_crm_leads",
     /** Lead stage dropdown + stage filter use WA callback_data (template CSV stages). */
     leadFilterUsesWaCallbackData: true,
+    /** Traffic channel on top-level `source` (backfilled from NPF); no CRM/NPF read for source filter. */
+    leadFilterSourcesOnWaEvents: true,
+    /** City / State on top-level Interakt fields (backfilled from NPF). */
+    leadFilterLocationOnWaEvents: true,
   };
 }

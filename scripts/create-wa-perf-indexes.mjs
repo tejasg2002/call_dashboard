@@ -47,9 +47,17 @@ async function indexWaCol(db, col, { mbaCallback = false } = {}) {
   await ensureIndex(c, { event_timestamp: 1 })
   await ensureIndex(c, { stage: 1, event_timestamp: 1 })
   await ensureIndex(c, { createdAt: 1 })
+  await ensureIndex(c, { createdAt: 1, phone_number: 1 })
   await ensureIndex(c, { template_name: 1 })
   await ensureIndex(c, { phone_number: 1 })
+  await ensureIndex(c, { 'data.customer.phone_number': 1 })
   if (mbaCallback) {
+    await ensureIndex(c, { source: 1 })
+    await ensureIndex(c, { source: 1, phone_number: 1 })
+    await ensureIndex(c, { City: 1 })
+    await ensureIndex(c, { State: 1 })
+    await ensureIndex(c, { city: 1 })
+    await ensureIndex(c, { state: 1 })
     await ensureIndex(c, { 'data.message.meta_data.source_data.callback_data': 1 })
     await ensureIndex(c, {
       'data.message.meta_data.source_data.callback_data': 1,
@@ -65,7 +73,9 @@ async function indexCrmLeads() {
   await ensureIndex(c, { 'source.channel': 1 })
   await ensureIndex(c, { '_source.source': 1 })
   await ensureIndex(c, { 'source.utmSource': 1 })
+  await ensureIndex(c, { 'source.channel': 1, 'stage.current': 1 })
 }
+
 
 // 1. itm.marketingwa — firestore_id (used by fetchMarketingwaButtonsByFirestoreId)
 const mwaCol = client.db('itm').collection('marketingwa')

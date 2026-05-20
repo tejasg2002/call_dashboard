@@ -19,7 +19,13 @@ import WAKpiCards from '../../../src/components/wa/WAKpiCards'
 import WATemplatePerformanceTable from '../../../src/components/wa/WATemplatePerformanceTable'
 import WAMessageFunnelChart from '../../../src/components/wa/WAMessageFunnelChart'
 import WACTAPerformanceTable from '../../../src/components/wa/WACTAPerformanceTable'
-import WAFilters from '../../../src/components/wa/WAFilters'
+import WAFilters, {
+  SHOW_LEAD_STAGE_FILTER,
+  SHOW_SOURCE_FILTER,
+  SHOW_CITY_FILTER,
+  SHOW_STATE_FILTER,
+  SHOW_TEMPLATE_EVENT_FILTERS,
+} from '../../../src/components/wa/WAFilters'
 import WACampaignManager from '../../../src/components/wa/WACampaignManager'
 import WACampaignAnalytics from '../../../src/components/wa/WACampaignAnalytics'
 import WAPaymentConversionServer from '../../../src/components/wa/WAPaymentConversionServer'
@@ -38,15 +44,6 @@ function saveCampaigns(c) {
 
 function formatCount(n) {
   return (n || 0).toLocaleString('en-IN')
-}
-
-function leadFilterSectionSuffix(pickedStages, pickedSources) {
-  const st = pickedStages || []
-  const so = pickedSources || []
-  const bits = []
-  if (st.length) bits.push(`stages: ${st.join(', ')}`)
-  if (so.length) bits.push(`sources: ${so.join(', ')}`)
-  return bits.length ? ` (${bits.join(' · ')})` : ''
 }
 
 /** Lead cohort phones from /api/wa-lead-filter (mode=phones) are already normalised. */
@@ -121,6 +118,8 @@ export default function WAApiPage() {
     endDate: '',
     pickedLeadStages: [],
     pickedSources: [],
+    pickedCities: [],
+    pickedStates: [],
   })
   const [campaigns, _setCampaigns] = useState(loadCampaigns)
   const [toast, setToast] = useState(null)
@@ -128,14 +127,17 @@ export default function WAApiPage() {
 
   // ── Lead filter state ──────────────────────────────────────────────────────
   const hasLeadFilter       = LEAD_FILTER_WORKSPACES.has(normalizeWAWorkspace(workspace))
-  const [leadFilterOpts, setLeadFilterOpts]         = useState(null)    // { leadStages, sources }
+  const [leadFilterOpts, setLeadFilterOpts]         = useState(null)    // { leadStages, sources, cities, states }
   const [leadFilterLoading, setLeadFilterLoading]   = useState(false)
   const [leadAnalytics, setLeadAnalytics]           = useState(null)    // result from /api/wa-lead-analytics
   const [leadAnalyticsLoading, setLeadAnalyticsLoading] = useState(false)
   /** Normalised CRM/webhook phones for the active lead filter (same cohort as analytics). */
   const [leadFilterPhoneNormals, setLeadFilterPhoneNormals] = useState(null)
   const isLeadFilterActive =
-    (filters.pickedLeadStages?.length || 0) > 0 || (filters.pickedSources?.length || 0) > 0
+    (SHOW_LEAD_STAGE_FILTER && (filters.pickedLeadStages?.length || 0) > 0) ||
+    (SHOW_SOURCE_FILTER && (filters.pickedSources?.length || 0) > 0) ||
+    (SHOW_CITY_FILTER && (filters.pickedCities?.length || 0) > 0) ||
+    (SHOW_STATE_FILTER && (filters.pickedStates?.length || 0) > 0)
 
   const finishWADashboardFetch = useCallback((requestedWs, data) => {
     const ws = normalizeWAWorkspace(requestedWs)
@@ -161,7 +163,13 @@ export default function WAApiPage() {
     setLeadAnalytics(null)
     setLeadFilterPhoneNormals(null)
     setLeadFilterOpts(null)
-    setFilters((f) => ({ ...f, pickedLeadStages: [], pickedSources: [] }))
+    setFilters((f) => ({
+      ...f,
+      pickedLeadStages: [],
+      pickedSources: [],
+      pickedCities: [],
+      pickedStates: [],
+    }))
   }, [workspace])
 
   // Load lead filter options when workspace supports CRM / webhook lead cohorts
@@ -176,14 +184,14 @@ export default function WAApiPage() {
           console.error('[WAPage] leadFilterOpts:', data.error)
           setToast(`Lead filter options: ${data.error}`)
           setTimeout(() => setToast(null), 8000)
-          setLeadFilterOpts({ leadStages: [], sources: [] })
+          setLeadFilterOpts({ leadStages: [], sources: [], cities: [], states: [] })
           return
         }
         setLeadFilterOpts(data)
       })
       .catch((err) => {
         console.error('[WAPage] leadFilterOpts error:', err)
-        setToast('Could not load lead stage / source options')
+        setToast('Could not load lead stage filter options')
         setTimeout(() => setToast(null), 8000)
       })
       .finally(() => setLeadFilterLoading(false))
@@ -275,13 +283,19 @@ export default function WAApiPage() {
 
     // ── Lead filter: if active, fetch filtered analytics ─────────────────────
     const ws = normalizeWAWorkspace(workspace)
-    const pickedStages = f.pickedLeadStages || []
-    const pickedSrcs = f.pickedSources || []
-    if (hasLeadFilter && (pickedStages.length || pickedSrcs.length)) {
+    const pickedStages = SHOW_LEAD_STAGE_FILTER ? f.pickedLeadStages || [] : []
+    const pickedSrcs = SHOW_SOURCE_FILTER ? f.pickedSources || [] : []
+    const pickedCities = SHOW_CITY_FILTER ? f.pickedCities || [] : []
+    const pickedStates = SHOW_STATE_FILTER ? f.pickedStates || [] : []
+    const leadCohortActive =
+      pickedStages.length || pickedSrcs.length || pickedCities.length || pickedStates.length
+    if (hasLeadFilter && leadCohortActive) {
       setLeadAnalyticsLoading(true)
       const analyticsParams = new URLSearchParams({ workspace: ws })
       for (const v of pickedStages) analyticsParams.append('leadStage', v)
       for (const v of pickedSrcs) analyticsParams.append('source', v)
+      for (const v of pickedCities) analyticsParams.append('city', v)
+      for (const v of pickedStates) analyticsParams.append('state', v)
       if (f.startDate) analyticsParams.set('startDate', f.startDate)
       if (f.endDate) analyticsParams.set('endDate', f.endDate)
 
@@ -290,9 +304,13 @@ export default function WAApiPage() {
         const data = await aRes.json()
         if (!aRes.ok || data.error) throw new Error(data.error || 'Lead analytics failed')
         setLeadAnalytics(data)
-        setLeadFilterPhoneNormals(Array.isArray(data.phones) ? data.phones : [])
-        setToast(`Lead filter: ${data.totalLeads.toLocaleString('en-IN')} leads matched`)
-        setTimeout(() => setToast(null), 5000)
+        setLeadFilterPhoneNormals(null)
+        if (data.totalLeads > 0) {
+          setToast(`Lead filter applied · ${data.totalLeads.toLocaleString('en-IN')} leads`)
+          setTimeout(() => setToast(null), 4000)
+        } else {
+          setToast(null)
+        }
       } catch (err) {
         console.error('[WAPage] lead analytics error:', err)
         setLeadAnalytics(null)
@@ -312,7 +330,9 @@ export default function WAApiPage() {
     // (lead-filtered template/KPI rows come from /api/wa-lead-analytics; refreshing the cache
     // here is redundant and can briefly replace the view or fail workspace checks).
     if (!hasRange) {
-      const leadCohortActive = hasLeadFilter && (pickedStages.length || pickedSrcs.length)
+      const leadCohortActive =
+        hasLeadFilter &&
+        (pickedStages.length || pickedSrcs.length || pickedCities.length || pickedStates.length)
       if (!leadCohortActive) await handleRefresh()
       return
     }
@@ -347,6 +367,9 @@ export default function WAApiPage() {
   )
 
   const paymentConversionForDisplay = useMemo(() => {
+    if (isLeadFilterActive && leadAnalytics?.paymentConversion) {
+      return leadAnalytics.paymentConversion
+    }
     const pc = snapshot?.paymentConversion
     if (!pc) return null
     if (!isLeadFilterActive || !leadAnalytics || !Array.isArray(leadFilterPhoneNormals)) return pc
@@ -391,7 +414,9 @@ export default function WAApiPage() {
       ? (leadAnalytics.templateRows || [])
       : apiTemplateRows
 
-    if (filters.templateName) rows = rows.filter((r) => r.template_name === filters.templateName)
+    if (SHOW_TEMPLATE_EVENT_FILTERS && filters.templateName) {
+      rows = rows.filter((r) => r.template_name === filters.templateName)
+    }
     if (!isLeadFilterActive || !leadAnalytics) {
       // Date slicing only needed on snapshot rows (lead analytics already respects dates)
       if (hasDates && filters.startDate) {
@@ -498,40 +523,7 @@ export default function WAApiPage() {
           leadFilterOpts={leadFilterOpts}
           leadFilterLoading={leadFilterLoading}
         />
-        {/* Lead filter active banner */}
-        {isLeadFilterActive && leadAnalytics && (
-          <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm ${
-            isDark
-              ? 'bg-brand-900/20 border-brand-700/40 text-brand-300'
-              : 'bg-brand-50 border-brand-200 text-brand-700'
-          }`}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span className="font-medium">
-              Showing data for{' '}
-              <strong>{leadAnalytics.totalLeads.toLocaleString('en-IN')} leads</strong>
-              {(filters.pickedLeadStages || []).length > 0 && (
-                <>
-                  {' '}
-                  in stage{(filters.pickedLeadStages || []).length > 1 ? 's' : ''}{' '}
-                  <strong>{(filters.pickedLeadStages || []).join(' · ')}</strong>
-                </>
-              )}
-              {(filters.pickedSources || []).length > 0 && (
-                <>
-                  {' '}
-                  from source{(filters.pickedSources || []).length > 1 ? 's' : ''}{' '}
-                  <strong>{(filters.pickedSources || []).join(' · ')}</strong>
-                </>
-              )}
-            </span>
-            {leadAnalyticsLoading && (
-              <span className="ml-auto inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            )}
-          </div>
-        )}
-        {leadAnalyticsLoading && !leadAnalytics && (
+        {leadAnalyticsLoading && isLeadFilterActive && !leadAnalytics && (
           <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             <span className="inline-block w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
             Loading lead-filtered analytics…
@@ -574,11 +566,7 @@ export default function WAApiPage() {
           <div className="space-y-4">
             <SectionHeader
               title="Template Performance"
-              description={
-                isLeadFilterActive && leadAnalytics
-                  ? `${filteredTemplateRows.length} templates · filtered to ${leadAnalytics.totalLeads.toLocaleString('en-IN')} leads${leadFilterSectionSuffix(filters.pickedLeadStages, filters.pickedSources)}`
-                  : `${filteredTemplateRows.length} templates tracked across all API messages`
-              }
+              description={`${filteredTemplateRows.length} templates tracked across all API messages`}
               isDark={isDark}
             />
 
