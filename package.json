@@ -17,7 +17,8 @@
     "backfill:mba-interakt-npf": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --dry-run",
     "backfill:mba-interakt-npf:apply": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --apply",
     "backfill:mba-interakt-location": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --dry-run --only=city,state",
-    "backfill:mba-interakt-location:apply": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --apply --only=city,state"
+    "backfill:mba-interakt-location:apply": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --apply --only=city,state",
+    "backfill:mba-interakt-location:verify": "node scripts/backfill-mba-interakt-from-npf-leads.mjs --verify --only=city,state"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
